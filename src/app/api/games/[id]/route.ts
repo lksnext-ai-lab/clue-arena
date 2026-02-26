@@ -88,9 +88,11 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     })
   );
 
-  // Only show envelope when game is finished
-  let sobre = undefined;
-  if (partida.estado === 'finalizada') {
+  const isAdmin = requestingUser?.rol === 'admin';
+
+  // Admin: always see envelope. Public: only when finalizada.
+  let sobre: { sospechoso: string; arma: string; habitacion: string } | undefined;
+  if (isAdmin || partida.estado === 'finalizada') {
     const envelopeRow = await db
       .select()
       .from(sobres)
@@ -110,17 +112,29 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     nombre: partida.nombre,
     estado: partida.estado,
     turnoActual: partida.turnoActual,
+    modoEjecucion: partida.modoEjecucion,
+    autoRunActivoDesde: partida.autoRunActivoDesde?.toISOString() ?? null,
     createdAt: partida.createdAt?.toISOString() ?? null,
     startedAt: partida.startedAt?.toISOString() ?? null,
     finishedAt: partida.finishedAt?.toISOString() ?? null,
-    equipos: gameTeams.map(({ pe, e }) => ({
-      id: pe.id,
-      equipoId: pe.equipoId,
-      equipoNombre: e.nombre,
-      orden: pe.orden,
-      eliminado: pe.eliminado,
-      puntos: pe.puntos,
-    })),
+    // numCartas is always public; cartas (values) only for admin or own team
+    equipos: gameTeams.map(({ pe, e }) => {
+      const cartasArray = JSON.parse(pe.cartas ?? '[]') as string[];
+      return {
+        id: pe.id,
+        equipoId: pe.equipoId,
+        equipoNombre: e.nombre,
+        orden: pe.orden,
+        eliminado: pe.eliminado,
+        puntos: pe.puntos,
+        numCartas: cartasArray.length,
+        ...(isAdmin
+          ? { cartas: cartasArray }
+          : pe.equipoId === (session?.user as any)?.equipo?.id
+            ? { cartas: cartasArray }
+            : {}),
+      };
+    }),
     turnos: enrichedTurnos,
     sobre,
   });

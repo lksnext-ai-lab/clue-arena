@@ -1,0 +1,138 @@
+'use client';
+
+import { useMemo, useState } from 'react';
+import { cn } from '@/lib/utils/cn';
+import {
+  buildDeductionBoard,
+  boardKey,
+  ALL_CARDS,
+  SOSPECHOSOS,
+  ARMAS,
+  HABITACIONES,
+  type CardCategory,
+} from '@/lib/utils/deduction-board';
+import type { GameDetailResponse } from '@/types/api';
+
+interface ArenaDeductionBoardProps {
+  partida: GameDetailResponse;
+}
+
+const CATEGORY_LABELS: Record<CardCategory, string> = {
+  sospechoso: 'SOSPECHOSOS',
+  arma: 'ARMAS',
+  habitacion: 'HABITACIONES',
+};
+
+const SECTIONS: { category: CardCategory; cards: readonly string[] }[] = [
+  { category: 'sospechoso', cards: SOSPECHOSOS },
+  { category: 'arma', cards: ARMAS },
+  { category: 'habitacion', cards: HABITACIONES },
+];
+
+/** Abbreviate team name to 8 chars */
+function abbrev(name: string): string {
+  return name.length > 8 ? name.slice(0, 7) + '…' : name;
+}
+
+interface TooltipProps { text: string; children: React.ReactNode }
+function Tooltip({ text, children }: TooltipProps) {
+  const [visible, setVisible] = useState(false);
+  return (
+    <span
+      className="relative"
+      onMouseEnter={() => setVisible(true)}
+      onMouseLeave={() => setVisible(false)}
+    >
+      {children}
+      {visible && (
+        <span className="absolute z-10 bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2 py-1 rounded bg-slate-900 border border-slate-600 text-xs text-slate-200 whitespace-nowrap pointer-events-none shadow-lg">
+          {text}
+        </span>
+      )}
+    </span>
+  );
+}
+
+export function ArenaDeductionBoard({ partida }: ArenaDeductionBoardProps) {
+  const equipoIds = partida.equipos.map((e) => e.equipoId);
+
+  const board = useMemo(
+    () => buildDeductionBoard(partida.turnos ?? [], partida.equipos.map((e) => e.equipoId)),
+    // Re-run when turns or team list changes (deep comparison via JSON.stringify below)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [JSON.stringify(partida.turnos?.map((t) => t.id)), JSON.stringify(equipoIds)]
+  );
+
+  return (
+    <div className="rounded-xl border border-slate-700 bg-slate-800 p-4 overflow-x-auto">
+      <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">
+        Tablero de deducción
+      </h2>
+
+      <table className="min-w-full text-xs border-collapse">
+        <thead>
+          <tr>
+            {/* Card name column */}
+            <th className="text-left text-slate-500 font-medium pb-2 pr-4 w-36">Carta</th>
+            {partida.equipos.map((e) => (
+              <th key={e.equipoId} className="pb-2 px-1 text-center min-w-[3rem]">
+                <span
+                  className={cn(
+                    'block font-medium',
+                    e.eliminado ? 'text-slate-600 line-through' : 'text-slate-300'
+                  )}
+                >
+                  {abbrev(e.equipoNombre)}
+                </span>
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {SECTIONS.map(({ category, cards }) => (
+            <>
+              {/* Section header row */}
+              <tr key={`header-${category}`}>
+                <td
+                  colSpan={partida.equipos.length + 1}
+                  className="pt-3 pb-1 text-xs font-semibold text-slate-500 uppercase tracking-widest"
+                >
+                  {CATEGORY_LABELS[category]}
+                </td>
+              </tr>
+
+              {cards.map((card) => (
+                <tr key={card} className="border-t border-slate-700/40">
+                  <td className="py-1 pr-4 text-slate-400 whitespace-nowrap">{card}</td>
+                  {partida.equipos.map((e) => {
+                    const cell = board.get(boardKey(e.equipoId, card));
+                    const seen = cell && cell.turnos.length > 0;
+                    return (
+                      <td key={e.equipoId} className="py-1 px-1 text-center">
+                        {seen ? (
+                          <Tooltip text={`T${cell!.turnos.join(', T')}`}>
+                            <span className="inline-block w-5 h-5 rounded bg-cyan-500/20 text-cyan-300 leading-5 cursor-default select-none">
+                              ✦
+                            </span>
+                          </Tooltip>
+                        ) : (
+                          <span className="inline-block w-5 h-5 rounded bg-slate-700/50 text-slate-600 leading-5 select-none text-center">
+                            ·
+                          </span>
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </>
+          ))}
+        </tbody>
+      </table>
+
+      {(partida.turnos ?? []).length === 0 && (
+        <p className="text-slate-600 text-xs mt-3">La partida no ha comenzado todavía.</p>
+      )}
+    </div>
+  );
+}

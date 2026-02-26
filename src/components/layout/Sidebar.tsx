@@ -38,7 +38,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/dashboard',       Icon: LayoutDashboard, labelKey: 'dashboard', roles: ['admin', 'equipo', 'espectador'] },
   { href: '/equipo',          Icon: Users,           labelKey: 'miEquipo',  roles: ['equipo'] },
   { href: '/admin',           Icon: Shield,          labelKey: 'admin',     roles: ['admin'] },
-  { href: '/arena',           Icon: Swords,          labelKey: 'arena',     roles: ['admin', 'equipo'] },
+  { href: '/arena',           Icon: Swords,          labelKey: 'arena',     roles: ['admin', 'equipo', 'espectador'] },
   { href: '/dashboard/juego', Icon: BookOpen,        labelKey: 'juego',     roles: ['admin', 'equipo', 'espectador'] },
   { href: '/ranking',         Icon: Trophy,          labelKey: 'ranking',   roles: ['admin', 'equipo', 'espectador'] },
 ];

@@ -38,6 +38,8 @@ export interface GameResponse {
   nombre: string;
   estado: GameStatus;
   turnoActual: number;
+  modoEjecucion: 'manual' | 'auto' | 'pausado';
+  autoRunActivoDesde: string | null;
   equipos: GameTeamResponse[];
   createdAt: string;
   startedAt: string | null;
@@ -51,12 +53,30 @@ export interface GameTeamResponse {
   orden: number;
   eliminado: boolean;
   puntos: number;
-  cartas?: string[]; // Solo para el equipo propietario
+  numCartas: number;   // Recuento público de cartas
+  cartas?: string[];   // Solo para el equipo propietario o admin
+}
+
+// --- Arena (F009) ---
+
+export interface ArenaActionRecord {
+  turno: number;
+  equipoId: string;
+  equipoNombre: string;
+  tipo: 'suggestion' | 'accusation' | 'pass';
+  sospechoso?: string;
+  arma?: string;
+  habitacion?: string;
+  refutadaPor?: string | null;     // equipoId (nunca la carta)
+  refutadaPorNombre?: string | null;
+  correcta?: boolean;              // Para acusaciones
+  deltaPoints?: number;
+  timestamp: string;
 }
 
 export interface GameDetailResponse extends GameResponse {
   turnos: TurnResponse[];
-  sobre?: EnvelopeResponse; // Solo cuando finalizada
+  sobre?: EnvelopeResponse; // Admin: siempre; Público: solo cuando finalizada
 }
 
 export interface TurnResponse {

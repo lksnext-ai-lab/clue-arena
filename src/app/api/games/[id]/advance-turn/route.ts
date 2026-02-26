@@ -16,6 +16,10 @@ import { NextResponse } from 'next/server';
 import { getAuthSession } from '@/lib/auth/session';
 import { advanceTurn, CoordinatorError } from '@/lib/game/coordinator';
 
+import { db } from '@/lib/db';
+import { partidas } from '@/lib/db/schema';
+import { eq } from 'drizzle-orm';
+
 export async function POST(
   _req: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -25,6 +29,21 @@ export async function POST(
   const session = await getAuthSession();
   if (!session?.user || session.user.rol !== 'admin') {
     return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 });
+  }
+
+  // Verify game state and mode
+  const partida = await db.select().from(partidas).where(eq(partidas.id, id)).get();
+  if (!partida) {
+    return NextResponse.json({ error: 'Partida no encontrada' }, { status: 404 });
+  }
+  if (partida.estado !== 'en_curso') {
+    return NextResponse.json({ error: 'La partida no está en curso' }, { status: 409 });
+  }
+  if (partida.modoEjecucion !== 'manual' && partida.modoEjecucion !== 'pausado') {
+    return NextResponse.json(
+      { error: 'La partida está en modo auto. Usa /pause antes de avanzar manualmente.' },
+      { status: 409 },
+    );
   }
 
   try {

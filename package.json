@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.7.4",
+    "@cfworker/json-schema": "^4.1.1",
     "@genkit-ai/googleai": "^1.28.0",
     "@hookform/resolvers": "^3.10.0",
     "@modelcontextprotocol/sdk": "^1.6.1",

@@ -1,7 +1,20 @@
+/**
+ * POST /api/games/:id/stop
+ *
+ * Manually finishes a game in any non-final state.
+ *
+ * - Idempotent: if already `finalizada` → 200.
+ * - Sets `modoEjecucion = 'manual'` first so any running auto-run loop stops.
+ * - Closes active turns with `estado = 'interrumpido'`.
+ * - Persists `finishedAt`.
+ *
+ * Auth: admin only.
+ */
+
 import { NextResponse } from 'next/server';
 import { getAuthSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
-import { partidas, turnos } from '@/lib/db/schema';
+import { partidas, turnos, sobres } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 
 // POST /api/games/:id/stop
@@ -17,11 +30,34 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     return NextResponse.json({ error: 'Partida no encontrada' }, { status: 404 });
   }
 
-  if (partida.estado !== 'en_curso') {
-    return NextResponse.json({ error: 'La partida no está en curso' }, { status: 409 });
+  // Idempotent: already finished
+  if (partida.estado === 'finalizada') {
+    const sobre = await db.select().from(sobres).where(eq(sobres.partidaId, id)).get();
+    return NextResponse.json({
+      id,
+      estado: 'finalizada',
+      sobre: sobre
+        ? { sospechoso: sobre.sospechoso, arma: sobre.arma, habitacion: sobre.habitacion }
+        : undefined,
+    });
   }
 
-  // Mark all in-progress turns as completed
+  if (partida.estado === 'pendiente') {
+    return NextResponse.json(
+      { error: 'La partida está pendiente; no se puede detener. Elimínala si procede.' },
+      { status: 409 },
+    );
+  }
+
+  const now = new Date();
+
+  // Set modoEjecucion=manual first so any running auto-run loop stops at the next iteration
+  await db
+    .update(partidas)
+    .set({ modoEjecucion: 'manual' })
+    .where(eq(partidas.id, id));
+
+  // Interrupt active turns
   const activeTurns = await db
     .select()
     .from(turnos)
@@ -31,15 +67,23 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   for (const turn of activeTurns) {
     await db
       .update(turnos)
-      .set({ estado: 'completado', finishedAt: new Date() })
+      .set({ estado: 'interrumpido', finishedAt: now })
       .where(eq(turnos.id, turn.id));
   }
 
   // Mark game as finished
   await db
     .update(partidas)
-    .set({ estado: 'finalizada', finishedAt: new Date() })
+    .set({ estado: 'finalizada', finishedAt: now })
     .where(eq(partidas.id, id));
 
-  return NextResponse.json({ success: true, estado: 'finalizada' });
+  const sobre = await db.select().from(sobres).where(eq(sobres.partidaId, id)).get();
+
+  return NextResponse.json({
+    id,
+    estado: 'finalizada',
+    sobre: sobre
+      ? { sospechoso: sobre.sospechoso, arma: sobre.arma, habitacion: sobre.habitacion }
+      : undefined,
+  });
 }

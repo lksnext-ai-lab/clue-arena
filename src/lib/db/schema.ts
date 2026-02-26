@@ -82,7 +82,7 @@ export const turnos = sqliteTable('turnos', {
     .references(() => equipos.id)
     .notNull(),
   numero: integer('numero').notNull(),
-  estado: text('estado', { enum: ['pendiente', 'en_curso', 'completado'] })
+  estado: text('estado', { enum: ['pendiente', 'en_curso', 'completado', 'interrumpido'] })
     .notNull()
     .default('pendiente'),
   startedAt: integer('started_at', { mode: 'timestamp' }),
