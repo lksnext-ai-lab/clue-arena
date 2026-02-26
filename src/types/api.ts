@@ -116,3 +116,60 @@ export interface ApiError {
 export interface ValidationError {
   errors: Record<string, string[]>;
 }
+
+// --- Agent contract (shared by MattinAI backend and local Genkit backend) ---
+
+export interface PlayTurnRequest {
+  type: 'play_turn';
+  gameId: string;
+  teamId: string;
+}
+
+export interface RefuteRequest {
+  type: 'refute';
+  gameId: string;
+  teamId: string;
+  suspect: string;
+  weapon: string;
+  room: string;
+}
+
+export type AgentRequest = PlayTurnRequest | RefuteRequest;
+
+export interface SuggestionAction {
+  type: 'suggestion';
+  suspect: string;
+  weapon: string;
+  room: string;
+}
+
+export interface AccusationAction {
+  type: 'accusation';
+  suspect: string;
+  weapon: string;
+  room: string;
+}
+
+export interface ShowCardAction {
+  type: 'show_card';
+  card: string;
+}
+
+export interface CannotRefuteAction {
+  type: 'cannot_refute';
+}
+
+export type AgentAction =
+  | SuggestionAction
+  | AccusationAction
+  | ShowCardAction
+  | CannotRefuteAction;
+
+export interface AgentResponse {
+  /** Structured action that the game engine applies */
+  action: AgentAction;
+  /** LLM reasoning text (for logs/debug) */
+  reasoning: string;
+  /** Always true; allows future streaming extension */
+  done: boolean;
+}

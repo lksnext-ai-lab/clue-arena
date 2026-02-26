@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.7.4",
+    "@genkit-ai/googleai": "^1.28.0",
     "@hookform/resolvers": "^3.10.0",
     "@modelcontextprotocol/sdk": "^1.6.1",
     "@radix-ui/react-dialog": "^1.1.6",
@@ -31,6 +32,8 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "drizzle-orm": "^0.39.3",
+    "genkit": "^1.29.0",
+    "genkitx-ollama": "^1.29.0",
     "lucide-react": "^0.479.0",
     "next": "^15.5.12",
     "next-auth": "5.0.0-beta.25",

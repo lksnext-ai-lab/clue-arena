@@ -14,15 +14,12 @@
 
 import Database from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
-import { readFileSync } from 'fs';
+import { readFileSync, readdirSync } from 'fs';
 import { resolve } from 'path';
 import * as schema from '@/lib/db/schema';
 
-/** Path to the consolidated migration SQL that defines the whole schema. */
-const MIGRATION_SQL = resolve(
-  __dirname,
-  '../../src/lib/db/migrations/0000_clean_gamora.sql',
-);
+/** Directory that contains all Drizzle migration SQL files. */
+const MIGRATIONS_DIR = resolve(__dirname, '../../src/lib/db/migrations');
 
 /**
  * Apply all Drizzle migrations contained in a single SQL file.
@@ -61,7 +58,13 @@ export function createTestDb(): TestDb {
   sqlite.pragma('foreign_keys = ON');
   sqlite.pragma('journal_mode = MEMORY');
 
-  applyMigrations(sqlite, MIGRATION_SQL);
+  // Apply all migrations in alphabetical order
+  const migrationFiles = readdirSync(MIGRATIONS_DIR)
+    .filter((f) => f.endsWith('.sql'))
+    .sort();
+  for (const file of migrationFiles) {
+    applyMigrations(sqlite, resolve(MIGRATIONS_DIR, file));
+  }
 
   const db = drizzle(sqlite, { schema });
 

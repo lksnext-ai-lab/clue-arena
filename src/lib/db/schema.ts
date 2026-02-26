@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, real } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, real, primaryKey } from 'drizzle-orm/sqlite-core';
 import { relations } from 'drizzle-orm';
 
 // --- usuarios ---
@@ -34,6 +34,12 @@ export const partidas = sqliteTable('partidas', {
     .notNull()
     .default('pendiente'),
   turnoActual: integer('turno_actual').notNull().default(0),
+  // Execution mode for auto-run (F007)
+  modoEjecucion: text('modo_ejecucion', { enum: ['manual', 'auto', 'pausado'] })
+    .notNull()
+    .default('manual'),
+  turnoDelayMs: integer('turno_delay_ms').notNull().default(3000),
+  autoRunActivoDesde: integer('auto_run_activo_desde', { mode: 'timestamp' }),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
   startedAt: integer('started_at', { mode: 'timestamp' }),
   finishedAt: integer('finished_at', { mode: 'timestamp' }),
@@ -169,6 +175,20 @@ export const sugerenciasRelations = relations(sugerencias, ({ one }) => ({
   partida: one(partidas, { fields: [sugerencias.partidaId], references: [partidas.id] }),
   equipo: one(equipos, { fields: [sugerencias.equipoId], references: [equipos.id] }),
 }));
+
+// --- agent_memories (local Genkit agent persistent deduction state) ---
+export const agentMemories = sqliteTable(
+  'agent_memories',
+  {
+    gameId: text('game_id').notNull(),
+    teamId: text('team_id').notNull(),
+    memoryJson: text('memory_json').notNull().default('{}'),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.gameId, t.teamId] }),
+  })
+);
 
 export const acusacionesRelations = relations(acusaciones, ({ one }) => ({
   turno: one(turnos, { fields: [acusaciones.turnoId], references: [turnos.id] }),
