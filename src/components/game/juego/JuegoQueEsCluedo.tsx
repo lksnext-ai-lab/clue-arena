@@ -1,3 +1,5 @@
+import Image from 'next/image';
+
 export function JuegoQueEsCluedo() {
   return (
     <section aria-labelledby="cluedo-heading">
@@ -48,22 +50,18 @@ export function JuegoQueEsCluedo() {
           </div>
         </div>
 
-        {/* Image column */}
+        {/* Image column — escenarios */}
         <div>
-          <div
-            className="relative w-full overflow-hidden rounded-xl border border-slate-700/50"
-            style={{ height: 280 }}
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/game/juego-mecanica.jpg"
-              alt="Diagrama de mecánica de juego Cluedo"
-              style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top' }}
+          <div className="relative w-full rounded-lg overflow-hidden border border-slate-700/50">
+            <Image
+              src="/game/escena.png"
+              alt="Escenarios del crimen — Clue Arena"
+              width={800}
+              height={600}
+              unoptimized
+              className="w-full h-auto object-cover"
             />
           </div>
-          <p className="text-xs text-slate-600 mt-1 text-center">
-            Assets gráficos del evento Clue Arena
-          </p>
         </div>
       </div>
     </section>

@@ -1,18 +1,22 @@
 /**
- * Auto-run loop for Clue Arena (F007 — §5.3).
+ * Auto-run loop para Clue Arena (F007 — §5.3).
  *
- * `startAutoRun` is a **fire-and-forget** function:
- * the Route Handler calls it without `await` and immediately returns 202.
+ * `startAutoRun` es la función awaitable que ejecuta el loop de turnos.
+ * Puede usarse directamente en tests (awaitable) o a través de GameRunner
+ * (runner.ts) para producción (fire-and-forget, con AbortController).
  *
- * The loop:
- *  1. Reads `partidas.modoEjecucion` before EVERY turn.
- *  2. Stops if the game is 'finalizada' or `modoEjecucion` ≠ 'auto'.
- *  3. Delegates each turn to `advanceTurn` (coordinator).
- *  4. Clears `autoRunActivoDesde` when the loop ends.
+ * El loop:
+ *  1. Comprueba `partidas.modoEjecucion` antes de CADA turno.
+ *  2. Para si la partida es 'finalizada' o `modoEjecucion` ≠ 'auto'.
+ *  3. Para si el AbortSignal (del GameRunner) está abortado.
+ *  4. Delega cada turno a `advanceTurn` (coordinator).
+ *  5. Limpia `autoRunActivoDesde` al terminar.
  *
- * Guarantees:
- *  - A turn in progress is NEVER interrupted; the pause check runs between turns.
- *  - Only one loop per game at a time (callers must verify `autoRunActivoDesde`).
+ * Garantías:
+ *  - Un turno en curso NO se interrumpe nunca; la comprobación de pausa
+ *    ocurre ENTRE turnos.
+ *  - El AbortSignal cancela el sleep inter-turno inmediatamente.
+ *  - Solo un loop por partida a la vez (el caller debe verificar `autoRunActivoDesde`).
  */
 
 import { db } from '@/lib/db';
@@ -28,8 +32,24 @@ export type { AdvanceTurnResult, CoordinatorError } from './coordinator';
 // Helpers
 // ---------------------------------------------------------------------------
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new DOMException('Aborted', 'AbortError'));
+      return;
+    }
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(new DOMException('Aborted', 'AbortError'));
+    };
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+    if (signal) {
+      signal.addEventListener('abort', onAbort, { once: true });
+    }
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -37,15 +57,21 @@ function sleep(ms: number): Promise<void> {
 // ---------------------------------------------------------------------------
 
 /**
- * Run turns in a loop until the game is `finalizada` or `modoEjecucion` ≠ 'auto'.
+ * Ejecuta turnos en bucle hasta que la partida sea `finalizada`,
+ * `modoEjecucion` ≠ 'auto', o el AbortSignal sea señalizado.
  *
- * @param gameId  The ID of the game to run.
- * @param delayMs Milliseconds to wait between turns (default 3000).
+ * @param gameId   ID de la partida.
+ * @param delayMs  Milisegundos entre turnos (por defecto 3000).
+ * @param signal   AbortSignal opcional del GameRunner para cancelación inmediata.
  */
-export async function startAutoRun(gameId: string, delayMs = 3000): Promise<void> {
+export async function startAutoRun(
+  gameId: string,
+  delayMs = 3000,
+  signal?: AbortSignal,
+): Promise<void> {
   try {
-    while (true) {
-      // ── 1. Check game state before each turn ──────────────────────────────
+    while (!signal?.aborted) {
+      // ── 1. Verificar estado antes de cada turno ────────────────────────────
       const partida = await db
         .select({
           estado: partidas.estado,
@@ -55,32 +81,34 @@ export async function startAutoRun(gameId: string, delayMs = 3000): Promise<void
         .where(eq(partidas.id, gameId))
         .get();
 
-      if (!partida) break; // Game deleted
-      if (partida.modoEjecucion !== 'auto') break; // Pause or manual change
-      if (partida.estado === 'finalizada') break; // Game already finished
+      if (!partida) break; // partida eliminada
+      if (partida.modoEjecucion !== 'auto') break; // pausada o manual
+      if (partida.estado === 'finalizada') break;
 
-      // ── 2. Execute one turn ───────────────────────────────────────────────
+      // ── 2. Ejecutar un turno ───────────────────────────────────────────────
       const result = await advanceTurn(gameId);
 
       if (result.gameOver) break;
 
-      // ── 3. Wait between turns ─────────────────────────────────────────────
+      // ── 3. Esperar entre turnos (cancelable con AbortSignal) ───────────────
       if (delayMs > 0) {
-        await sleep(delayMs);
+        try {
+          await sleep(delayMs, signal);
+        } catch {
+          break; // AbortError → salir limpiamente
+        }
       }
     }
   } catch {
-    // Errors during auto-run are swallowed (fire-and-forget).
-    // The game state in the DB remains consistent because each advanceTurn
-    // is transactionally safe. An admin can resume or inspect from the UI.
+    // Errores en advanceTurn son tragados (fire-and-forget).
+    // El estado en BD sigue siendo consistente porque cada advanceTurn
+    // es atómico. El admin puede reanudar o inspeccionar desde la UI.
   } finally {
-    // Clear the active sentinel regardless of how the loop ended
+    // Limpiar el sentinel de la BD (best-effort)
     await db
       .update(partidas)
       .set({ autoRunActivoDesde: null })
       .where(eq(partidas.id, gameId))
-      .catch(() => {
-        // Best-effort; don't throw from finally
-      });
+      .catch(() => {});
   }
 }

@@ -43,13 +43,6 @@ const OBJETIVO_ITEMS: ObjetivoItem[] = [
   },
 ];
 
-const KPI_ITEMS: KpiItem[] = [
-  { label: 'Equipos que completan ≥ 1 partida', valor: '≥ 80%' },
-  { label: 'Partidas sin error técnico', valor: '≥ 95%' },
-  { label: 'Puntuación media encuesta post-evento', valor: '≥ 4 / 5' },
-  { label: 'NPS del evento', valor: '≥ 30' },
-];
-
 export function JuegoObjetivos() {
   return (
     <section aria-labelledby="objetivos-heading">
@@ -73,19 +66,6 @@ export function JuegoObjetivos() {
             </div>
             <p className="text-sm font-semibold text-white mt-2 mb-1">{titulo}</p>
             <p className="text-xs text-slate-400 leading-relaxed">{descripcion}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* KPI strip */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-5">
-        {KPI_ITEMS.map(({ label, valor }) => (
-          <div
-            key={label}
-            className="bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 flex items-center justify-between gap-3"
-          >
-            <span className="text-xs text-slate-400 leading-tight">{label}</span>
-            <span className="text-sm font-bold text-cyan-400 shrink-0">{valor}</span>
           </div>
         ))}
       </div>

@@ -1,0 +1,1 @@
+ALTER TABLE `partidas` ADD `max_turnos` integer;

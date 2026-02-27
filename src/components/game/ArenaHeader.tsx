@@ -38,7 +38,10 @@ function statusBadge(estado: string) {
 
 function activeTeamName(partida: GameDetailResponse): string | null {
   if (partida.estado !== 'en_curso') return null;
-  const active = partida.equipos.filter((e) => !e.eliminado);
+  // Sort by orden to match coordinator's team-selection logic
+  const active = [...partida.equipos]
+    .filter((e) => !e.eliminado)
+    .sort((a, b) => a.orden - b.orden);
   if (active.length === 0) return null;
   const idx = partida.turnoActual % active.length;
   return active[idx]?.equipoNombre ?? null;
@@ -46,12 +49,19 @@ function activeTeamName(partida: GameDetailResponse): string | null {
 
 export function ArenaHeader({ partida, isAdmin, isSyncing, onRefresh }: ArenaHeaderProps) {
   const [busy, setBusy] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   async function callAction(action: string) {
     setBusy(action);
+    setActionError(null);
     try {
       await apiFetch(`/games/${partida.id}/${action}`, { method: 'POST' });
       onRefresh();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Error desconocido';
+      setActionError(msg);
+      // Auto-dismiss after 6 s
+      setTimeout(() => setActionError(null), 6_000);
     } finally {
       setBusy(null);
     }
@@ -69,7 +79,7 @@ export function ArenaHeader({ partida, isAdmin, isSyncing, onRefresh }: ArenaHea
   const isRunning = partida.estado === 'en_curso';
   const isAuto = partida.modoEjecucion === 'auto';
   const isPaused = partida.modoEjecucion === 'pausado';
-  const estimatedMax = partida.equipos.length * 12; // rough estimate
+  const configuredMax = partida.maxTurnos ?? null;
 
   return (
     <div className="rounded-xl border border-slate-700 bg-slate-800 p-4">
@@ -90,8 +100,8 @@ export function ArenaHeader({ partida, isAdmin, isSyncing, onRefresh }: ArenaHea
         {/* Turn info */}
         {isRunning && (
           <div className="text-sm text-slate-400 shrink-0">
-            <span className="text-white font-medium">Turno {partida.turnoActual}</span>
-            {estimatedMax > 0 && <span> / ~{estimatedMax}</span>}
+            <span className="text-white font-medium">Turno {partida.turnos.length}</span>
+            {configuredMax !== null && <span> / {configuredMax}</span>}
             {teamName && (
               <span>
                 {' · '}
@@ -174,6 +184,15 @@ export function ArenaHeader({ partida, isAdmin, isSyncing, onRefresh }: ArenaHea
               Cancelar
             </button>
           )}
+        </div>
+      )}
+
+      {/* Action error banner */}
+      {actionError && (
+        <div className="mt-2 flex items-center gap-2 rounded-lg bg-red-500/10 border border-red-500/30 px-3 py-2 text-xs text-red-400">
+          <span>✖</span>
+          <span className="flex-1">{actionError}</span>
+          <button onClick={() => setActionError(null)} className="text-red-400/60 hover:text-red-300">✕</button>
         </div>
       )}
     </div>

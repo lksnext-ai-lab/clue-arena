@@ -38,6 +38,7 @@ export interface GameResponse {
   nombre: string;
   estado: GameStatus;
   turnoActual: number;
+  maxTurnos: number | null;
   modoEjecucion: 'manual' | 'auto' | 'pausado';
   autoRunActivoDesde: string | null;
   equipos: GameTeamResponse[];

@@ -17,6 +17,8 @@ import { getAuthSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { partidas } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
+import { gameRunner } from '@/lib/game/runner';
+import { gameEventEmitter } from '@/lib/ws/GameEventEmitter';
 
 export async function POST(
   _req: Request,
@@ -55,6 +57,15 @@ export async function POST(
     .update(partidas)
     .set({ modoEjecucion: 'pausado' })
     .where(eq(partidas.id, id));
+
+  // Señalizar el loop para que termine tras el turno en curso (cancela el sleep inter-turno)
+  gameRunner.stop(id);
+
+  gameEventEmitter.emitTurnCompleted(id, {
+    type: 'status_changed',
+    gameId: id,
+    payload: { nuevoEstado: 'pausada' },
+  });
 
   return NextResponse.json({ success: true, modoEjecucion: 'pausado' });
 }

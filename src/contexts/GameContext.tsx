@@ -1,21 +1,22 @@
 'use client';
 
 import React, { createContext, useContext, useState, useCallback } from 'react';
-import { useInterval } from '@/lib/utils/useInterval';
+import { useGameSocket } from '@/lib/utils/useGameSocket';
 import { apiFetch } from '@/lib/api/client';
 import type { GameDetailResponse } from '@/types/api';
+import type { ServerMessage } from '@/lib/ws/protocol';
 
 interface GameContextValue {
   partida: GameDetailResponse | null;
-  isPolling: boolean;
+  isConnected: boolean;
   lastUpdated: Date | null;
   error: Error | null;
-  refresh: () => void;
+  refresh: () => void; // fallback HTTP manual
 }
 
 const GameContext = createContext<GameContextValue>({
   partida: null,
-  isPolling: false,
+  isConnected: false,
   lastUpdated: null,
   error: null,
   refresh: () => {},
@@ -24,16 +25,17 @@ const GameContext = createContext<GameContextValue>({
 interface GameProviderProps {
   children: React.ReactNode;
   gameId: string;
-  pollingInterval: number; // ms
 }
 
-export function GameProvider({ children, gameId, pollingInterval }: GameProviderProps) {
+export function GameProvider({ children, gameId }: GameProviderProps) {
   const [partida, setPartida] = useState<GameDetailResponse | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
   const isFinished = partida?.estado === 'finalizada';
 
+  // Fetching HTTP: solo al montar (estado inicial) y como fallback manual
   const fetchGame = useCallback(async () => {
     try {
       const data = await apiFetch<GameDetailResponse>(`/games/${gameId}`);
@@ -45,17 +47,40 @@ export function GameProvider({ children, gameId, pollingInterval }: GameProvider
     }
   }, [gameId]);
 
-  // Initial fetch
+  // Carga inicial
   React.useEffect(() => {
     fetchGame();
   }, [fetchGame]);
 
-  // Polling: stop when game is finished
-  useInterval(fetchGame, isFinished ? null : pollingInterval);
+  // Manejador de mensajes WebSocket
+  const handleWsMessage = useCallback((msg: ServerMessage) => {
+    if (msg.type === 'subscribed') {
+      setIsConnected(true);
+      // Re-fetch completo al suscribirse para garantizar estado fresco
+      fetchGame();
+      return;
+    }
+    if (msg.type === 'game:turn_completed' || msg.type === 'game:status_changed') {
+      // Re-fetch completo del estado actual (simple y robusto)
+      fetchGame();
+    }
+  }, [fetchGame]);
+
+  const handleWsDisconnect = useCallback(() => {
+    setIsConnected(false);
+  }, []);
+
+  // WebSocket: activo mientras la partida no ha finalizado
+  useGameSocket({
+    gameId,
+    onMessage: handleWsMessage,
+    onDisconnect: handleWsDisconnect,
+    enabled: !isFinished,
+  });
 
   const value: GameContextValue = {
     partida,
-    isPolling: !isFinished,
+    isConnected,
     lastUpdated,
     error,
     refresh: fetchGame,

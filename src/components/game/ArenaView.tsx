@@ -101,7 +101,7 @@ function ArenaPending({ partida }: { partida: GameDetailResponse }) {
 
 export function ArenaView({ gameId, initialData }: ArenaViewProps) {
   return (
-    <GameProvider gameId={gameId} pollingInterval={5_000}>
+    <GameProvider gameId={gameId}>
       <ArenaContent initialData={initialData} gameId={gameId} />
     </GameProvider>
   );
@@ -110,11 +110,11 @@ export function ArenaView({ gameId, initialData }: ArenaViewProps) {
 // ── ArenaContent (uses useGame) ───────────────────────────────────────────────
 
 function ArenaContent({ gameId: _gameId, initialData }: ArenaViewProps) {
-  const { partida: polled, isPolling, error, refresh } = useGame();
+  const { partida: live, isConnected, error, refresh } = useGame();
   const { rol } = useAppSession();
 
-  // Prefer live polled data; fall back to SSR initial data
-  const data = polled ?? initialData;
+  // Prefer live WebSocket-driven data; fall back to SSR initial data
+  const data = live ?? initialData;
 
   if (error && !data) return <ArenaError error={error} onRetry={refresh} />;
   if (!data) return <ArenaSkeleton />;
@@ -131,7 +131,7 @@ function ArenaContent({ gameId: _gameId, initialData }: ArenaViewProps) {
       <ArenaHeader
         partida={data}
         isAdmin={isAdmin}
-        isSyncing={isPolling}
+        isSyncing={isConnected}
         onRefresh={refresh}
       />
 

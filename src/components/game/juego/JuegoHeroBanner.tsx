@@ -7,7 +7,7 @@ export function JuegoHeroBanner() {
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src="/game/juego-hero.jpg"
+          src="/game/banner.png"
           alt="Banner del evento Clue Arena — El Algoritmo Asesinado"
           style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top' }}
         />
@@ -22,7 +22,7 @@ export function JuegoHeroBanner() {
         {/* Text content */}
         <div className="absolute inset-0 flex flex-col justify-center px-8 sm:px-12">
           <p className="text-xs font-semibold tracking-widest uppercase text-cyan-400 mb-2">
-            Challenge corporativo · Mayo 2026
+            Challenge corporativo
           </p>
           <h1 className="text-3xl sm:text-4xl font-bold text-white leading-tight">
             El{' '}

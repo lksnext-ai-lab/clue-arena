@@ -18,7 +18,7 @@ import { ArenaView } from '@/components/game/ArenaView';
 
 /**
  * UI-005 — Arena: Vista de espectador de partida (F009)
- * Server Component: loads initial game state for SSR, then polling takes over.
+ * Server Component: loads initial game state for SSR, then WebSocket takes over.
  */
 export default async function ArenaPage({
   params,
@@ -120,12 +120,13 @@ async function loadArenaData(gameId: string): Promise<GameDetailResponse | null>
     nombre: partida.nombre,
     estado: partida.estado as GameDetailResponse['estado'],
     turnoActual: partida.turnoActual,
+    maxTurnos: partida.maxTurnos ?? null,
     modoEjecucion: partida.modoEjecucion as GameDetailResponse['modoEjecucion'],
     autoRunActivoDesde: partida.autoRunActivoDesde?.toISOString() ?? null,
     createdAt: partida.createdAt?.toISOString() ?? '',
     startedAt: partida.startedAt?.toISOString() ?? null,
     finishedAt: partida.finishedAt?.toISOString() ?? null,
-    equipos: gameTeams.map(({ pe, e }) => {
+    equipos: [...gameTeams].sort((a, b) => a.pe.orden - b.pe.orden).map(({ pe, e }) => {
       const cartasArray = JSON.parse(pe.cartas ?? '[]') as string[];
       return {
         id: pe.id,

@@ -21,7 +21,8 @@ import { getAuthSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { partidas } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
-import { startAutoRun } from '@/lib/game/auto-run';
+import { gameRunner } from '@/lib/game/runner';
+import { gameEventEmitter } from '@/lib/ws/GameEventEmitter';
 
 const RunBodySchema = z.object({
   turnoDelayMs: z.number().int().min(0).max(60_000).optional(),
@@ -63,7 +64,7 @@ export async function POST(
       { status: 400 },
     );
   }
-  if (partida.autoRunActivoDesde !== null) {
+  if (partida.autoRunActivoDesde !== null || gameRunner.isRunning(id)) {
     return NextResponse.json(
       { error: 'Ya existe un bucle de auto-run activo para esta partida' },
       { status: 409 },
@@ -82,9 +83,14 @@ export async function POST(
     })
     .where(eq(partidas.id, id));
 
-  // Fire-and-forget: do NOT await
-  // eslint-disable-next-line @typescript-eslint/no-floating-promises
-  startAutoRun(id, delay);
+  gameEventEmitter.emitTurnCompleted(id, {
+    type: 'status_changed',
+    gameId: id,
+    payload: { nuevoEstado: 'en_curso' },
+  });
+
+  // Delegar al GameRunner (proceso servidor, fuera del ciclo HTTP)
+  gameRunner.start(id, delay);
 
   return NextResponse.json(
     { success: true, modoEjecucion: 'auto', turnoDelayMs: delay },

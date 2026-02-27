@@ -16,7 +16,8 @@ import { db } from '@/lib/db';
 import { partidas, partidaEquipos, equipos, turnos } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
-import { startAutoRun } from '@/lib/game/auto-run';
+import { gameRunner } from '@/lib/game/runner';
+import { gameEventEmitter } from '@/lib/ws/GameEventEmitter';
 
 const StartBodySchema = z.object({
   modo: z.enum(['auto', 'manual']).optional().default('manual'),
@@ -92,10 +93,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     });
   }
 
-  // If auto mode, fire-and-forget the auto-run loop
+  // Notify connected clients that the game has started
+  gameEventEmitter.emitTurnCompleted(id, {
+    type: 'status_changed',
+    gameId: id,
+    payload: { nuevoEstado: 'en_curso' },
+  });
+
+  // Si es modo auto, delegar al GameRunner (proceso servidor, fuera del ciclo HTTP)
   if (modo === 'auto') {
-    // eslint-disable-next-line @typescript-eslint/no-floating-promises
-    startAutoRun(id, delay);
+    gameRunner.start(id, delay);
   }
 
   return NextResponse.json({

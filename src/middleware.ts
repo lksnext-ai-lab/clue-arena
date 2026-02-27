@@ -5,7 +5,7 @@ import { auth } from '@/lib/auth/edge-config';
 import { DEV_COOKIE, DEV_USERS } from '@/lib/auth/dev';
 
 // Public paths that bypass authentication
-const PUBLIC_PATHS = ['/login', '/auth', '/ranking', '/partidas'];
+const PUBLIC_PATHS = ['/login', '/auth', '/ranking', '/api/ranking', '/partidas'];
 // Protected paths that require authentication
 // (middleware already blocks everything not in PUBLIC_PATHS, but we keep this explicit)
 

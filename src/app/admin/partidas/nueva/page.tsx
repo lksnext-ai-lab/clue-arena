@@ -31,7 +31,7 @@ export default function NuevaPartidaPage() {
     formState: { errors, isSubmitting },
   } = useForm<CreateGameInput>({
     resolver: zodResolver(CreateGameSchema),
-    defaultValues: { nombre: '', equipoIds: [] },
+    defaultValues: { nombre: '', equipoIds: [], maxTurnos: null },
   });
 
   useEffect(() => {
@@ -116,6 +116,32 @@ export default function NuevaPartidaPage() {
               {errors.nombre.message}
             </p>
           )}
+        </div>
+
+        {/* Máximo de turnos */}
+        <div>
+          <label className="block text-sm font-medium mb-1">
+            Máximo de turnos{' '}
+            <span className="text-xs font-normal" style={{ color: '#64748b' }}>(opcional — deja vacío para sin límite)</span>
+          </label>
+          <input
+            type="number"
+            min={1}
+            {...register('maxTurnos', {
+              setValueAs: (v: string) => (v === '' || v === undefined ? null : parseInt(v, 10)),
+            })}
+            className="w-full px-3 py-2 rounded-md text-sm"
+            style={{ background: '#1a1a2e', color: '#f1f5f9', border: '1px solid #334155' }}
+            placeholder="Sin límite"
+          />
+          {errors.maxTurnos && (
+            <p className="text-xs mt-1" style={{ color: '#ef4444' }}>
+              {errors.maxTurnos.message}
+            </p>
+          )}
+          <p className="text-xs mt-1" style={{ color: '#475569' }}>
+            Si se alcanza este número de turnos, la partida finaliza automáticamente y se penaliza a cada equipo con −3 puntos.
+          </p>
         </div>
 
         {/* Equipos */}

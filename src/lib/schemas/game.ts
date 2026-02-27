@@ -9,6 +9,12 @@ export const CreateGameSchema = z.object({
     .array(z.string())
     .min(2, 'Se necesitan al menos 2 equipos')
     .max(6, 'Máximo 6 equipos por partida'),
+  maxTurnos: z
+    .number()
+    .int('El máximo de turnos debe ser un entero')
+    .min(1, 'El máximo de turnos debe ser al menos 1')
+    .nullable()
+    .optional(),
 });
 
 export type CreateGameInput = z.infer<typeof CreateGameSchema>;

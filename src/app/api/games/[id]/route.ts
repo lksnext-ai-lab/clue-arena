@@ -112,13 +112,14 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     nombre: partida.nombre,
     estado: partida.estado,
     turnoActual: partida.turnoActual,
+    maxTurnos: partida.maxTurnos ?? null,
     modoEjecucion: partida.modoEjecucion,
     autoRunActivoDesde: partida.autoRunActivoDesde?.toISOString() ?? null,
     createdAt: partida.createdAt?.toISOString() ?? null,
     startedAt: partida.startedAt?.toISOString() ?? null,
     finishedAt: partida.finishedAt?.toISOString() ?? null,
     // numCartas is always public; cartas (values) only for admin or own team
-    equipos: gameTeams.map(({ pe, e }) => {
+    equipos: [...gameTeams].sort((a, b) => a.pe.orden - b.pe.orden).map(({ pe, e }) => {
       const cartasArray = JSON.parse(pe.cartas ?? '[]') as string[];
       return {
         id: pe.id,

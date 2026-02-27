@@ -34,6 +34,7 @@ export const partidas = sqliteTable('partidas', {
     .notNull()
     .default('pendiente'),
   turnoActual: integer('turno_actual').notNull().default(0),
+  maxTurnos: integer('max_turnos'),
   // Execution mode for auto-run (F007)
   modoEjecucion: text('modo_ejecucion', { enum: ['manual', 'auto', 'pausado'] })
     .notNull()

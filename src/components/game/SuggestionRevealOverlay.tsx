@@ -123,7 +123,7 @@ export function SuggestionCardStrip({
   const isNoRef          = phase === 'no_refutation';
   const highlightedValue = isRefuted && sug.cartaMostrada ? sug.cartaMostrada : null;
   const cards            = buildCards(sug);
-  const imageH           = 'h-28';
+  const imageH           = '';  // height driven by aspectRatio below
 
   return (
     <div className={cn('flex flex-col', compact ? 'gap-1' : 'gap-3')}>
@@ -203,7 +203,10 @@ export function SuggestionCardStrip({
                 </div>
               )}
 
-              <div className={cn('relative w-full bg-slate-900/80 overflow-hidden', imageH)}>
+              <div
+                className={cn('relative w-full bg-slate-900/80 overflow-hidden', imageH)}
+                style={{ aspectRatio: '3/4' }}
+              >
                 {card.imagen ? (
                   <Image
                     src={card.imagen}
@@ -302,7 +305,7 @@ export function SuggestionRevealOverlay({ partida }: SuggestionRevealOverlayProp
     }, delayMs);
   }, []);
 
-  // ── Core effect: reacts to every polling update ──
+  // ── Core effect: reacts to every live update (WebSocket-driven) ──
 
   useEffect(() => {
     if (partida.estado !== 'en_curso') return;
@@ -383,13 +386,13 @@ export function SuggestionRevealOverlay({ partida }: SuggestionRevealOverlayProp
   return (
     <div
       className={cn(
-        'absolute inset-x-0 bottom-0 z-20 flex items-end justify-center',
+        'fixed inset-0 z-50 flex items-center justify-center',
         'transition-all duration-700 pointer-events-none',
-        isDim ? 'opacity-0 translate-y-2' : 'opacity-100 translate-y-0'
+        isDim ? 'opacity-0 scale-95' : 'opacity-100 scale-100'
       )}
     >
-      <div className="absolute inset-x-0 bottom-0 h-4/5 bg-gradient-to-t from-slate-900/70 via-slate-900/30 to-transparent rounded-b-xl pointer-events-none" />
-      <div className="relative z-10 w-full max-w-lg px-4 pb-4 pt-2">
+
+      <div className="relative z-10 w-full max-w-lg px-4 py-4">
         <SuggestionCardStrip
           suggestion={sug}
           equipoNombre={equipoNombre}

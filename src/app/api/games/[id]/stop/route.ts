@@ -16,6 +16,8 @@ import { getAuthSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { partidas, turnos, sobres } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
+import { gameRunner } from '@/lib/game/runner';
+import { gameEventEmitter } from '@/lib/ws/GameEventEmitter';
 
 // POST /api/games/:id/stop
 export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -51,7 +53,10 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
 
   const now = new Date();
 
-  // Set modoEjecucion=manual first so any running auto-run loop stops at the next iteration
+  // Señalizar al GameRunner para que aborte el loop inmediatamente (cancela el sleep inter-turno)
+  gameRunner.stop(id);
+
+  // Set modoEjecucion=manual so the loop exits if it re-checks before receiving the abort signal
   await db
     .update(partidas)
     .set({ modoEjecucion: 'manual' })
@@ -76,6 +81,12 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     .update(partidas)
     .set({ estado: 'finalizada', finishedAt: now })
     .where(eq(partidas.id, id));
+
+  gameEventEmitter.emitTurnCompleted(id, {
+    type: 'status_changed',
+    gameId: id,
+    payload: { nuevoEstado: 'finalizada' },
+  });
 
   const sobre = await db.select().from(sobres).where(eq(sobres.partidaId, id)).get();
 

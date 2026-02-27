@@ -23,6 +23,7 @@ import {
 } from '@/lib/db/schema';
 import { eq, and, count } from 'drizzle-orm';
 import type { InferSelectModel } from 'drizzle-orm';
+import { gameEventEmitter } from '@/lib/ws/GameEventEmitter';
 
 /** Row type for partidaEquipos table */
 type TeamRow = InferSelectModel<typeof partidaEquipos>;
@@ -152,7 +153,7 @@ export async function advanceTurn(gameId: string): Promise<AdvanceTurnResult> {
 
   // ── 5. Apply the action ───────────────────────────────────────────────────
   if (action.type === 'suggestion') {
-    await handleSuggestion({
+    const maxTurnsReached = await handleSuggestion({
       gameId,
       teamId: currentTeam.equipoId,
       turnoId: turno.id,
@@ -162,11 +163,30 @@ export async function advanceTurn(gameId: string): Promise<AdvanceTurnResult> {
       allTeams,
       turnoActual: partida.turnoActual,
       activeTeamCount: activeTeams.length,
+      maxTurnos: partida.maxTurnos,
     });
 
+    gameEventEmitter.emitTurnCompleted(gameId, {
+      type: 'turn_completed',
+      gameId,
+      payload: {
+        turnoNumero: turno.numero,
+        equipoId: currentTeam.equipoId,
+        resultadoTipo: 'sugerencia',
+      },
+    });
+
+    if (maxTurnsReached) {
+      gameEventEmitter.emitTurnCompleted(gameId, {
+        type: 'status_changed',
+        gameId,
+        payload: { nuevoEstado: 'finalizada' },
+      });
+    }
+
     return {
-      gameOver: false,
-      reason: 'suggestion_applied',
+      gameOver: maxTurnsReached,
+      reason: maxTurnsReached ? 'max_turns_reached' : 'suggestion_applied',
       teamId: currentTeam.equipoId,
       actionType: 'suggestion',
     };
@@ -180,7 +200,26 @@ export async function advanceTurn(gameId: string): Promise<AdvanceTurnResult> {
       room: action.room,
       turnoActual: partida.turnoActual,
       allTeams,
+      maxTurnos: partida.maxTurnos,
     });
+
+    gameEventEmitter.emitTurnCompleted(gameId, {
+      type: 'turn_completed',
+      gameId,
+      payload: {
+        turnoNumero: turno.numero,
+        equipoId: currentTeam.equipoId,
+        resultadoTipo: gameOver ? 'acusacion_correcta' : 'acusacion_incorrecta',
+      },
+    });
+
+    if (gameOver) {
+      gameEventEmitter.emitTurnCompleted(gameId, {
+        type: 'status_changed',
+        gameId,
+        payload: { nuevoEstado: 'finalizada' },
+      });
+    }
 
     return {
       gameOver,
@@ -205,10 +244,11 @@ interface SuggestionParams {
   allTeams: TeamRow[];
   turnoActual: number;
   activeTeamCount: number;
+  maxTurnos: number | null;
 }
 
-async function handleSuggestion(p: SuggestionParams): Promise<void> {
-  const { gameId, teamId, turnoId, suspect, weapon, room, allTeams, turnoActual, activeTeamCount } = p;
+async function handleSuggestion(p: SuggestionParams): Promise<boolean> {
+  const { gameId, teamId, turnoId, suspect, weapon, room, allTeams, turnoActual, activeTeamCount, maxTurnos } = p;
 
   // Determine refutador (first team after suggester in rotation with a matching card)
   const suggesterIdx = allTeams.findIndex((t) => t.equipoId === teamId);
@@ -278,7 +318,7 @@ async function handleSuggestion(p: SuggestionParams): Promise<void> {
     .set({ estado: 'completado', finishedAt: new Date() })
     .where(eq(turnos.id, turnoId));
 
-  await _advanceTurnoIndex(gameId, turnoActual, activeTeamCount, allTeams);
+  return _advanceTurnoIndex(gameId, turnoActual, activeTeamCount, allTeams, maxTurnos);
 }
 
 // ---------------------------------------------------------------------------
@@ -294,13 +334,14 @@ interface AccusationParams {
   room: string;
   turnoActual: number;
   allTeams: TeamRow[];
+  maxTurnos: number | null;
 }
 
 /**
  * Returns true if the accusation ended the game (correct or all eliminated).
  */
 async function handleAccusation(p: AccusationParams): Promise<boolean> {
-  const { gameId, teamId, turnoId, suspect, weapon, room, turnoActual, allTeams } = p;
+  const { gameId, teamId, turnoId, suspect, weapon, room, turnoActual, allTeams, maxTurnos } = p;
 
   // Load the envelope
   const sobre = await db.select().from(sobres).where(eq(sobres.partidaId, gameId)).get();
@@ -373,10 +414,10 @@ async function handleAccusation(p: AccusationParams): Promise<boolean> {
     return true;
   }
 
-  // Game continues: advance turn
+  // Game continues: advance turn (may finalize if maxTurnos reached)
   const activeAfter = updatedTeams.filter((t) => !t.eliminado);
-  await _advanceTurnoIndex(gameId, turnoActual, activeAfter.length, updatedTeams);
-  return false;
+  const maxTurnsReached = await _advanceTurnoIndex(gameId, turnoActual, activeAfter.length, updatedTeams, maxTurnos);
+  return maxTurnsReached;
 }
 
 // ---------------------------------------------------------------------------
@@ -388,7 +429,8 @@ async function _advanceTurnoIndex(
   turnoActual: number,
   activeCount: number,
   teamsSnapshot: TeamRow[],
-): Promise<void> {
+  maxTurnos: number | null,
+): Promise<boolean> {
   const newTurnoActual = (turnoActual + 1) % activeCount;
 
   await db
@@ -396,16 +438,38 @@ async function _advanceTurnoIndex(
     .set({ turnoActual: newTurnoActual })
     .where(eq(partidas.id, gameId));
 
-  // Sort snapshot by orden, filter active
-  const sorted = teamsSnapshot
-    .filter((t) => !t.eliminado)
-    .sort((a, b) => a.orden - b.orden);
-  const nextTeam = sorted[newTurnoActual % sorted.length];
-
   const [{ total }] = await db
     .select({ total: count() })
     .from(turnos)
     .where(eq(turnos.partidaId, gameId));
+
+  // Check if the max-turns limit has been reached
+  if (maxTurnos !== null && total >= maxTurnos) {
+    // Penalise each active (non-eliminated) team with -3 points
+    const activeTeams = teamsSnapshot.filter((t) => !t.eliminado);
+    for (const team of activeTeams) {
+      await db
+        .update(partidaEquipos)
+        .set({ puntos: team.puntos - 3 })
+        .where(
+          and(
+            eq(partidaEquipos.partidaId, gameId),
+            eq(partidaEquipos.equipoId, team.equipoId),
+          ),
+        );
+    }
+    await db
+      .update(partidas)
+      .set({ estado: 'finalizada', finishedAt: new Date() })
+      .where(eq(partidas.id, gameId));
+    return true;
+  }
+
+  // Sort snapshot by orden, filter active; create the next team's turn record
+  const sorted = teamsSnapshot
+    .filter((t) => !t.eliminado)
+    .sort((a, b) => a.orden - b.orden);
+  const nextTeam = sorted[newTurnoActual % sorted.length];
 
   await db.insert(turnos).values({
     id: uuidv4(),
@@ -415,4 +479,6 @@ async function _advanceTurnoIndex(
     estado: 'en_curso',
     startedAt: new Date(),
   });
+
+  return false;
 }

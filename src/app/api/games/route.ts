@@ -34,6 +34,7 @@ export async function GET(request: Request) {
         nombre: game.nombre,
         estado: game.estado,
         turnoActual: game.turnoActual,
+        maxTurnos: game.maxTurnos ?? null,
         modoEjecucion: game.modoEjecucion,
         autoRunActivoDesde: game.autoRunActivoDesde?.toISOString() ?? null,
         createdAt: game.createdAt?.toISOString() ?? null,
@@ -71,7 +72,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const { nombre, equipoIds } = parsed.data;
+  const { nombre, equipoIds, maxTurnos } = parsed.data;
 
   // Validate all teams exist
   const teamRows = await Promise.all(
@@ -117,6 +118,7 @@ export async function POST(request: Request) {
     nombre,
     estado: 'pendiente',
     turnoActual: 0,
+    maxTurnos: maxTurnos ?? null,
     createdAt: now,
   });
 
@@ -154,6 +156,7 @@ export async function POST(request: Request) {
       nombre,
       estado: 'pendiente',
       turnoActual: 0,
+      maxTurnos: maxTurnos ?? null,
       modoEjecucion: 'manual',
       autoRunActivoDesde: null,
       createdAt: now.toISOString(),

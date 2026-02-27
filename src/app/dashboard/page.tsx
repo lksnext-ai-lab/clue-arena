@@ -14,6 +14,7 @@ import { eq, desc } from 'drizzle-orm';
 import { RankingPodium, type RankingEntry } from '@/components/dashboard/RankingPodium';
 import { TeamStatsSection } from '@/components/dashboard/TeamStatsSection';
 import { ActivityFeed } from '@/components/dashboard/ActivityFeed';
+import { LastGameCard, type LastGameData } from '@/components/dashboard/LastGameCard';
 import type { ActivityEvent } from '@/components/dashboard/ActivityItem';
 
 // ---------------------------------------------------------------------------
@@ -122,6 +123,51 @@ async function fetchRecentActivityFromDb(limit = 10): Promise<ActivityEvent[]> {
   return events.slice(0, limit);
 }
 
+async function fetchLastGameFromDb(): Promise<LastGameData | null> {
+  // Prefer en_curso, then finalizada, then any — newest first
+  const allPartidas = await db
+    .select()
+    .from(partidas)
+    .orderBy(desc(partidas.createdAt))
+    .all();
+
+  if (allPartidas.length === 0) return null;
+
+  const pick =
+    allPartidas.find((p) => p.estado === 'en_curso') ??
+    allPartidas.find((p) => p.estado === 'finalizada') ??
+    allPartidas[0];
+
+  const gameTeams = await db
+    .select({ pe: partidaEquipos, e: equipos })
+    .from(partidaEquipos)
+    .innerJoin(equipos, eq(partidaEquipos.equipoId, equipos.id))
+    .where(eq(partidaEquipos.partidaId, pick.id))
+    .all();
+
+  const toMs = (v: Date | number | null | undefined): number | null => {
+    if (v == null) return null;
+    if (v instanceof Date) return v.getTime();
+    return (v as number) * 1000;
+  };
+
+  return {
+    id: pick.id,
+    nombre: pick.nombre,
+    estado: pick.estado as LastGameData['estado'],
+    turnoActual: pick.turnoActual,
+    maxTurnos: pick.maxTurnos ?? null,
+    startedAtMs: toMs(pick.startedAt),
+    finishedAtMs: toMs(pick.finishedAt),
+    equipos: gameTeams.map(({ pe, e }) => ({
+      equipoId: pe.equipoId,
+      equipoNombre: e.nombre,
+      puntos: pe.puntos,
+      eliminado: pe.eliminado,
+    })),
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Page component
 // ---------------------------------------------------------------------------
@@ -141,14 +187,17 @@ export default async function DashboardPage() {
     miEquipoId = (session.user as { equipo?: { id: string } }).equipo?.id ?? null;
   }
 
-  const [ranking, activity] = await Promise.all([
+  const [ranking, activity, lastGame] = await Promise.all([
     fetchRankingFromDb(),
     fetchRecentActivityFromDb(10),
+    fetchLastGameFromDb(),
   ]);
 
   return (
     <div className="flex flex-col gap-6 p-6">
       <RankingPodium initialRanking={ranking} miEquipoId={miEquipoId} />
+
+      <LastGameCard game={lastGame} miEquipoId={miEquipoId} />
 
       {miEquipoId && <TeamStatsSection equipoId={miEquipoId} />}
 

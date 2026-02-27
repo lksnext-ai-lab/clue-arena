@@ -17,7 +17,7 @@ import {
 
 /**
  * UI-008 — Detalle de partida (Admin)
- * Polls every 3s.
+ * Actualización en tiempo real via WebSocket.
  *
  * ControlBar por estado × modoEjecucion:
  *   pendiente              → Iniciar (manual) · Iniciar (auto)
@@ -29,7 +29,7 @@ import {
 export default function AdminPartidaPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = React.use(params);
   return (
-    <GameProvider gameId={id} pollingInterval={3_000}>
+    <GameProvider gameId={id}>
       <AdminPartidaContent gameId={id} />
     </GameProvider>
   );
@@ -56,7 +56,7 @@ const MODE_COLORS: Record<string, { bg: string; text: string }> = {
 // ---------------------------------------------------------------------------
 
 function AdminPartidaContent({ gameId }: { gameId: string }) {
-  const { partida, isPolling, lastUpdated, refresh } = useGame();
+  const { partida, isConnected, lastUpdated, refresh } = useGame();
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
 
@@ -96,7 +96,7 @@ function AdminPartidaContent({ gameId }: { gameId: string }) {
           <h1 className="text-2xl font-bold">{partida.nombre}</h1>
           <p className="text-sm mt-1" style={{ color: '#64748b' }}>
             Turno {partida.turnoActual}
-            {isPolling && ' · actualizando cada 3 s'}
+            {isConnected && ' · en tiempo real'}
             {lastUpdated && ` · ${formatFecha(lastUpdated)}`}
           </p>
         </div>
