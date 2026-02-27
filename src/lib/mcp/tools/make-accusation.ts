@@ -10,14 +10,15 @@ import {
 } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
+import { SOSPECHOSOS, ARMAS, HABITACIONES } from '@/types/domain';
 
 export const makeAccusationTool = {
   schema: {
     game_id: z.string().describe('ID de la partida'),
     team_id: z.string().describe('ID del equipo que realiza la acusación'),
-    suspect: z.string().describe('Sospechoso acusado'),
-    weapon: z.string().describe('Arma acusada'),
-    room: z.string().describe('Habitación acusada'),
+    suspect: z.enum(SOSPECHOSOS).describe('Sospechoso acusado (canónico del evento)'),
+    weapon: z.enum(ARMAS).describe('Arma acusada (canónica del evento)'),
+    room: z.enum(HABITACIONES).describe('Habitación acusada (canónica del evento)'),
   },
 
   handler: async ({

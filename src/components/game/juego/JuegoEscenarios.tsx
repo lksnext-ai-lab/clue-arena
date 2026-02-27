@@ -1,17 +1,5 @@
-import { HABITACIONES } from '@/types/domain';
-
-/** Mapping from Cluedo domain name → corporate scenario slug and display name */
-const HABITACION_ESCENARIO: Record<string, { slug: string; nombre: string; emoji: string }> = {
-  'Cocina':          { slug: 'la-sala-de-servidores', nombre: 'La Sala de Servidores',       emoji: '🖥️' },
-  'Salón de baile':  { slug: 'el-open-space',          nombre: 'El Open Space',               emoji: '💬' },
-  'Conservatorio':   { slug: 'la-cafeteria',            nombre: 'La Cafetería',                emoji: '☕' },
-  'Comedor':         { slug: 'recursos-humanos',        nombre: 'Recursos Humanos',            emoji: '🔒' },
-  'Sala de billar':  { slug: 'el-despacho-del-ceo',    nombre: 'El Despacho del CEO',         emoji: '👑' },
-  'Biblioteca':      { slug: 'la-sala-de-juntas',      nombre: 'La Sala de Juntas',           emoji: '♟️' },
-  'Sala de estar':   { slug: 'el-almacen-de-it',       nombre: 'El Almacén de IT',            emoji: '📦' },
-  'Estudio':         { slug: 'el-laboratorio',          nombre: 'El Laboratorio de Innovación', emoji: '🤖' },
-  'Vestíbulo':       { slug: 'la-zona-de-descanso',    nombre: 'La Zona de Descanso',         emoji: '❓' },
-};
+import { HABITACIONES, ESCENARIO_META } from '@/types/domain';
+import Image from 'next/image';
 
 export function JuegoEscenarios() {
   return (
@@ -20,31 +8,31 @@ export function JuegoEscenarios() {
         id="escenarios-heading"
         className="text-xs font-semibold tracking-widest uppercase text-cyan-400 mb-5"
       >
-        Escenarios — habitaciones de la mansión
+        Escenarios — habitaciones de la empresa
       </h2>
 
       {/* Room grid with individual scenario images */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        {HABITACIONES.map((hab) => {
-          const escenario = HABITACION_ESCENARIO[hab];
+        {HABITACIONES.map((habitacion) => {
+          const meta = ESCENARIO_META[habitacion];
           return (
             <div
-              key={hab}
+              key={habitacion}
               className="bg-slate-800/60 border border-slate-700/50 rounded-xl overflow-hidden"
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={`/game/escenarios/${escenario.slug}.png`}
-                alt={escenario.nombre}
-                className="w-full object-cover object-top"
-                style={{ aspectRatio: '16/9' }}
-              />
+              <div className="relative w-full" style={{ aspectRatio: '16/9' }}>
+                <Image
+                  src={meta.imagen}
+                  alt={habitacion}
+                  fill
+                  className="object-cover object-top"
+                  loading="lazy"
+                  sizes="(max-width: 640px) 100vw, 33vw"
+                />
+              </div>
               <div className="px-3 py-2 flex items-center gap-2">
-                <span className="text-base" role="img" aria-hidden="true">{escenario.emoji}</span>
-                <div>
-                  <p className="text-xs font-semibold text-slate-200 leading-tight">{escenario.nombre}</p>
-                  <p className="text-xs text-slate-500 leading-tight">{hab}</p>
-                </div>
+                <span className="text-base" role="img" aria-hidden="true">{meta.emoji}</span>
+                <p className="text-xs font-semibold text-slate-200 leading-tight">{habitacion}</p>
               </div>
             </div>
           );
@@ -52,7 +40,7 @@ export function JuegoEscenarios() {
       </div>
 
       <p className="text-xs text-slate-600 mt-3">
-        9 habitaciones forman la mansión corporativa. El crimen ocurrió en una de ellas. Las sugerencias siempre han de especificar una habitación.
+        9 habitaciones forman la empresa. El crimen ocurrió en una de ellas. Las sugerencias siempre han de especificar una habitación.
       </p>
     </section>
   );

@@ -1,18 +1,5 @@
-import { SOSPECHOSOS } from '@/types/domain';
-
-interface PersonajeMeta {
-  color: string;
-  descripcion: string;
-}
-
-const PERSONAJE_META: Record<string, PersonajeMeta> = {
-  'Coronel Mostaza':  { color: '#eab308', descripcion: 'Militar retirado, experto en estrategia y presión.' },
-  'Señora Pavo Real': { color: '#3b82f6', descripcion: 'Directora ejecutiva con secretos corporativos enterrados.' },
-  'Reverendo Verde':  { color: '#22c55e', descripcion: 'Consultor inesperadamente ambicioso y bien conectado.' },
-  'Señora Escarlata': { color: '#ef4444', descripcion: 'Investigadora brillante con métodos cuestionables.' },
-  'Profesor Ciruela': { color: '#a855f7', descripcion: 'Científico de datos con motivos ocultos y frialdad analítica.' },
-  'Señorita Amapola': { color: '#ec4899', descripcion: 'Asistente personal que escucha todo y olvida poco.' },
-};
+import Image from 'next/image';
+import { SOSPECHOSOS, PERSONAJE_META } from '@/types/domain';
 
 export function JuegoPersonajes() {
   return (
@@ -24,40 +11,42 @@ export function JuegoPersonajes() {
         Personajes sospechosos
       </h2>
 
-      {/* Reference image */}
-      <div
-        className="relative w-full overflow-hidden rounded-xl border border-slate-700/50 mb-5"
-        style={{ height: 280 }}
-      >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/game/juego-personajes.jpg"
-          alt="Galería de personajes sospechosos del evento"
-          style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top' }}
-        />
-      </div>
-
       {/* Character cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {SOSPECHOSOS.map((nombre) => {
-          const meta = PERSONAJE_META[nombre] ?? { color: '#64748b', descripcion: '' };
+          const meta = PERSONAJE_META[nombre] ?? { color: '#64748b', departamento: '', descripcion: '', imagen: '' };
           return (
             <div
               key={nombre}
-              className="rounded-lg p-3 flex flex-col"
+              className="rounded-lg overflow-hidden flex flex-col"
               style={{
                 background: 'rgba(30,41,59,0.6)',
-                border: `1px solid ${meta.color}40`,
+                border: `1px solid ${meta.color}50`,
               }}
             >
-              <div className="flex items-center gap-2">
-                <span
-                  className="w-3 h-3 rounded-full shrink-0"
-                  style={{ background: meta.color }}
+              {/* Character image */}
+              <div className="relative w-full" style={{ aspectRatio: '2/3' }}>
+                <Image
+                  src={meta.imagen}
+                  alt={nombre}
+                  fill
+                  unoptimized
+                  className="object-cover object-top"
+                  sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 16vw"
                 />
-                <span className="text-xs font-semibold text-white leading-tight">{nombre}</span>
+                {/* Department badge */}
+                <span
+                  className="absolute bottom-1.5 left-1.5 text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide"
+                  style={{ background: `${meta.color}cc`, color: '#fff' }}
+                >
+                  {meta.departamento}
+                </span>
               </div>
-              <p className="text-xs text-slate-500 mt-2 leading-tight">{meta.descripcion}</p>
+              {/* Name + description */}
+              <div className="p-2 flex flex-col gap-1">
+                <p className="text-xs font-semibold text-white leading-tight">{nombre}</p>
+                <p className="text-[10px] text-slate-500 leading-tight">{meta.descripcion}</p>
+              </div>
             </div>
           );
         })}

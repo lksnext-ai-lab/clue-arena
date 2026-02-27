@@ -43,9 +43,9 @@ describe('Game Engine', () => {
     const action: SuggestionAction = {
       type: 'suggestion',
       equipoId: 'team-a',
-      sospechoso: 'Coronel Mostaza',
-      arma: 'Cuchillo',
-      habitacion: 'Cocina',
+      sospechoso: 'Coronel Mustard',
+      arma: 'Teclado mecánico',
+      habitacion: 'La Cafetería',
     };
 
     const newState = applyAction(state, action);
@@ -74,7 +74,7 @@ describe('Game Engine', () => {
     const state = initGame(TEAM_IDS, 42);
 
     // Find an incorrect accusation
-    const wrongSospechoso = ['Coronel Mostaza', 'Señora Pavo Real', 'Reverendo Verde']
+    const wrongSospechoso = ['Directora Scarlett', 'Coronel Mustard', 'Sra. White']
       .find((s) => s !== state.sobre.sospechoso)!;
 
     const action: AccusationAction = {
@@ -96,7 +96,7 @@ describe('Game Engine', () => {
     const twoTeams = ['team-x', 'team-y'];
     const state = initGame(twoTeams, 99);
 
-    const wrongSospechoso = ['Coronel Mostaza', 'Señora Pavo Real', 'Reverendo Verde']
+    const wrongSospechoso = ['Directora Scarlett', 'Coronel Mustard', 'Sra. White']
       .find((s) => s !== state.sobre.sospechoso)!;
 
     // Eliminate team-x

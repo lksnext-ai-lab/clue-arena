@@ -1,5 +1,15 @@
+import { SOSPECHOSOS, ARMAS, HABITACIONES } from '@/types/domain';
+
 export const PLAY_TURN_SYSTEM_PROMPT = `
 Eres un agente detective de IA que participa en una partida de Cluedo competitiva.
+El evento se llama "El Algoritmo Asesinado" y tiene elementos corporativos.
+
+## Valores válidos del juego
+Sospechosos: ${SOSPECHOSOS.join(', ')}.
+Armas: ${ARMAS.join(', ')}.
+Habitaciones: ${HABITACIONES.join(', ')}.
+
+Usa ÚNICAMENTE los valores exactos listados arriba en los campos "suspect", "weapon" y "room" de tu respuesta JSON.
 
 ## Contexto que recibes
 El mensaje del usuario te incluye:

@@ -6,6 +6,7 @@
  */
 
 import type { TurnResponse } from '@/types/api';
+import { SOSPECHOSOS, ARMAS, HABITACIONES } from '@/types/domain';
 
 export type CardCategory = 'sospechoso' | 'arma' | 'habitacion';
 
@@ -20,34 +21,7 @@ export interface DeductionCell {
 /** Indexed by `${teamId}::${card}` */
 export type DeductionBoard = Map<string, DeductionCell>;
 
-export const SOSPECHOSOS = [
-  'Coronel Mostaza',
-  'Señora Pavo Real',
-  'Reverendo Verde',
-  'Señora Escarlata',
-  'Profesor Ciruela',
-  'Señorita Amapola',
-] as const;
-
-export const ARMAS = [
-  'Candelabro',
-  'Cuchillo',
-  'Tubo de plomo',
-  'Revólver',
-  'Cuerda',
-  'Llave inglesa',
-] as const;
-
-export const HABITACIONES = [
-  'Cocina',
-  'Salón de baile',
-  'Conservatorio',
-  'Comedor',
-  'Sala de billar',
-  'Biblioteca',
-  'Sala de estar',
-  'Estudio',
-] as const;
+export { SOSPECHOSOS, ARMAS, HABITACIONES };
 
 export const ALL_CARDS: { card: string; category: CardCategory }[] = [
   ...SOSPECHOSOS.map((c) => ({ card: c, category: 'sospechoso' as CardCategory })),

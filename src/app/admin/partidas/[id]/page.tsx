@@ -1,10 +1,19 @@
 'use client';
 
 import React from 'react';
+import Image from 'next/image';
 import { GameProvider, useGame } from '@/contexts/GameContext';
 import { apiFetch } from '@/lib/api/client';
 import { useState } from 'react';
 import { formatFecha } from '@/lib/utils/formatting';
+import {
+  PERSONAJE_META,
+  ARMA_META,
+  ESCENARIO_META,
+  type Sospechoso,
+  type Arma,
+  type Habitacion,
+} from '@/types/domain';
 
 /**
  * UI-008 — Detalle de partida (Admin)
@@ -387,32 +396,93 @@ interface SobreRevealProps {
 }
 
 function SobreReveal({ sobre, finalizada }: SobreRevealProps) {
+  const sospechosoMeta = PERSONAJE_META[sobre.sospechoso as Sospechoso];
+  const armaMeta       = ARMA_META[sobre.arma as Arma];
+  const habitacionMeta = ESCENARIO_META[sobre.habitacion as Habitacion];
+
   return (
     <section>
-      <h2 className="text-lg font-semibold mb-3" style={{ color: '#f59e0b' }}>
+      <h2 className="text-lg font-semibold mb-4" style={{ color: '#f59e0b' }}>
         🔍 Sobre secreto{!finalizada && <span className="text-xs ml-2 opacity-60">(solo admin)</span>}
       </h2>
       <div
-        className="rounded-xl p-5 flex gap-6"
+        className="rounded-xl p-6 grid grid-cols-3 gap-6"
         style={{ background: '#1a1a2e', border: '1px solid #f59e0b55' }}
       >
-        <SobreItem label="Sospechoso" value={sobre.sospechoso} />
-        <SobreItem label="Arma" value={sobre.arma} />
-        <SobreItem label="Habitación" value={sobre.habitacion} />
+        <SobreCard
+          label="Sospechoso"
+          value={sobre.sospechoso}
+          imagen={sospechosoMeta?.imagen}
+          sublabel={sospechosoMeta?.departamento}
+          accent={sospechosoMeta?.color ?? '#f59e0b'}
+        />
+        <SobreCard
+          label="Arma"
+          value={sobre.arma}
+          imagen={armaMeta?.imagen}
+          sublabel={armaMeta?.emoji}
+          accent="#f59e0b"
+        />
+        <SobreCard
+          label="Habitación"
+          value={sobre.habitacion}
+          imagen={habitacionMeta?.imagen}
+          sublabel={habitacionMeta?.emoji}
+          accent="#f59e0b"
+        />
       </div>
     </section>
   );
 }
 
-function SobreItem({ label, value }: { label: string; value: string }) {
+interface SobreCardProps {
+  label: string;
+  value: string;
+  imagen?: string;
+  sublabel?: string;
+  accent: string;
+}
+
+function SobreCard({ label, value, imagen, sublabel, accent }: SobreCardProps) {
   return (
-    <div>
-      <p className="text-xs uppercase tracking-wide mb-1" style={{ color: '#64748b' }}>
-        {label}
-      </p>
-      <p className="font-semibold" style={{ color: '#f59e0b' }}>
-        {value}
-      </p>
+    <div
+      className="rounded-xl overflow-hidden flex flex-col"
+      style={{ border: `2px solid ${accent}66`, background: '#0d0d1a', boxShadow: `0 4px 24px ${accent}22` }}
+    >
+      {/* Imagen de la carta — aspect ratio de carta de juego (3:4) */}
+      <div className="relative w-full" style={{ aspectRatio: '3/4', background: '#070712' }}>
+        {imagen ? (
+          <Image
+            src={imagen}
+            alt={value}
+            fill
+            className="object-contain"
+            sizes="(max-width: 768px) 30vw, 250px"
+            unoptimized
+          />
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center text-4xl opacity-30">
+            🃏
+          </div>
+        )}
+      </div>
+      {/* Pie de carta */}
+      <div
+        className="px-4 py-3 flex flex-col gap-0.5"
+        style={{ borderTop: `1px solid ${accent}33` }}
+      >
+        <p className="text-[10px] uppercase tracking-widest font-medium" style={{ color: '#64748b' }}>
+          {label}
+        </p>
+        {sublabel && (
+          <p className="text-xs font-medium" style={{ color: `${accent}bb` }}>
+            {sublabel}
+          </p>
+        )}
+        <p className="text-sm font-bold leading-snug" style={{ color: accent }}>
+          {value}
+        </p>
+      </div>
     </div>
   );
 }

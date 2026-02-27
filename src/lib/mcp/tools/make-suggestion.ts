@@ -10,15 +10,16 @@ import {
 } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
+import { SOSPECHOSOS, ARMAS, HABITACIONES } from '@/types/domain';
 import type { Carta } from '@/types/domain';
 
 export const makeSuggestionTool = {
   schema: {
     game_id: z.string().describe('ID de la partida'),
     team_id: z.string().describe('ID del equipo que realiza la sugerencia'),
-    suspect: z.string().describe('Nombre del sospechoso'),
-    weapon: z.string().describe('Nombre del arma'),
-    room: z.string().describe('Nombre de la habitación'),
+    suspect: z.enum(SOSPECHOSOS).describe('Nombre del sospechoso (canónico del evento)'),
+    weapon: z.enum(ARMAS).describe('Nombre del arma (canónico del evento)'),
+    room: z.enum(HABITACIONES).describe('Nombre de la habitación (canónico del evento)'),
   },
 
   handler: async ({

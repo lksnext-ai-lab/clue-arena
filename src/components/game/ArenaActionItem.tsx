@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { cn } from '@/lib/utils/cn';
 import type { TurnResponse } from '@/types/api';
+import { SuggestionCardStrip } from './SuggestionRevealOverlay';
 
 interface ArenaActionItemProps {
   turno: TurnResponse;
@@ -37,39 +38,35 @@ export function ArenaActionItem({ turno, isNew, teams }: ArenaActionItemProps) {
         return (
           <div key={s.id} className="p-3">
             <div
-              className="flex items-center justify-between cursor-pointer select-none"
+              className="flex items-start justify-between cursor-pointer select-none gap-2"
               onClick={() => setExpanded((v) => !v)}
             >
-              <div className="flex items-center gap-2 min-w-0">
+              <div className="flex flex-wrap items-center gap-1.5 min-w-0">
                 <span className="shrink-0 text-xs font-mono text-slate-500">T{turno.numero}</span>
                 <span className="shrink-0 text-xs px-1.5 py-0.5 rounded font-semibold bg-slate-700 text-slate-300">
                   SUGERENCIA
                 </span>
-                <span className="text-sm font-medium text-white truncate">{equipoNombre}</span>
+                <span className="text-sm font-medium text-white">{equipoNombre}</span>
+                {refutadorNombre ? (
+                  <span className="shrink-0 text-xs text-amber-400">
+                    ↩ {refutadorNombre}{s.cartaMostrada ? ` · ${s.cartaMostrada}` : ''}
+                  </span>
+                ) : (
+                  <span className="shrink-0 text-xs text-cyan-400">✓ nadie refutó</span>
+                )}
               </div>
-              <span className="text-slate-500 text-xs ml-2 shrink-0">{expanded ? '▲' : '▼'}</span>
+              <span className="text-slate-500 text-xs shrink-0">{expanded ? '▲' : '▼'}</span>
             </div>
 
             {expanded && (
-              <div className="mt-2 pl-10 space-y-1 text-sm">
-                <p className="text-slate-400">
-                  Sospechoso: <span className="text-slate-200">{s.sospechoso}</span>
-                </p>
-                <p className="text-slate-400">
-                  Arma: <span className="text-slate-200">{s.arma}</span>
-                </p>
-                <p className="text-slate-400">
-                  Habitación: <span className="text-slate-200">{s.habitacion}</span>
-                </p>
-                <p className="mt-1">
-                  {refutadorNombre ? (
-                    <span className="text-amber-400">
-                      Refutada por <span className="font-medium">{refutadorNombre}</span>
-                    </span>
-                  ) : (
-                    <span className="text-cyan-400">No refutada</span>
-                  )}
-                </p>
+              <div className="mt-2 pt-1">
+                <SuggestionCardStrip
+                  suggestion={s}
+                  equipoNombre={equipoNombre}
+                  refutadorNombre={refutadorNombre}
+                  turnoNumero={turno.numero}
+                  compact
+                />
               </div>
             )}
           </div>

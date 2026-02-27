@@ -8,6 +8,7 @@ import { ArenaTeamPanel } from './ArenaTeamPanel';
 import { ArenaDeductionBoard } from './ArenaDeductionBoard';
 import { ArenaActionFeed } from './ArenaActionFeed';
 import { ArenaFinalResult } from './ArenaFinalResult';
+import { SuggestionRevealOverlay } from './SuggestionRevealOverlay';
 
 interface ArenaViewProps {
   gameId: string;
@@ -140,7 +141,13 @@ function ArenaContent({ gameId: _gameId, initialData }: ArenaViewProps) {
       {/* Main grid: teams + deduction board */}
       <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-4">
         <ArenaTeamPanel partida={data} />
-        <ArenaDeductionBoard partida={data} />
+        {/* Relative wrapper so the overlay can be absolutely positioned over the board */}
+        <div className="relative">
+          <ArenaDeductionBoard partida={data} />
+          {data.estado === 'en_curso' && (
+            <SuggestionRevealOverlay partida={data} />
+          )}
+        </div>
       </div>
 
       {/* Action feed */}

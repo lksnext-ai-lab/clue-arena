@@ -44,10 +44,10 @@ import {
 import { eq, and } from 'drizzle-orm';
 
 // ── Constants ────────────────────────────────────────────────────────────────
-const SOSPECHOSO = 'Coronel Mostaza';
-const ARMA = 'Cuchillo';
-const HABITACION = 'Cocina';
-const SOSPECHOSO_INCORRECTO = 'Señorita Escarlata';
+const SOSPECHOSO = 'Coronel Mustard';
+const ARMA = 'Teclado mecánico';
+const HABITACION = 'La Cafetería';
+const SOSPECHOSO_INCORRECTO = 'Directora Scarlett';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -110,9 +110,9 @@ async function setupGame(
 
   // Create team-partida associations
   const defaultCards: Record<string, string[]> = {
-    'team-a': ['Señora Pavo Real', 'Revólver', 'Billar'],
-    'team-b': ['Reverendo Verde', 'Cuerda', 'Comedor'],
-    'team-c': ['Señora Blanca', 'Llave inglesa', 'Salón'],
+    'team-a': ['Dra. Peacock', 'Cable de red', 'El Open Space'],
+    'team-b': ['Sr. Green', 'Grapadora industrial', 'Recursos Humanos'],
+    'team-c': ['Sra. White', 'Termo de acero', 'El Almacén de IT'],
   };
   const cardMap = opts.teamCards ?? defaultCards;
 
@@ -167,9 +167,9 @@ describe('Coordinator — advanceTurn', () => {
     const { gameId } = await setupGame(testDb.db, {
       // Ensure no team has the exact suggestion cards
       teamCards: {
-        'team-a': ['Señora Pavo Real', 'Revólver', 'Billar'],
-        'team-b': ['Reverendo Verde', 'Cuerda', 'Comedor'],
-        'team-c': ['Señora Blanca', 'Llave inglesa', 'Salón'],
+        'team-a': ['Dra. Peacock', 'Cable de red', 'El Open Space'],
+        'team-b': ['Sr. Green', 'Grapadora industrial', 'Recursos Humanos'],
+        'team-c': ['Sra. White', 'Termo de acero', 'El Almacén de IT'],
       },
     });
 
@@ -193,9 +193,9 @@ describe('Coordinator — advanceTurn', () => {
   it('applies suggestion — finds refutador and invokes refute agent', async () => {
     const { gameId } = await setupGame(testDb.db, {
       teamCards: {
-        'team-a': ['Señora Pavo Real', 'Revólver', 'Billar'],
-        'team-b': ['Coronel Mostaza', 'Revólver', 'Cocina'], // holds suspect + room
-        'team-c': ['Señora Blanca', 'Llave inglesa', 'Salón'],
+        'team-a': ['Dra. Peacock', 'Cable de red', 'El Open Space'],
+        'team-b': ['Coronel Mustard', 'Cable de red', 'La Cafetería'], // holds suspect + room
+        'team-c': ['Sra. White', 'Termo de acero', 'El Almacén de IT'],
       },
     });
 
@@ -206,7 +206,7 @@ describe('Coordinator — advanceTurn', () => {
         reasoning: 'test',
         done: true,
       })
-      // Second call: refute → show_card (Coronel Mostaza)
+      // Second call: refute → show_card (Coronel Mustard)
       .mockResolvedValueOnce({
         action: { type: 'show_card', card: SOSPECHOSO },
         reasoning: 'I have this card',
@@ -223,9 +223,9 @@ describe('Coordinator — advanceTurn', () => {
   it('applies suggestion — refutador returns cannot_refute, cartaMostrada stays null', async () => {
     const { gameId } = await setupGame(testDb.db, {
       teamCards: {
-        'team-a': ['Señora Pavo Real', 'Revólver', 'Billar'],
-        'team-b': ['Coronel Mostaza', 'Cuerda', 'Comedor'],
-        'team-c': ['Señora Blanca', 'Llave inglesa', 'Salón'],
+        'team-a': ['Dra. Peacock', 'Cable de red', 'El Open Space'],
+        'team-b': ['Coronel Mustard', 'Grapadora industrial', 'Recursos Humanos'],
+        'team-c': ['Sra. White', 'Termo de acero', 'El Almacén de IT'],
       },
     });
 
@@ -336,7 +336,7 @@ describe('Coordinator — advanceTurn', () => {
     const { gameId } = await setupGame(testDb.db, {
       teams: ['team-a'],
       envelop: { sospechoso: SOSPECHOSO, arma: ARMA, habitacion: HABITACION },
-      teamCards: { 'team-a': ['Señora Pavo Real', 'Revólver', 'Billar'] },
+      teamCards: { 'team-a': ['Dra. Peacock', 'Cable de red', 'El Open Space'] },
     });
 
     mockInvokeAgent.mockResolvedValue({
@@ -417,9 +417,9 @@ describe('get_game_state MCP tool', () => {
   it('returns filtered view — own cards visible, other teams empty', async () => {
     const { gameId } = await setupGame(testDb.db, {
       teamCards: {
-        'team-a': ['Señora Pavo Real', 'Revólver', 'Billar'],
-        'team-b': ['Reverendo Verde', 'Cuerda', 'Comedor'],
-        'team-c': ['Señora Blanca', 'Llave inglesa', 'Salón'],
+        'team-a': ['Dra. Peacock', 'Cable de red', 'El Open Space'],
+        'team-b': ['Sr. Green', 'Grapadora industrial', 'Recursos Humanos'],
+        'team-c': ['Sra. White', 'Termo de acero', 'El Almacén de IT'],
       },
     });
 
@@ -462,9 +462,9 @@ describe('show_card MCP tool', () => {
   it('allows the suggester to see cartaMostrada', async () => {
     const { gameId } = await setupGame(testDb.db, {
       teamCards: {
-        'team-a': ['Señora Pavo Real', 'Revólver', 'Billar'],
-        'team-b': ['Coronel Mostaza', 'Cuerda', 'Comedor'],
-        'team-c': ['Señora Blanca', 'Llave inglesa', 'Salón'],
+        'team-a': ['Dra. Peacock', 'Cable de red', 'El Open Space'],
+        'team-b': ['Coronel Mustard', 'Grapadora industrial', 'Recursos Humanos'],
+        'team-c': ['Sra. White', 'Termo de acero', 'El Almacén de IT'],
       },
     });
 

@@ -29,11 +29,6 @@ const SECTIONS: { category: CardCategory; cards: readonly string[] }[] = [
   { category: 'habitacion', cards: HABITACIONES },
 ];
 
-/** Abbreviate team name to 8 chars */
-function abbrev(name: string): string {
-  return name.length > 8 ? name.slice(0, 7) + '…' : name;
-}
-
 interface TooltipProps { text: string; children: React.ReactNode }
 function Tooltip({ text, children }: TooltipProps) {
   const [visible, setVisible] = useState(false);
@@ -75,14 +70,14 @@ export function ArenaDeductionBoard({ partida }: ArenaDeductionBoardProps) {
             {/* Card name column */}
             <th className="text-left text-slate-500 font-medium pb-2 pr-4 w-36">Carta</th>
             {partida.equipos.map((e) => (
-              <th key={e.equipoId} className="pb-2 px-1 text-center min-w-[3rem]">
+              <th key={e.equipoId} className="pb-2 px-2 text-center min-w-[5rem]">
                 <span
                   className={cn(
-                    'block font-medium',
+                    'block font-medium text-center break-words leading-tight',
                     e.eliminado ? 'text-slate-600 line-through' : 'text-slate-300'
                   )}
                 >
-                  {abbrev(e.equipoNombre)}
+                  {e.equipoNombre}
                 </span>
               </th>
             ))}

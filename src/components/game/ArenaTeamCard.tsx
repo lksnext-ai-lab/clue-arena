@@ -30,7 +30,7 @@ export function ArenaTeamCard({ equipo, position, isActiveTurn }: ArenaTeamCardP
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">
             <span className="text-base">{medal}</span>
-            <span className="font-semibold text-sm text-white truncate">{equipo.equipoNombre}</span>
+            <span className="font-semibold text-sm text-white break-words leading-snug">{equipo.equipoNombre}</span>
           </div>
           {isActiveTurn && !equipo.eliminado && (
             <span className="inline-flex items-center gap-1 mt-1 text-xs font-medium text-cyan-400 animate-pulse">
