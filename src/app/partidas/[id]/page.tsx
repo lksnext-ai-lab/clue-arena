@@ -12,7 +12,7 @@ import {
   acusaciones,
   sobres,
 } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import type { GameDetailResponse } from '@/types/api';
 import { ArenaView } from '@/components/game/ArenaView';
 
@@ -115,6 +115,15 @@ async function loadArenaData(gameId: string): Promise<GameDetailResponse | null>
     }
   }
 
+  // Authoritative active team: look up the current en_curso turn
+  const activeTurno = partida.estado === 'en_curso'
+    ? await db.select({ equipoId: turnos.equipoId })
+        .from(turnos)
+        .where(and(eq(turnos.partidaId, gameId), eq(turnos.estado, 'en_curso')))
+        .get()
+    : undefined;
+  const activeEquipoId = activeTurno?.equipoId ?? null;
+
   return {
     id: gameId,
     nombre: partida.nombre,
@@ -123,6 +132,7 @@ async function loadArenaData(gameId: string): Promise<GameDetailResponse | null>
     maxTurnos: partida.maxTurnos ?? null,
     modoEjecucion: partida.modoEjecucion as GameDetailResponse['modoEjecucion'],
     autoRunActivoDesde: partida.autoRunActivoDesde?.toISOString() ?? null,
+    activeEquipoId,
     createdAt: partida.createdAt?.toISOString() ?? '',
     startedAt: partida.startedAt?.toISOString() ?? null,
     finishedAt: partida.finishedAt?.toISOString() ?? null,

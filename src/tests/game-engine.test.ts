@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { initGame, applyAction, isGameOver, getWinner } from '@/lib/game/engine';
+import { initGame, applyAction, isGameOver, getWinner, calcEfficiencyBonus } from '@/lib/game/engine';
 import type { SuggestionAction, AccusationAction } from '@/lib/game/types';
 
 describe('Game Engine', () => {
@@ -37,9 +37,6 @@ describe('Game Engine', () => {
   it('applies a suggestion and finds a refuter', () => {
     const state = initGame(TEAM_IDS, 42);
 
-    // Find a card held by team-b to suggest
-    const cardHeldByB = state.equipos.find((e) => e.equipoId === 'team-b')!.cartas[0];
-
     const action: SuggestionAction = {
       type: 'suggestion',
       equipoId: 'team-a',
@@ -48,9 +45,9 @@ describe('Game Engine', () => {
       habitacion: 'La Cafetería',
     };
 
-    const newState = applyAction(state, action);
-    expect(newState.historial).toHaveLength(1);
-    expect(newState.historial[0].action.type).toBe('suggestion');
+    const result = applyAction(state, action);
+    expect(result.state.historial).toHaveLength(1);
+    expect(result.state.historial[0].action.type).toBe('suggestion');
   });
 
   it('correct accusation ends the game', () => {
@@ -64,16 +61,38 @@ describe('Game Engine', () => {
       habitacion: state.sobre.habitacion,
     };
 
-    const newState = applyAction(state, action);
+    const result = applyAction(state, action);
 
-    expect(isGameOver(newState)).toBe(true);
-    expect(getWinner(newState)).toBe('team-a');
+    expect(isGameOver(result.state)).toBe(true);
+    expect(getWinner(result.state)).toBe('team-a');
   });
 
-  it('incorrect accusation eliminates the team', () => {
+  it('correct accusation emits EVT_WIN and EVT_WIN_EFFICIENCY score events', () => {
+    const state = initGame(TEAM_IDS, 42);
+    // Start game
+    const startedState = { ...state, estado: 'en_curso' as const };
+
+    const result = applyAction(startedState, {
+      type: 'accusation',
+      equipoId: 'team-a',
+      sospechoso: startedState.sobre.sospechoso,
+      arma: startedState.sobre.arma,
+      habitacion: startedState.sobre.habitacion,
+    });
+
+    const evtWin = result.scoreEvents.find((e) => e.type === 'EVT_WIN');
+    expect(evtWin).toBeDefined();
+    expect(evtWin!.points).toBe(1000);
+    expect(evtWin!.equipoId).toBe('team-a');
+
+    // EVT_SURVIVE for non-eliminated, non-winner teams
+    const surviveEvents = result.scoreEvents.filter((e) => e.type === 'EVT_SURVIVE');
+    expect(surviveEvents.length).toBe(2); // team-b and team-c
+  });
+
+  it('incorrect accusation eliminates the team and emits EVT_WRONG_ACCUSATION', () => {
     const state = initGame(TEAM_IDS, 42);
 
-    // Find an incorrect accusation
     const wrongSospechoso = ['Directora Scarlett', 'Coronel Mustard', 'Sra. White']
       .find((s) => s !== state.sobre.sospechoso)!;
 
@@ -85,11 +104,13 @@ describe('Game Engine', () => {
       habitacion: state.sobre.habitacion,
     };
 
-    const newState = applyAction(state, action);
-    const teamA = newState.equipos.find((e) => e.equipoId === 'team-a')!;
+    const result = applyAction(state, action);
+    const teamA = result.state.equipos.find((e) => e.equipoId === 'team-a')!;
 
     expect(teamA.eliminado).toBe(true);
-    expect(isGameOver(newState)).toBe(false); // other teams still active
+    expect(isGameOver(result.state)).toBe(false); // other teams still active
+    expect(result.scoreEvents.find((e) => e.type === 'EVT_WRONG_ACCUSATION')).toBeDefined();
+    expect(result.scoreEvents.find((e) => e.type === 'EVT_WRONG_ACCUSATION')!.points).toBe(-150);
   });
 
   it('game ends when all teams are eliminated', () => {
@@ -100,7 +121,7 @@ describe('Game Engine', () => {
       .find((s) => s !== state.sobre.sospechoso)!;
 
     // Eliminate team-x
-    const stateAfterX = applyAction(state, {
+    const r1 = applyAction(state, {
       type: 'accusation',
       equipoId: 'team-x',
       sospechoso: wrongSospechoso as any,
@@ -109,14 +130,113 @@ describe('Game Engine', () => {
     });
 
     // Eliminate team-y
-    const stateAfterY = applyAction(stateAfterX, {
+    const r2 = applyAction(r1.state, {
       type: 'accusation',
       equipoId: 'team-y',
       sospechoso: wrongSospechoso as any,
-      arma: state.sobre.arma,
-      habitacion: state.sobre.habitacion,
+      arma: r1.state.sobre.arma,
+      habitacion: r1.state.sobre.habitacion,
     });
 
-    expect(isGameOver(stateAfterY)).toBe(true);
+    expect(isGameOver(r2.state)).toBe(true);
+  });
+
+  // --------------- Scoring tests (G001) ---------------
+
+  it('EVT_PASS emitted for voluntary pass', () => {
+    const state = initGame(['team-a', 'team-b'], 1);
+    const result = applyAction(state, { type: 'pass', equipoId: 'team-a' });
+    const evtPass = result.scoreEvents.find((e) => e.type === 'EVT_PASS');
+    expect(evtPass).toBeDefined();
+    expect(evtPass!.points).toBe(-5);
+    expect(result.state.equipos.find((e) => e.equipoId === 'team-a')!.puntos).toBe(-5);
+  });
+
+  it('EVT_SUGGESTION emitted for valid unique suggestion', () => {
+    const state = initGame(TEAM_IDS, 42);
+    const result = applyAction(state, {
+      type: 'suggestion',
+      equipoId: 'team-a',
+      sospechoso: 'Coronel Mustard',
+      arma: 'Teclado mecánico',
+      habitacion: 'La Cafetería',
+    });
+    const evtSugg = result.scoreEvents.find((e) => e.type === 'EVT_SUGGESTION');
+    expect(evtSugg).toBeDefined();
+    expect(evtSugg!.points).toBe(10);
+  });
+
+  it('EVT_INVALID_CARD emitted and suggestion not processed for non-existent card', () => {
+    const state = initGame(TEAM_IDS, 42);
+    const result = applyAction(state, {
+      type: 'suggestion',
+      equipoId: 'team-a',
+      sospechoso: 'Profesor Fantasma' as any, // does not exist
+      arma: 'Teclado mecánico',
+      habitacion: 'La Cafetería',
+    });
+    expect(result.scoreEvents.find((e) => e.type === 'EVT_INVALID_CARD')).toBeDefined();
+    expect(result.scoreEvents.find((e) => e.type === 'EVT_SUGGESTION')).toBeUndefined();
+    // result field should be null (no refutation processed)
+    expect(result.state.historial[0].result).toBeNull();
+  });
+
+  it('EVT_REDUNDANT_SUGGESTION emitted for repeated combination', () => {
+    const state = initGame(TEAM_IDS, 42);
+    const suggestion: SuggestionAction = {
+      type: 'suggestion',
+      equipoId: 'team-a',
+      sospechoso: 'Coronel Mustard',
+      arma: 'Teclado mecánico',
+      habitacion: 'La Cafetería',
+    };
+    const r1 = applyAction(state, suggestion);
+    // team-b plays, then team-a repeats same suggestion
+    const r2 = applyAction(r1.state, { type: 'pass', equipoId: 'team-b' });
+    const r3 = applyAction(r2.state, { type: 'pass', equipoId: 'team-c' });
+    const r4 = applyAction(r3.state, suggestion);
+    expect(r4.scoreEvents.find((e) => e.type === 'EVT_REDUNDANT_SUGGESTION')).toBeDefined();
+    expect(r4.scoreEvents.find((e) => e.type === 'EVT_SUGGESTION')).toBeUndefined();
+  });
+
+  it('EVT_SUGGESTION capped at 5 per team', () => {
+    let state = initGame(['team-a', 'team-b'], 7);
+    // 6 unique valid combos (suspects × rooms — all values are in domain.ts)
+    const suspects = [
+      'Coronel Mustard', 'Directora Scarlett', 'Sra. White',
+      'Sr. Green', 'Dra. Peacock', 'Profesor Plum',
+    ] as const;
+    const rooms = [
+      'La Cafetería', 'La Sala de Juntas', 'La Sala de Servidores',
+      'La Zona de Descanso', 'Recursos Humanos', 'El Almacén de IT',
+    ] as const;
+    let suggCount = 0;
+    // Make 6 unique suggestions (should only earn 5 EVT_SUGGESTION)
+    for (let i = 0; i < 6; i++) {
+      const r = applyAction(state, {
+        type: 'suggestion',
+        equipoId: 'team-a',
+        sospechoso: suspects[i] as any,
+        arma: 'Teclado mecánico',
+        habitacion: rooms[i] as any,
+      });
+      const sg = r.scoreEvents.filter((e) => e.type === 'EVT_SUGGESTION');
+      suggCount += sg.length;
+      state = r.state;
+      if (i < 5) {
+        // Pass team-b to return to team-a
+        const pass = applyAction(state, { type: 'pass', equipoId: 'team-b' });
+        state = pass.state;
+      }
+    }
+    expect(suggCount).toBe(5); // cap enforced
+  });
+
+  it('calcEfficiencyBonus works correctly', () => {
+    expect(calcEfficiencyBonus(2)).toBe(500);
+    expect(calcEfficiencyBonus(4)).toBe(450);
+    expect(calcEfficiencyBonus(10)).toBe(300);
+    expect(calcEfficiencyBonus(22)).toBe(0);  // 500 - (22-2)*25 = 0
+    expect(calcEfficiencyBonus(25)).toBe(0); // clamped to 0
   });
 });

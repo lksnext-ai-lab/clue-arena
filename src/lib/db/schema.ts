@@ -160,6 +160,18 @@ export const ranking = sqliteTable('ranking', {
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
 });
 
+// --- score_events ---
+export const scoreEvents = sqliteTable('score_events', {
+  id:        integer('id').primaryKey({ autoIncrement: true }),
+  gameId:    text('game_id').notNull().references(() => partidas.id),
+  equipoId:  text('equipo_id').notNull().references(() => equipos.id),
+  turno:     integer('turno').notNull(),
+  type:      text('type').notNull(),        // ScoreEventType
+  points:    integer('points').notNull(),
+  meta:      text('meta'),                  // JSON serializado
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+});
+
 // --- Relations ---
 export const usuariosRelations = relations(usuarios, ({ many }) => ({
   equipos: many(equipos),
@@ -209,6 +221,11 @@ export const agentMemories = sqliteTable(
     pk: primaryKey({ columns: [t.gameId, t.teamId] }),
   })
 );
+
+export const scoreEventsRelations = relations(scoreEvents, ({ one }) => ({
+  partida: one(partidas, { fields: [scoreEvents.gameId], references: [partidas.id] }),
+  equipo: one(equipos, { fields: [scoreEvents.equipoId], references: [equipos.id] }),
+}));
 
 export const acusacionesRelations = relations(acusaciones, ({ one }) => ({
   turno: one(turnos, { fields: [acusaciones.turnoId], references: [turnos.id] }),

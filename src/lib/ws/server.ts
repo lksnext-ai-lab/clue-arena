@@ -61,7 +61,8 @@ function broadcastGameEvent(gameId: string, event: GameStateEvent) {
     const p = event.payload as {
       turnoNumero: number;
       equipoId: string;
-      resultadoTipo: 'sugerencia' | 'acusacion_correcta' | 'acusacion_incorrecta';
+      resultadoTipo: 'sugerencia' | 'acusacion_correcta' | 'acusacion_incorrecta' | 'pase';
+      nextEquipoId?: string | null;
     };
     broadcast(gameId, {
       type: 'game:turn_completed',
@@ -69,6 +70,7 @@ function broadcastGameEvent(gameId: string, event: GameStateEvent) {
       turnoNumero: p.turnoNumero,
       equipoId: p.equipoId,
       resultadoTipo: p.resultadoTipo,
+      nextEquipoId: p.nextEquipoId ?? null,
       ts: Date.now(),
     });
   } else if (event.type === 'status_changed') {

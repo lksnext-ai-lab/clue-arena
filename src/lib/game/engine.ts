@@ -23,6 +23,8 @@ import type {
   AccusationResult,
   ActionRecord,
   GameStateView,
+  ScoreEvent,
+  ApplyActionResult,
 } from './types';
 
 // --- Seeded RNG (mulberry32) ---
@@ -75,6 +77,7 @@ export function initGame(equipoIds: string[], seed?: number): GameState {
     cartas: [],
     eliminado: false,
     puntos: 0,
+    turnosJugados: 0,
   }));
 
   shuffled.forEach((carta, idx) => {
@@ -93,9 +96,114 @@ export function initGame(equipoIds: string[], seed?: number): GameState {
   };
 }
 
+// --- Scoring constants ---
+const EVT_WIN_POINTS = 1_000;
+const EVT_SURVIVE_POINTS = 200;
+const EVT_SUGGESTION_POINTS = 10;
+const EVT_SUGGESTION_CAP = 5;
+const EVT_REFUTATION_POINTS = 15;
+const EVT_WRONG_ACCUSATION_POINTS = -150;
+const EVT_PASS_POINTS = -5;
+
+/** Returns the efficiency bonus for a winning team based on own turns played. */
+export function calcEfficiencyBonus(turnosJugados: number): number {
+  const T_MIN = 2;
+  const BONUS_BASE = 500;
+  const DECAY = 25;
+  return Math.max(0, BONUS_BASE - (turnosJugados - T_MIN) * DECAY);
+}
+
+/**
+ * Validates a suggestion and returns penalty events (if any).
+ * - EVT_INVALID_CARD: early return; caller must skip suggestion processing.
+ * - EVT_REDUNDANT_SUGGESTION: suggestion proceeds but no EVT_SUGGESTION.
+ * - Empty array: suggestion is fully valid.
+ */
+export function validateSuggestion(
+  action: SuggestionAction,
+  historial: ActionRecord[],
+): ScoreEvent[] {
+  const turno = historial.length; // proxy for current turn number
+
+  // 1. Invalid card check
+  const hasInvalidCard =
+    !SOSPECHOSOS.includes(action.sospechoso) ||
+    !ARMAS.includes(action.arma) ||
+    !HABITACIONES.includes(action.habitacion);
+
+  if (hasInvalidCard) {
+    return [
+      {
+        equipoId: action.equipoId,
+        type: 'EVT_INVALID_CARD',
+        points: -30,
+        turno,
+        meta: {
+          sospechoso: action.sospechoso,
+          arma: action.arma,
+          habitacion: action.habitacion,
+        },
+      },
+    ];
+  }
+
+  // 2. Redundant suggestion check
+  const isRedundant = historial.some(
+    (r) =>
+      r.equipoId === action.equipoId &&
+      r.action.type === 'suggestion' &&
+      (r.action as SuggestionAction).sospechoso === action.sospechoso &&
+      (r.action as SuggestionAction).arma === action.arma &&
+      (r.action as SuggestionAction).habitacion === action.habitacion,
+  );
+
+  if (isRedundant) {
+    return [
+      {
+        equipoId: action.equipoId,
+        type: 'EVT_REDUNDANT_SUGGESTION',
+        points: -20,
+        turno,
+        meta: {
+          sospechoso: action.sospechoso,
+          arma: action.arma,
+          habitacion: action.habitacion,
+        },
+      },
+    ];
+  }
+
+  return [];
+}
+
+/** Counts the number of EVT_SUGGESTION events already earned by a team in the historial. */
+function countValidSuggestionsInHistory(historial: ActionRecord[], equipoId: string): number {
+  let count = 0;
+  for (const record of historial) {
+    if (record.equipoId !== equipoId || record.action.type !== 'suggestion') continue;
+    // A suggestion with a non-null result that is not a redundant one counts as valid.
+    // (Invalid-card suggestions have result === null and no refutation.)
+    if (record.result === null) continue; // was an invalid-card action
+    // Check if this history entry itself was redundant vs all prior entries
+    const isRedundant = historial
+      .filter((r) => r !== record)
+      .some(
+        (r) =>
+          r.equipoId === equipoId &&
+          r.action.type === 'suggestion' &&
+          r.timestamp < record.timestamp &&
+          (r.action as SuggestionAction).sospechoso === (record.action as SuggestionAction).sospechoso &&
+          (r.action as SuggestionAction).arma === (record.action as SuggestionAction).arma &&
+          (r.action as SuggestionAction).habitacion === (record.action as SuggestionAction).habitacion,
+      );
+    if (!isRedundant) count++;
+  }
+  return count;
+}
+
 // --- Apply action ---
-export function applyAction(state: GameState, action: GameAction): GameState {
-  if (state.estado === 'finalizada') return state;
+export function applyAction(state: GameState, action: GameAction): ApplyActionResult {
+  if (state.estado === 'finalizada') return { state, scoreEvents: [] };
 
   const currentEquipo = getEquipoEnTurno(state);
   if (!currentEquipo || currentEquipo.equipoId !== action.equipoId) {
@@ -114,35 +222,122 @@ export function applyAction(state: GameState, action: GameAction): GameState {
   }
 }
 
-function applySuggestion(state: GameState, action: SuggestionAction): GameState {
+function incrementTurnosJugados(equipos: EquipoState[], equipoId: string): EquipoState[] {
+  return equipos.map((e) =>
+    e.equipoId === equipoId ? { ...e, turnosJugados: e.turnosJugados + 1 } : e,
+  );
+}
+
+function applySuggestion(state: GameState, action: SuggestionAction): ApplyActionResult {
+  const turno = state.turnoActual;
+  const scoreEvents: ScoreEvent[] = [];
+
+  // Increment own turn counter
+  const equiposWithTurno = incrementTurnosJugados(state.equipos, action.equipoId);
+
+  // Validate suggestion
+  const penalties = validateSuggestion(action, state.historial);
+  const isInvalidCard = penalties.some((e) => e.type === 'EVT_INVALID_CARD');
+
+  if (isInvalidCard) {
+    // Turn consumed; suggestion not processed (no refutation, no suggestionResult)
+    scoreEvents.push(...penalties);
+    const penaltySum = penalties.reduce((s, e) => s + e.points, 0);
+    const equiposUpdated = equiposWithTurno.map((e) =>
+      e.equipoId === action.equipoId ? { ...e, puntos: e.puntos + penaltySum } : e,
+    );
+    const record: ActionRecord = {
+      turno,
+      equipoId: action.equipoId,
+      action,
+      result: null, // marks this as invalid-card (no refutation)
+      timestamp: Date.now(),
+    };
+    return {
+      state: {
+        ...state,
+        turnoActual: nextTurnoIndex(equiposUpdated, turno),
+        equipos: equiposUpdated,
+        historial: [...state.historial, record],
+      },
+      scoreEvents,
+    };
+  }
+
+  // Process suggestion normally (find refutador)
   const refutador = findRefutador(state, action);
   let cartaMostrada: Carta | null = null;
 
   if (refutador) {
-    const equipoRef = state.equipos.find((e) => e.equipoId === refutador)!;
+    const equipoRef = equiposWithTurno.find((e) => e.equipoId === refutador)!;
     const matchingCards = equipoRef.cartas.filter(
-      (c) => c === action.sospechoso || c === action.arma || c === action.habitacion
+      (c) => c === action.sospechoso || c === action.arma || c === action.habitacion,
     );
     cartaMostrada = matchingCards[0] ?? null;
   }
 
-  const result: SuggestionResult = { refutadaPor: refutador, cartaMostrada };
-
+  const suggestionResult: SuggestionResult = { refutadaPor: refutador, cartaMostrada };
   const record: ActionRecord = {
-    turno: state.turnoActual,
+    turno,
     equipoId: action.equipoId,
     action,
-    result,
+    result: suggestionResult,
     timestamp: Date.now(),
   };
+  const newHistorial = [...state.historial, record];
+
+  // Scoring
+  if (penalties.length > 0) {
+    // Redundant suggestion
+    scoreEvents.push(...penalties);
+  } else {
+    // Valid suggestion — check cap
+    const validSuggCount = countValidSuggestionsInHistory(state.historial, action.equipoId);
+    if (validSuggCount < EVT_SUGGESTION_CAP) {
+      scoreEvents.push({
+        equipoId: action.equipoId,
+        type: 'EVT_SUGGESTION',
+        points: EVT_SUGGESTION_POINTS,
+        turno,
+      });
+    }
+  }
+
+  if (refutador) {
+    scoreEvents.push({
+      equipoId: refutador,
+      type: 'EVT_REFUTATION',
+      points: EVT_REFUTATION_POINTS,
+      turno,
+    });
+  }
+
+  // Apply point deltas
+  const pointsByEquipo = new Map<string, number>();
+  for (const evt of scoreEvents) {
+    pointsByEquipo.set(evt.equipoId, (pointsByEquipo.get(evt.equipoId) ?? 0) + evt.points);
+  }
+  const equiposUpdated = equiposWithTurno.map((e) => ({
+    ...e,
+    puntos: e.puntos + (pointsByEquipo.get(e.equipoId) ?? 0),
+  }));
 
   return {
-    ...state,
-    historial: [...state.historial, record],
+    state: {
+      ...state,
+      turnoActual: nextTurnoIndex(equiposUpdated, turno),
+      equipos: equiposUpdated,
+      historial: newHistorial,
+    },
+    scoreEvents,
+    suggestionResult,
   };
 }
 
-function applyAccusation(state: GameState, action: AccusationAction): GameState {
+function applyAccusation(state: GameState, action: AccusationAction): ApplyActionResult {
+  const turno = state.turnoActual;
+  const scoreEvents: ScoreEvent[] = [];
+
   const correcta =
     action.sospechoso === state.sobre.sospechoso &&
     action.arma === state.sobre.arma &&
@@ -154,46 +349,122 @@ function applyAccusation(state: GameState, action: AccusationAction): GameState 
   };
 
   const record: ActionRecord = {
-    turno: state.turnoActual,
+    turno,
     equipoId: action.equipoId,
     action,
     result,
     timestamp: Date.now(),
   };
 
-  const equiposActualizados = state.equipos.map((e) => {
-    if (e.equipoId !== action.equipoId) return e;
-    if (correcta) return { ...e, puntos: e.puntos + 100 };
-    return { ...e, eliminado: true }; // Wrong accusation = eliminated
-  });
+  // Increment own turn counter for winner
+  const equiposWithTurno = incrementTurnosJugados(state.equipos, action.equipoId);
 
-  const activeEquipos = equiposActualizados.filter((e) => !e.eliminado);
-
+  let equiposActualizados: EquipoState[];
   let nuevoEstado = state.estado;
   let ganadorId = state.ganadorId;
 
   if (correcta) {
+    const winnerState = equiposWithTurno.find((e) => e.equipoId === action.equipoId)!;
+    const T = winnerState.turnosJugados;
+    const effBonus = calcEfficiencyBonus(T);
+
+    // EVT_WIN
+    scoreEvents.push({
+      equipoId: action.equipoId,
+      type: 'EVT_WIN',
+      points: EVT_WIN_POINTS,
+      turno,
+    });
+    // EVT_WIN_EFFICIENCY
+    if (effBonus > 0) {
+      scoreEvents.push({
+        equipoId: action.equipoId,
+        type: 'EVT_WIN_EFFICIENCY',
+        points: effBonus,
+        turno,
+        meta: { T, T_min: 2, bonus: effBonus },
+      });
+    }
+    // EVT_SURVIVE for all non-eliminated, non-winner teams
+    for (const e of equiposWithTurno) {
+      if (!e.eliminado && e.equipoId !== action.equipoId) {
+        scoreEvents.push({
+          equipoId: e.equipoId,
+          type: 'EVT_SURVIVE',
+          points: EVT_SURVIVE_POINTS,
+          turno,
+        });
+      }
+    }
+
     nuevoEstado = 'finalizada';
     ganadorId = action.equipoId;
-  } else if (activeEquipos.length === 0) {
+  } else {
+    // Wrong accusation
+    scoreEvents.push({
+      equipoId: action.equipoId,
+      type: 'EVT_WRONG_ACCUSATION',
+      points: EVT_WRONG_ACCUSATION_POINTS,
+      turno,
+    });
+  }
+
+  // Apply point deltas
+  const pointsByEquipo = new Map<string, number>();
+  for (const evt of scoreEvents) {
+    pointsByEquipo.set(evt.equipoId, (pointsByEquipo.get(evt.equipoId) ?? 0) + evt.points);
+  }
+  equiposActualizados = equiposWithTurno.map((e) => {
+    const delta = pointsByEquipo.get(e.equipoId) ?? 0;
+    if (!correcta && e.equipoId === action.equipoId) {
+      return { ...e, eliminado: true, puntos: e.puntos + delta };
+    }
+    return { ...e, puntos: e.puntos + delta };
+  });
+
+  const activeEquipos = equiposActualizados.filter((e) => !e.eliminado);
+
+  if (!correcta && activeEquipos.length === 0) {
     nuevoEstado = 'finalizada';
   }
 
-  const nextTurno = nuevoEstado === 'finalizada' ? state.turnoActual : nextTurnoIndex(equiposActualizados, state.turnoActual);
+  const nextTurno =
+    nuevoEstado === 'finalizada'
+      ? state.turnoActual
+      : nextTurnoIndex(equiposActualizados, turno);
 
   return {
-    ...state,
-    estado: nuevoEstado,
-    turnoActual: nextTurno,
-    equipos: equiposActualizados,
-    historial: [...state.historial, record],
-    ganadorId,
+    state: {
+      ...state,
+      estado: nuevoEstado,
+      turnoActual: nextTurno,
+      equipos: equiposActualizados,
+      historial: [...state.historial, record],
+      ganadorId,
+    },
+    scoreEvents,
+    accusationResult: result,
   };
 }
 
-function applyPass(state: GameState, equipoId: string): GameState {
+function applyPass(state: GameState, equipoId: string): ApplyActionResult {
+  const turno = state.turnoActual;
+  const scoreEvents: ScoreEvent[] = [
+    {
+      equipoId,
+      type: 'EVT_PASS',
+      points: EVT_PASS_POINTS,
+      turno,
+    },
+  ];
+
+  const equiposWithTurno = incrementTurnosJugados(state.equipos, equipoId);
+  const equiposUpdated = equiposWithTurno.map((e) =>
+    e.equipoId === equipoId ? { ...e, puntos: e.puntos + EVT_PASS_POINTS } : e,
+  );
+
   const record: ActionRecord = {
-    turno: state.turnoActual,
+    turno,
     equipoId,
     action: { type: 'pass', equipoId },
     result: null,
@@ -201,9 +472,13 @@ function applyPass(state: GameState, equipoId: string): GameState {
   };
 
   return {
-    ...state,
-    turnoActual: nextTurnoIndex(state.equipos, state.turnoActual),
-    historial: [...state.historial, record],
+    state: {
+      ...state,
+      turnoActual: nextTurnoIndex(equiposUpdated, turno),
+      equipos: equiposUpdated,
+      historial: [...state.historial, record],
+    },
+    scoreEvents,
   };
 }
 

@@ -19,3 +19,21 @@ test('admin page redirects unauthenticated users', async ({ page }) => {
   await page.goto('/admin');
   await expect(page).toHaveURL(/\/login/);
 });
+
+test('/instrucciones is publicly accessible without authentication', async ({ page }) => {
+  await page.goto('/instrucciones');
+  await expect(page).toHaveURL(/\/instrucciones/);
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+});
+
+test('/instrucciones shows MCP contract section', async ({ page }) => {
+  await page.goto('/instrucciones');
+  await expect(page.getByText('Contrato MCP')).toBeVisible();
+});
+
+test('/instrucciones shows all three element categories', async ({ page }) => {
+  await page.goto('/instrucciones');
+  await expect(page.getByText('Sospechosos (6)')).toBeVisible();
+  await expect(page.getByText('Armas (6)')).toBeVisible();
+  await expect(page.getByText('Escenarios (9)')).toBeVisible();
+});

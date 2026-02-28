@@ -48,6 +48,19 @@ describe('ServerMessageSchema', () => {
     expect(() => ServerMessageSchema.parse({ type: 'unknown' })).toThrow();
   });
 
+  it('parses game:turn_completed with resultadoTipo pase', () => {
+    const msg = {
+      type: 'game:turn_completed',
+      gameId: 'g1',
+      turnoNumero: 2,
+      equipoId: 'eq1',
+      resultadoTipo: 'pase',
+      ts: 1000,
+    };
+    expect(() => ServerMessageSchema.parse(msg)).not.toThrow();
+    expect(ServerMessageSchema.parse(msg).type).toBe('game:turn_completed');
+  });
+
   it('rejects game:turn_completed with invalid resultadoTipo', () => {
     const msg = {
       type: 'game:turn_completed',

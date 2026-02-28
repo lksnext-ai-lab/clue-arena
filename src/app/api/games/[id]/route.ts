@@ -121,6 +121,15 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     }
   }
 
+  // Determine authoritative active team (coordinator creates the en_curso turn record)
+  const activeTurno = partida.estado === 'en_curso'
+    ? await db.select({ equipoId: turnos.equipoId })
+        .from(turnos)
+        .where(and(eq(turnos.partidaId, gameId), eq(turnos.estado, 'en_curso')))
+        .get()
+    : undefined;
+  const activeEquipoId = activeTurno?.equipoId ?? null;
+
   return NextResponse.json({
     id: gameId,
     nombre: partida.nombre,
@@ -129,6 +138,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     maxTurnos: partida.maxTurnos ?? null,
     modoEjecucion: partida.modoEjecucion,
     autoRunActivoDesde: partida.autoRunActivoDesde?.toISOString() ?? null,
+    activeEquipoId,
     createdAt: partida.createdAt?.toISOString() ?? null,
     startedAt: partida.startedAt?.toISOString() ?? null,
     finishedAt: partida.finishedAt?.toISOString() ?? null,

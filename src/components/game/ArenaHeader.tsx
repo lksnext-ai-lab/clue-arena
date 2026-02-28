@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { cn } from '@/lib/utils/cn';
 import { apiFetch } from '@/lib/api/client';
+import { useGame } from '@/contexts/GameContext';
 import type { GameDetailResponse } from '@/types/api';
 
 interface ArenaHeaderProps {
@@ -36,20 +37,10 @@ function statusBadge(estado: string) {
   }
 }
 
-function activeTeamName(partida: GameDetailResponse): string | null {
-  if (partida.estado !== 'en_curso') return null;
-  // Sort by orden to match coordinator's team-selection logic
-  const active = [...partida.equipos]
-    .filter((e) => !e.eliminado)
-    .sort((a, b) => a.orden - b.orden);
-  if (active.length === 0) return null;
-  const idx = partida.turnoActual % active.length;
-  return active[idx]?.equipoNombre ?? null;
-}
-
 export function ArenaHeader({ partida, isAdmin, isSyncing, onRefresh }: ArenaHeaderProps) {
   const [busy, setBusy] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const { activeEquipoId } = useGame();
 
   async function callAction(action: string) {
     setBusy(action);
@@ -75,7 +66,9 @@ export function ArenaHeader({ partida, isAdmin, isSyncing, onRefresh }: ArenaHea
     await callAction('stop');
   }
 
-  const teamName = activeTeamName(partida);
+  const teamName = activeEquipoId
+    ? (partida.equipos.find((e) => e.equipoId === activeEquipoId)?.equipoNombre ?? null)
+    : null;
   const isRunning = partida.estado === 'en_curso';
   const isAuto = partida.modoEjecucion === 'auto';
   const isPaused = partida.modoEjecucion === 'pausado';

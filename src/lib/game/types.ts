@@ -21,6 +21,39 @@ export interface EquipoState {
   cartas: Carta[];
   eliminado: boolean;
   puntos: number;
+  turnosJugados: number;
+}
+
+// ---------------------------------------------------------------------------
+// Scoring
+// ---------------------------------------------------------------------------
+
+export type ScoreEventType =
+  | 'EVT_WIN'
+  | 'EVT_WIN_EFFICIENCY'
+  | 'EVT_SURVIVE'
+  | 'EVT_SUGGESTION'
+  | 'EVT_REFUTATION'
+  | 'EVT_WRONG_ACCUSATION'
+  | 'EVT_PASS'
+  | 'EVT_TIMEOUT'
+  | 'EVT_INVALID_CARD'
+  | 'EVT_REDUNDANT_SUGGESTION'
+  | 'EVT_INVALID_FORMAT';
+
+export interface ScoreEvent {
+  equipoId: string;
+  type: ScoreEventType;
+  points: number;
+  turno: number;
+  meta?: Record<string, unknown>;
+}
+
+export interface ApplyActionResult {
+  state: GameState;
+  scoreEvents: ScoreEvent[];
+  suggestionResult?: SuggestionResult;
+  accusationResult?: AccusationResult;
 }
 
 export type GameAction =

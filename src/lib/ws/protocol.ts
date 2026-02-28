@@ -16,7 +16,8 @@ export const ServerMessageSchema = z.discriminatedUnion('type', [
     gameId: z.string(),
     turnoNumero: z.number(),
     equipoId: z.string(),
-    resultadoTipo: z.enum(['sugerencia', 'acusacion_correcta', 'acusacion_incorrecta']),
+    resultadoTipo: z.enum(['sugerencia', 'acusacion_correcta', 'acusacion_incorrecta', 'pase']),
+    nextEquipoId: z.string().nullable().optional(),
     ts: z.number(),
   }),
   // Cambio de estado de la partida
@@ -47,7 +48,7 @@ export type ClientMessage = z.infer<typeof ClientMessageSchema>;
 
 // Evento interno que fluye por GameEventEmitter
 export interface GameStateEvent {
-  type: 'turn_completed' | 'status_changed' | 'state_snapshot';
+  type: 'turn_completed' | 'status_changed' | 'state_snapshot' | 'score_event';
   gameId: string;
   payload: unknown;
 }

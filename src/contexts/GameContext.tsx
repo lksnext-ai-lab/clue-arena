@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useRef } from 'react';
 import { useGameSocket } from '@/lib/utils/useGameSocket';
 import { apiFetch } from '@/lib/api/client';
 import type { GameDetailResponse } from '@/types/api';
@@ -8,6 +8,7 @@ import type { ServerMessage } from '@/lib/ws/protocol';
 
 interface GameContextValue {
   partida: GameDetailResponse | null;
+  activeEquipoId: string | null;
   isConnected: boolean;
   lastUpdated: Date | null;
   error: Error | null;
@@ -16,6 +17,7 @@ interface GameContextValue {
 
 const GameContext = createContext<GameContextValue>({
   partida: null,
+  activeEquipoId: null,
   isConnected: false,
   lastUpdated: null,
   error: null,
@@ -29,20 +31,32 @@ interface GameProviderProps {
 
 export function GameProvider({ children, gameId }: GameProviderProps) {
   const [partida, setPartida] = useState<GameDetailResponse | null>(null);
+  const [activeEquipoId, setActiveEquipoId] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<Error | null>(null);
+
+  // Monotonic counter to discard out-of-order HTTP responses.
+  // Multiple WS events (e.g. rapid auto-run turns) can trigger concurrent
+  // fetchGame() calls; a slow earlier response must never overwrite a fast
+  // later one, or the turn indicator ends up showing a stale team.
+  const fetchSeqRef = useRef(0);
 
   const isFinished = partida?.estado === 'finalizada';
 
   // Fetching HTTP: solo al montar (estado inicial) y como fallback manual
   const fetchGame = useCallback(async () => {
+    const seq = ++fetchSeqRef.current;
     try {
       const data = await apiFetch<GameDetailResponse>(`/games/${gameId}`);
+      // Only accept this response if no newer request has completed after us
+      if (seq < fetchSeqRef.current) return;
       setPartida(data);
+      setActiveEquipoId(data.activeEquipoId);
       setLastUpdated(new Date());
       setError(null);
     } catch (err) {
+      if (seq < fetchSeqRef.current) return;
       setError(err instanceof Error ? err : new Error('Error desconocido'));
     }
   }, [gameId]);
@@ -60,7 +74,16 @@ export function GameProvider({ children, gameId }: GameProviderProps) {
       fetchGame();
       return;
     }
-    if (msg.type === 'game:turn_completed' || msg.type === 'game:status_changed') {
+    if (msg.type === 'game:turn_completed') {
+      // Immediately apply coordinator's authoritative next-team indicator,
+      // then also re-fetch for full state refresh
+      if (msg.nextEquipoId !== undefined) {
+        setActiveEquipoId(msg.nextEquipoId);
+      }
+      fetchGame();
+      return;
+    }
+    if (msg.type === 'game:status_changed') {
       // Re-fetch completo del estado actual (simple y robusto)
       fetchGame();
     }
@@ -80,6 +103,7 @@ export function GameProvider({ children, gameId }: GameProviderProps) {
 
   const value: GameContextValue = {
     partida,
+    activeEquipoId,
     isConnected,
     lastUpdated,
     error,

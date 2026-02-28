@@ -42,6 +42,7 @@ export const getGameStateTool = {
         cartas: JSON.parse(e.cartas),
         eliminado: e.eliminado,
         puntos: e.puntos,
+        turnosJugados: 0,
       })),
       historial: [],
       ganadorId: null,

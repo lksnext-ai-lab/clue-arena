@@ -81,6 +81,7 @@ export interface ArenaActionRecord {
 }
 
 export interface GameDetailResponse extends GameResponse {
+  activeEquipoId: string | null;
   turnos: TurnResponse[];
   sobre?: EnvelopeResponse; // Admin: siempre; Público: solo cuando finalizada
 }
