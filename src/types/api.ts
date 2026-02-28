@@ -85,6 +85,13 @@ export interface GameDetailResponse extends GameResponse {
   sobre?: EnvelopeResponse; // Admin: siempre; Público: solo cuando finalizada
 }
 
+export interface PaseResponse {
+  id: string;
+  equipoId: string;
+  origen: 'voluntario' | 'timeout' | 'invalid_format';
+  createdAt: string;
+}
+
 export interface TurnResponse {
   id: string;
   equipoId: string;
@@ -93,6 +100,7 @@ export interface TurnResponse {
   estado: string;
   sugerencias: SuggestionResponse[];
   acusacion?: AccusationResponse;
+  pase?: PaseResponse;
 }
 
 export interface SuggestionResponse {
@@ -185,11 +193,16 @@ export interface CannotRefuteAction {
   type: 'cannot_refute';
 }
 
+export interface PassAgentAction {
+  type: 'pass';
+}
+
 export type AgentAction =
   | SuggestionAction
   | AccusationAction
   | ShowCardAction
-  | CannotRefuteAction;
+  | CannotRefuteAction
+  | PassAgentAction;
 
 export interface AgentResponse {
   /** Structured action that the game engine applies */

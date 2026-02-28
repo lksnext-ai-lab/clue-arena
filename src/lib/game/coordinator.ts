@@ -20,8 +20,9 @@ import {
   sugerencias,
   acusaciones,
   sobres,
+  pases,
 } from '@/lib/db/schema';
-import { eq, and, count } from 'drizzle-orm';
+import { eq, and, count, sql } from 'drizzle-orm';
 import type { InferSelectModel } from 'drizzle-orm';
 import { gameEventEmitter } from '@/lib/ws/GameEventEmitter';
 
@@ -29,6 +30,7 @@ import { gameEventEmitter } from '@/lib/ws/GameEventEmitter';
 type TeamRow = InferSelectModel<typeof partidaEquipos>;
 import { v4 as uuidv4 } from 'uuid';
 import { invokeAgent } from '@/lib/api/agent';
+import { AgentResponseError } from '@/lib/api/local-agent';
 import { logInvocacionValidity } from '@/lib/utils/log';
 import type { Carta } from '@/types/domain';
 
@@ -57,8 +59,8 @@ export interface AdvanceTurnResult {
   reason: string;
   /** The team whose turn was processed. */
   teamId: string;
-  /** The action type that was applied: 'suggestion' | 'accusation'. */
-  actionType: 'suggestion' | 'accusation';
+  /** The action type that was applied: 'suggestion' | 'accusation' | 'pass'. */
+  actionType: 'suggestion' | 'accusation' | 'pass';
 }
 
 // ---------------------------------------------------------------------------
@@ -136,14 +138,96 @@ export async function advanceTurn(gameId: string): Promise<AdvanceTurnResult> {
   }
 
   // ── 4. Invoke the agent for the current team ──────────────────────────────
-  const { response: agentResponse, invocacionId } = await invokeAgent(
-    { type: 'play_turn', gameId, teamId: currentTeam.equipoId },
-    { turnoId: turno.id },
-  );
+  let agentAction!: import('@/types/api').AgentAction;
+  let invocacionId!: string;
+  let passOrigen: 'timeout' | 'invalid_format' | null = null;
 
-  const { action } = agentResponse;
+  try {
+    const { response: agentResponse, invocacionId: invId } = await invokeAgent(
+      { type: 'play_turn', gameId, teamId: currentTeam.equipoId },
+      { turnoId: turno.id },
+    );
+    agentAction = agentResponse.action;
+    invocacionId = invId;
+  } catch (err) {
+    // Determine pass origin from error type
+    if (
+      err instanceof Error &&
+      (err.name === 'AbortError' || err.name === 'TimeoutError' || err.message.toLowerCase().includes('timeout'))
+    ) {
+      passOrigen = 'timeout';
+    } else if (err instanceof AgentResponseError) {
+      passOrigen = 'invalid_format';
+    } else {
+      throw err;
+    }
 
-  const isValidAction = action.type === 'suggestion' || action.type === 'accusation';
+    const maxTurnsReached = await handlePass({
+      gameId,
+      teamId: currentTeam.equipoId,
+      turnoId: turno.id,
+      turnoActual: partida.turnoActual,
+      activeTeamCount: activeTeams.length,
+      allTeams,
+      maxTurnos: partida.maxTurnos,
+      origen: passOrigen,
+    });
+
+    // Apply scoring for forced passes
+    if (passOrigen === 'timeout') {
+      await db
+        .update(partidaEquipos)
+        .set({ puntos: sql`${partidaEquipos.puntos} - 20` })
+        .where(
+          and(
+            eq(partidaEquipos.partidaId, gameId),
+            eq(partidaEquipos.equipoId, currentTeam.equipoId),
+          ),
+        );
+    } else {
+      await db
+        .update(partidaEquipos)
+        .set({ puntos: sql`${partidaEquipos.puntos} - 25` })
+        .where(
+          and(
+            eq(partidaEquipos.partidaId, gameId),
+            eq(partidaEquipos.equipoId, currentTeam.equipoId),
+          ),
+        );
+    }
+
+    gameEventEmitter.emitTurnCompleted(gameId, {
+      type: 'turn_completed',
+      gameId,
+      payload: {
+        turnoNumero: turno.numero,
+        equipoId: currentTeam.equipoId,
+        resultadoTipo: 'pase',
+      },
+    });
+
+    if (maxTurnsReached) {
+      gameEventEmitter.emitTurnCompleted(gameId, {
+        type: 'status_changed',
+        gameId,
+        payload: { nuevoEstado: 'finalizada' },
+      });
+    }
+
+    return {
+      gameOver: maxTurnsReached,
+      reason: maxTurnsReached ? 'max_turns_reached' : (`${passOrigen}_pass` as string),
+      teamId: currentTeam.equipoId,
+      actionType: 'pass',
+    };
+  }
+
+  const action = agentAction;
+
+  const isValidAction =
+    action.type === 'suggestion' ||
+    action.type === 'accusation' ||
+    action.type === 'pass';
   logInvocacionValidity(
     invocacionId,
     gameId,
@@ -157,7 +241,7 @@ export async function advanceTurn(gameId: string): Promise<AdvanceTurnResult> {
     throw new CoordinatorError(
       422,
       `Tipo de acción inválido para play_turn: "${action.type}". ` +
-        'Se esperaba "suggestion" o "accusation".',
+        'Se esperaba "suggestion", "accusation" o "pass".',
     );
   }
 
@@ -200,7 +284,7 @@ export async function advanceTurn(gameId: string): Promise<AdvanceTurnResult> {
       teamId: currentTeam.equipoId,
       actionType: 'suggestion',
     };
-  } else {
+  } else if (action.type === 'accusation') {
     const gameOver = await handleAccusation({
       gameId,
       teamId: currentTeam.equipoId,
@@ -236,6 +320,43 @@ export async function advanceTurn(gameId: string): Promise<AdvanceTurnResult> {
       reason: gameOver ? 'accusation_correct' : 'accusation_incorrect',
       teamId: currentTeam.equipoId,
       actionType: 'accusation',
+    };
+  } else {
+    // action.type === 'pass' — pase voluntario del agente
+    const maxTurnsReached = await handlePass({
+      gameId,
+      teamId: currentTeam.equipoId,
+      turnoId: turno.id,
+      turnoActual: partida.turnoActual,
+      activeTeamCount: activeTeams.length,
+      allTeams,
+      maxTurnos: partida.maxTurnos,
+      origen: 'voluntario',
+    });
+
+    gameEventEmitter.emitTurnCompleted(gameId, {
+      type: 'turn_completed',
+      gameId,
+      payload: {
+        turnoNumero: turno.numero,
+        equipoId: currentTeam.equipoId,
+        resultadoTipo: 'pase',
+      },
+    });
+
+    if (maxTurnsReached) {
+      gameEventEmitter.emitTurnCompleted(gameId, {
+        type: 'status_changed',
+        gameId,
+        payload: { nuevoEstado: 'finalizada' },
+      });
+    }
+
+    return {
+      gameOver: maxTurnsReached,
+      reason: maxTurnsReached ? 'max_turns_reached' : 'pass_applied',
+      teamId: currentTeam.equipoId,
+      actionType: 'pass',
     };
   }
 }
@@ -433,6 +554,62 @@ async function handleAccusation(p: AccusationParams): Promise<boolean> {
   const activeAfter = updatedTeams.filter((t) => !t.eliminado);
   const maxTurnsReached = await _advanceTurnoIndex(gameId, turnoActual, activeAfter.length, updatedTeams, maxTurnos);
   return maxTurnsReached;
+}
+
+// ---------------------------------------------------------------------------
+// Pass handler
+// ---------------------------------------------------------------------------
+
+interface PassParams {
+  gameId: string;
+  teamId: string;
+  turnoId: string;
+  turnoActual: number;
+  activeTeamCount: number;
+  allTeams: TeamRow[];
+  maxTurnos: number | null;
+  origen: 'voluntario' | 'timeout' | 'invalid_format';
+}
+
+/**
+ * Persists a pass record, optionally applies EVT_PASS penalty (−5 for voluntario),
+ * marks the turn as completed, and advances the turn index.
+ * Returns true if maxTurnos was reached (game ended).
+ */
+async function handlePass(p: PassParams): Promise<boolean> {
+  const { gameId, teamId, turnoId, turnoActual, activeTeamCount, allTeams, maxTurnos, origen } = p;
+
+  // Persist pass in `pases` table
+  await db.insert(pases).values({
+    id: uuidv4(),
+    turnoId,
+    partidaId: gameId,
+    equipoId: teamId,
+    origen,
+    createdAt: new Date(),
+  });
+
+  // Apply EVT_PASS penalty (−5) only for voluntary passes.
+  // Forced passes (timeout / invalid_format) apply their own penalties in the caller.
+  if (origen === 'voluntario') {
+    await db
+      .update(partidaEquipos)
+      .set({ puntos: sql`${partidaEquipos.puntos} - 5` })
+      .where(
+        and(
+          eq(partidaEquipos.partidaId, gameId),
+          eq(partidaEquipos.equipoId, teamId),
+        ),
+      );
+  }
+
+  // Mark turn as completed
+  await db
+    .update(turnos)
+    .set({ estado: 'completado', finishedAt: new Date() })
+    .where(eq(turnos.id, turnoId));
+
+  return _advanceTurnoIndex(gameId, turnoActual, activeTeamCount, allTeams, maxTurnos);
 }
 
 // ---------------------------------------------------------------------------

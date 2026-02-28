@@ -131,6 +131,22 @@ export const acusaciones = sqliteTable('acusaciones', {
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 });
 
+// --- pases ---
+export const pases = sqliteTable('pases', {
+  id: text('id').primaryKey(),
+  turnoId: text('turno_id')
+    .references(() => turnos.id)
+    .notNull(),
+  partidaId: text('partida_id')
+    .references(() => partidas.id)
+    .notNull(),
+  equipoId: text('equipo_id')
+    .references(() => equipos.id)
+    .notNull(),
+  origen: text('origen', { enum: ['voluntario', 'timeout', 'invalid_format'] }).notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+});
+
 // --- ranking (snapshot post-evento o por partida) ---
 export const ranking = sqliteTable('ranking', {
   id: text('id').primaryKey(),
@@ -171,6 +187,7 @@ export const turnosRelations = relations(turnos, ({ one, many }) => ({
   equipo: one(equipos, { fields: [turnos.equipoId], references: [equipos.id] }),
   sugerencias: many(sugerencias),
   acusaciones: many(acusaciones),
+  pases: many(pases),
 }));
 
 export const sugerenciasRelations = relations(sugerencias, ({ one }) => ({
@@ -197,4 +214,10 @@ export const acusacionesRelations = relations(acusaciones, ({ one }) => ({
   turno: one(turnos, { fields: [acusaciones.turnoId], references: [turnos.id] }),
   partida: one(partidas, { fields: [acusaciones.partidaId], references: [partidas.id] }),
   equipo: one(equipos, { fields: [acusaciones.equipoId], references: [equipos.id] }),
+}));
+
+export const pasesRelations = relations(pases, ({ one }) => ({
+  turno: one(turnos, { fields: [pases.turnoId], references: [turnos.id] }),
+  partida: one(partidas, { fields: [pases.partidaId], references: [partidas.id] }),
+  equipo: one(equipos, { fields: [pases.equipoId], references: [equipos.id] }),
 }));

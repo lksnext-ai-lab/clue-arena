@@ -6,14 +6,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock Genkit ai instance before importing local-agent
 vi.mock('@/lib/ai/genkit', () => ({
-  ai: { generate: vi.fn(), defineTool: vi.fn((config, handler) => ({ ...config, handler })) },
+  ai: { generate: vi.fn() },
   DEFAULT_MODEL: 'test-model',
-}));
-
-// Mock the tools module to avoid DB/MCP dependencies
-vi.mock('@/lib/ai/tools/cluedo-tools', () => ({
-  PLAY_TURN_TOOLS: [],
-  REFUTE_TOOLS: [],
 }));
 
 // Mock MCP tool wrappers and context to avoid DB/logger/pino dependencies
@@ -46,6 +40,9 @@ const mockGenerate = vi.mocked(ai.generate);
 function fakeResponse(outputJson: unknown) {
   return {
     output: outputJson,
+    toolRequests: [],
+    finishReason: 'stop',
+    usage: {},
     messages: [
       {
         role: 'model',
@@ -98,6 +95,25 @@ describe('invokeAgent — play_turn', () => {
     await expect(
       invokeAgent({ type: 'play_turn', gameId: 'g1', teamId: 't1' }, TEST_OPTIONS)
     ).rejects.toThrow(AgentResponseError);
+  });
+
+  it('returns pass action when LLM outputs pass', async () => {
+    const expected = { action: { type: 'pass' } };
+    mockGenerate.mockResolvedValueOnce(fakeResponse(expected) as never);
+
+    const result = await invokeAgent({ type: 'play_turn', gameId: 'g1', teamId: 't1' }, TEST_OPTIONS);
+
+    expect(result.action.type).toBe('pass');
+    expect(result.done).toBe(true);
+  });
+
+  it('does NOT throw AgentResponseError when LLM outputs pass (was previously invalid)', async () => {
+    const expected = { action: { type: 'pass' } };
+    mockGenerate.mockResolvedValueOnce(fakeResponse(expected) as never);
+
+    await expect(
+      invokeAgent({ type: 'play_turn', gameId: 'g1', teamId: 't1' }, TEST_OPTIONS)
+    ).resolves.not.toThrow();
   });
 });
 

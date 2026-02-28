@@ -1,8 +1,8 @@
 /**
- * Agent facade — selects backend (local Genkit or MattinAI) based on AGENT_BACKEND env var.
+ * Agent facade — selects backend based on AGENT_BACKEND env var.
  *
- * AGENT_BACKEND=local  → Genkit backend (development / CI / staging)
- * AGENT_BACKEND=mattin → MattinAI backend (default, production)
+ * AGENT_BACKEND=local      → Genkit backend (development / CI / staging)
+ * AGENT_BACKEND=mattin     → MattinAI backend (default, production)
  *
  * All server-side callers must import invokeAgent from here, never directly
  * from mattin.ts or local-agent.ts.
@@ -17,7 +17,8 @@ import { agentLog } from '@/lib/utils/logger';
 export type { AgentRequest, AgentResponse };
 
 function resolveBackendName(): 'mattin' | 'local' {
-  return process.env.AGENT_BACKEND === 'local' ? 'local' : 'mattin';
+  if (process.env.AGENT_BACKEND === 'local') return 'local';
+  return 'mattin';
 }
 
 export async function invokeAgent(

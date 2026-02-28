@@ -9,6 +9,7 @@ import {
   sugerencias,
   acusaciones,
   sobres,
+  pases,
 } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 
@@ -51,6 +52,11 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
         .from(acusaciones)
         .where(eq(acusaciones.turnoId, t.id))
         .get();
+      const turnPase = await db
+        .select()
+        .from(pases)
+        .where(eq(pases.turnoId, t.id))
+        .get();
 
       return {
         id: t.id,
@@ -82,6 +88,14 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
               habitacion: turnAcusacion.habitacion,
               correcta: turnAcusacion.correcta,
               createdAt: turnAcusacion.createdAt?.toISOString() ?? null,
+            }
+          : undefined,
+        pase: turnPase
+          ? {
+              id: turnPase.id,
+              equipoId: turnPase.equipoId,
+              origen: turnPase.origen as 'voluntario' | 'timeout' | 'invalid_format',
+              createdAt: turnPase.createdAt?.toISOString() ?? null,
             }
           : undefined,
       };

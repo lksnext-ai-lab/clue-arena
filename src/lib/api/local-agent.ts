@@ -2,43 +2,87 @@
  * Local agent backend using Genkit — implements AgentRequest/AgentResponse contract.
  * Server-side only. Never import this in client components.
  *
- * NOTE: We do NOT use Genkit tools here. Models in the gemini-2.5/3.x family attach
- * thought_signatures to function-call responses; Genkit does not echo them back in the
- * subsequent tool-result turn, causing a 400 error. Instead we pre-fetch all context
- * (game state + memory) and inject it into a single-turn prompt.
+ * Context-injection approach (tool-free):
+ *   Game state and agent memory are fetched directly before the LLM call and
+ *   embedded in the user prompt.  A single ai.generate() call is made without
+ *   any Genkit tools, making this implementation compatible with thinking models
+ *   (Gemini 2.5 Pro / Flash Thinking) that cannot mix tool-calling with extended
+ *   thinking mode.
+ *
+ *   For play_turn the model may include an optional "memory" field in its JSON
+ *   response.  If present, it is persisted via saveAgentMemory so that future
+ *   turns can benefit from accumulated deductions.
+ *
+ *   McpCallContext (AsyncLocalStorage) is set for the entire invocation so that
+ *   the context-fetch helpers below emit F012-compatible log entries via the
+ *   withMcpLog wrapper.
  */
 import { z } from 'zod';
 import type { AgentRequest, AgentResponse, AgentAction } from '@/types/api';
 import { ai, DEFAULT_MODEL } from '@/lib/ai/genkit';
-import { getGameStateTool } from '@/lib/mcp/tools/get-game-state';
-import { withMcpLog } from '@/lib/mcp/tools/_log-wrapper';
 import { createMcpCallContext, mcpContextStorage } from '@/lib/mcp/tools/context';
-import { getAgentMemory, saveAgentMemory } from '@/lib/ai/agent-memory';
+import { withMcpLog } from '@/lib/mcp/tools/_log-wrapper';
 import { PLAY_TURN_SYSTEM_PROMPT } from '@/lib/ai/prompts/play-turn';
 import { REFUTE_SYSTEM_PROMPT } from '@/lib/ai/prompts/refute';
 import { logGenkitRequest, logGenkitResponse } from '@/lib/ai/genkit-log';
+import { getGameStateTool } from '@/lib/mcp/tools/get-game-state';
+import { getAgentMemory, saveAgentMemory } from '@/lib/ai/agent-memory';
 
-// --- Zod schemas for validating LLM JSON output ---
-const PlayTurnResponseSchema = z.union([
-  z.object({
-    action: z.object({
+// ---------------------------------------------------------------------------
+// Instrumented context-fetch helpers (F012 logging, no agentic tool calls)
+// ---------------------------------------------------------------------------
+
+const loggedGetGameState = withMcpLog('get_game_state', getGameStateTool.handler);
+
+const loggedGetAgentMemory = withMcpLog(
+  'get_agent_memory',
+  async ({ game_id, team_id }: { game_id: string; team_id: string }) => {
+    const memory = await getAgentMemory(game_id, team_id);
+    return { content: [{ type: 'text' as const, text: JSON.stringify(memory) }] };
+  },
+);
+
+const loggedSaveAgentMemory = withMcpLog(
+  'save_agent_memory',
+  async ({
+    game_id,
+    team_id,
+    memory,
+  }: {
+    game_id: string;
+    team_id: string;
+    memory: Record<string, unknown>;
+  }) => {
+    await saveAgentMemory(game_id, team_id, memory);
+    return { content: [{ type: 'text' as const, text: 'ok' }] };
+  },
+);
+
+// ---------------------------------------------------------------------------
+// Zod schemas — validate the final JSON action emitted by the LLM
+// ---------------------------------------------------------------------------
+
+/**
+ * play_turn: action + optional memory the model wants to persist for next turn.
+ */
+const PlayTurnResponseSchema = z.object({
+  action: z.union([
+    z.object({
       type: z.literal('suggestion'),
       suspect: z.string(),
       weapon: z.string(),
       room: z.string(),
     }),
-    memory: z.record(z.unknown()).optional(),
-  }),
-  z.object({
-    action: z.object({
+    z.object({
       type: z.literal('accusation'),
       suspect: z.string(),
       weapon: z.string(),
       room: z.string(),
     }),
-    memory: z.record(z.unknown()).optional(),
-  }),
-]);
+    z.object({ type: z.literal('pass') }),
+  ]),
+  memory: z.record(z.unknown()).optional(),
+});
 
 const RefuteResponseSchema = z.union([
   z.object({
@@ -49,23 +93,27 @@ const RefuteResponseSchema = z.union([
   }),
 ]);
 
+// ---------------------------------------------------------------------------
+// Public types
+// ---------------------------------------------------------------------------
+
 export interface LocalAgentOptions {
   /** F012: UUID from the parent invokeAgent call for log correlation */
   invocacionId: string;
   turnoId: string;
 }
 
-// Wrapped handlers for consistent MCP tool call logging (F012)
-const loggedGetGameState = withMcpLog('get_game_state', getGameStateTool.handler);
+// ---------------------------------------------------------------------------
+// Main export
+// ---------------------------------------------------------------------------
 
-// --- Main export ---
 export async function invokeAgent(
   request: AgentRequest,
   options: LocalAgentOptions,
 ): Promise<AgentResponse> {
   const isPlayTurn = request.type === 'play_turn';
 
-  // F012: create McpCallContext so withMcpLog can correlate tool calls
+  // McpCallContext: provides F012 correlation IDs for context-fetch log entries.
   const mcpCtx = createMcpCallContext(
     options.invocacionId,
     request.gameId,
@@ -73,43 +121,8 @@ export async function invokeAgent(
     options.turnoId,
   );
 
-  // Pre-fetch context so the model doesn't need tool calls (single-turn safe).
-  // Run inside mcpContextStorage so withMcpLog picks up the context.
-  const [gameStateJson, agentMemory] = await mcpContextStorage.run(mcpCtx, () =>
-    Promise.all([
-      loggedGetGameState({ game_id: request.gameId, team_id: request.teamId })
-        .then((r) => (r as { content: { text: string }[] }).content[0].text)
-        .catch(() => '{}'),
-      getAgentMemory(request.gameId, request.teamId).catch(() => ({})),
-    ]),
-  );
-
-  const contextBlock =
-    `## Estado actual de la partida\n\`\`\`json\n${gameStateJson}\n\`\`\`\n\n` +
-    `## Tu memoria de turnos anteriores\n\`\`\`json\n${JSON.stringify(agentMemory, null, 2)}\n\`\`\``;
-
   const systemPrompt = isPlayTurn ? PLAY_TURN_SYSTEM_PROMPT : REFUTE_SYSTEM_PROMPT;
 
-  const userPrompt = isPlayTurn
-    ? `${contextBlock}\n\nJuega tu turno.`
-    : `${contextBlock}\n\n` +
-      `Refuta la combinación: sospechoso="${request.suspect}", arma="${request.weapon}", habitación="${request.room}".`;
-
-  // F012 §4.4 — log the LLM request before calling ai.generate()
-  logGenkitRequest({
-    invocacionId: options.invocacionId,
-    gameId: request.gameId,
-    teamId: request.teamId,
-    turnoId: options.turnoId,
-    model: DEFAULT_MODEL,
-    tipo: request.type,
-    systemPrompt,
-    userPrompt,
-  });
-
-  const tsLlm = Date.now();
-
-  // F012 §4.4 — shared log params reused in both catch and success paths
   const baseResponseParams = {
     invocacionId: options.invocacionId,
     gameId: request.gameId,
@@ -120,18 +133,78 @@ export async function invokeAgent(
   } as const;
 
   let llmResponse: Awaited<ReturnType<typeof ai.generate>>;
+
   try {
-    llmResponse = await ai.generate({
-      model: DEFAULT_MODEL,
-      system: systemPrompt,
-      prompt: userPrompt,
-      output: { format: 'json' },
+    llmResponse = await mcpContextStorage.run(mcpCtx, async () => {
+      // ── Step 1: fetch all context before the LLM call (parallel) ─────────
+      // withMcpLog emits F012-compatible log entries for each fetch.
+      const [gameStateResult, memoryResult] = await Promise.all([
+        loggedGetGameState({ game_id: request.gameId, team_id: request.teamId }) as Promise<{
+          content: { text: string }[];
+        }>,
+        loggedGetAgentMemory({ game_id: request.gameId, team_id: request.teamId }) as Promise<{
+          content: { text: string }[];
+        }>,
+      ]);
+
+      const gameStateJson = gameStateResult.content[0].text;
+      const memoryJson = memoryResult.content[0].text;
+
+      // ── Step 2: build context-rich user prompt ────────────────────────────
+      const baseContext =
+        `gameId="${request.gameId}" teamId="${request.teamId}"\n\n` +
+        `## Estado actual de la partida\n${gameStateJson}\n\n` +
+        `## Tu memoria de turnos anteriores\n${memoryJson}\n\n`;
+
+      const refuteRequest = request as Extract<AgentRequest, { type: 'refute' }>;
+      const userPrompt = isPlayTurn
+        ? `${baseContext}Razona a partir del contexto y decide tu acción. Devuelve ÚNICAMENTE el JSON solicitado.`
+        : `${baseContext}` +
+          `Refuta la combinación: sospechoso="${refuteRequest.suspect}", ` +
+          `arma="${refuteRequest.weapon}", ` +
+          `habitación="${refuteRequest.room}".\n\n` +
+          `Devuelve ÚNICAMENTE el JSON solicitado.`;
+
+      // F012 §4.4 — log before the LLM call
+      logGenkitRequest({
+        invocacionId: options.invocacionId,
+        gameId: request.gameId,
+        teamId: request.teamId,
+        turnoId: options.turnoId,
+        model: DEFAULT_MODEL,
+        tipo: request.type,
+        systemPrompt,
+        userPrompt,
+      });
+
+      // ── Step 3: single LLM call — no tools, compatible with thinking models
+      const response = await ai.generate({
+        model: DEFAULT_MODEL,
+        system: systemPrompt,
+        prompt: userPrompt,
+        output: { format: 'json' },
+      });
+
+      // ── Step 4: persist memory update if the model included one ───────────
+      if (isPlayTurn) {
+        const rawOutput = response.output as Record<string, unknown> | null;
+        const updatedMemory = rawOutput?.memory;
+        if (updatedMemory && typeof updatedMemory === 'object') {
+          await loggedSaveAgentMemory({
+            game_id: request.gameId,
+            team_id: request.teamId,
+            memory: updatedMemory as Record<string, unknown>,
+          });
+        }
+      }
+
+      return response;
     });
   } catch (err) {
     logGenkitResponse({
       ...baseResponseParams,
       estado: 'error',
-      durationMs: Date.now() - tsLlm,
+      durationMs: 0,
       finishReason: null,
       tokensInput: null,
       tokensOutput: null,
@@ -143,27 +216,31 @@ export async function invokeAgent(
     throw err;
   }
 
-  // Accumulate reasoning text from all model messages
+  // Collect reasoning/thinking text from model-role messages.
   const reasoning = llmResponse.messages
     .filter((m) => m.role === 'model')
     .flatMap((m) => m.content)
     .filter((p) => p.text)
     .map((p) => p.text!)
-    .join('');
+    .join('\n');
 
-  // Parse and validate the structured action
+  // Validate the final structured JSON output with Zod.
   const schema = isPlayTurn ? PlayTurnResponseSchema : RefuteResponseSchema;
   const parsed = schema.safeParse(llmResponse.output);
 
-  // F012 §4.4 — log response after Zod validation so estado reflects parse errors too
+  // F012 §4.4 — log after Zod validation.
   logGenkitResponse({
     ...baseResponseParams,
     estado: parsed.success ? 'ok' : 'parse_error',
-    durationMs: Date.now() - tsLlm,
+    durationMs:
+      (llmResponse.usage as { latencyMs?: number } | undefined)?.latencyMs ?? 0,
     finishReason: llmResponse.finishReason ?? null,
-    tokensInput: (llmResponse.usage as { inputTokens?: number } | undefined)?.inputTokens ?? null,
-    tokensOutput: (llmResponse.usage as { outputTokens?: number } | undefined)?.outputTokens ?? null,
-    tokensTotal: (llmResponse.usage as { totalTokens?: number } | undefined)?.totalTokens ?? null,
+    tokensInput:
+      (llmResponse.usage as { inputTokens?: number } | undefined)?.inputTokens ?? null,
+    tokensOutput:
+      (llmResponse.usage as { outputTokens?: number } | undefined)?.outputTokens ?? null,
+    tokensTotal:
+      (llmResponse.usage as { totalTokens?: number } | undefined)?.totalTokens ?? null,
     messageCount: llmResponse.messages.length,
     outputValid: parsed.success,
     errorMessage: parsed.success ? null : parsed.error.message,
@@ -173,14 +250,7 @@ export async function invokeAgent(
   if (!parsed.success) {
     throw new AgentResponseError(
       `Respuesta del agente no válida: ${parsed.error.message}`,
-      reasoning
-    );
-  }
-
-  // Persist memory if the model included it (play_turn only)
-  if (isPlayTurn && 'memory' in parsed.data && parsed.data.memory) {
-    await saveAgentMemory(request.gameId, request.teamId, parsed.data.memory).catch(
-      (e) => console.warn('[local-agent] Failed to save memory:', e)
+      reasoning,
     );
   }
 
@@ -191,10 +261,14 @@ export async function invokeAgent(
   };
 }
 
+// ---------------------------------------------------------------------------
+// Errors
+// ---------------------------------------------------------------------------
+
 export class AgentResponseError extends Error {
   constructor(
     message: string,
-    public readonly reasoning: string
+    public readonly reasoning: string,
   ) {
     super(message);
     this.name = 'AgentResponseError';

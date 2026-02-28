@@ -17,4 +17,4 @@ export const ai = genkit({
 });
 
 /** Default model. Override with GENKIT_MODEL env var. */
-export const DEFAULT_MODEL = process.env.GENKIT_MODEL ?? 'googleai/gemini-3-flash-preview';
+export const DEFAULT_MODEL = process.env.GENKIT_MODEL ?? 'googleai/gemini-2.5-flash';
