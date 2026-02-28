@@ -25,6 +25,16 @@ vi.mock('@/lib/api/agent', () => ({
   invokeAgent: (...args: unknown[]) => mockInvokeAgent(...args),
 }));
 
+// ── Logger mock (F012 — avoid pino initialization in tests) ──────────────────
+vi.mock('@/lib/utils/log', () => ({
+  logInvocacionValidity: vi.fn(),
+}));
+
+/** Wraps an agent action in the F012 invokeAgent return format */
+function agentResult(action: Record<string, unknown>) {
+  return { response: { action, reasoning: 'test', done: true }, invocacionId: 'test-inv-id' };
+}
+
 // ── Import after mocks ────────────────────────────────────────────────────────
 import { advanceTurn, CoordinatorError } from '@/lib/game/coordinator';
 import { getGameStateTool } from '@/lib/mcp/tools/get-game-state';
@@ -174,11 +184,9 @@ describe('Coordinator — advanceTurn', () => {
     });
 
     // Suggestion with cards nobody holds
-    mockInvokeAgent.mockResolvedValue({
-      action: { type: 'suggestion', suspect: SOSPECHOSO, weapon: ARMA, room: HABITACION },
-      reasoning: 'test',
-      done: true,
-    });
+    mockInvokeAgent.mockResolvedValue(
+      agentResult({ type: 'suggestion', suspect: SOSPECHOSO, weapon: ARMA, room: HABITACION }),
+    );
 
     const result = await advanceTurn(gameId);
 
@@ -201,17 +209,13 @@ describe('Coordinator — advanceTurn', () => {
 
     // First call: play_turn → suggestion
     mockInvokeAgent
-      .mockResolvedValueOnce({
-        action: { type: 'suggestion', suspect: SOSPECHOSO, weapon: ARMA, room: HABITACION },
-        reasoning: 'test',
-        done: true,
-      })
+      .mockResolvedValueOnce(
+        agentResult({ type: 'suggestion', suspect: SOSPECHOSO, weapon: ARMA, room: HABITACION }),
+      )
       // Second call: refute → show_card (Coronel Mustard)
-      .mockResolvedValueOnce({
-        action: { type: 'show_card', card: SOSPECHOSO },
-        reasoning: 'I have this card',
-        done: true,
-      });
+      .mockResolvedValueOnce(
+        agentResult({ type: 'show_card', card: SOSPECHOSO }),
+      );
 
     await advanceTurn(gameId);
 
@@ -230,16 +234,12 @@ describe('Coordinator — advanceTurn', () => {
     });
 
     mockInvokeAgent
-      .mockResolvedValueOnce({
-        action: { type: 'suggestion', suspect: SOSPECHOSO, weapon: ARMA, room: HABITACION },
-        reasoning: 'test',
-        done: true,
-      })
-      .mockResolvedValueOnce({
-        action: { type: 'cannot_refute' },
-        reasoning: 'no cards',
-        done: true,
-      });
+      .mockResolvedValueOnce(
+        agentResult({ type: 'suggestion', suspect: SOSPECHOSO, weapon: ARMA, room: HABITACION }),
+      )
+      .mockResolvedValueOnce(
+        agentResult({ type: 'cannot_refute' }),
+      );
 
     await advanceTurn(gameId);
 
@@ -251,11 +251,9 @@ describe('Coordinator — advanceTurn', () => {
   it('advances turnoActual and creates next turn after suggestion', async () => {
     const { gameId } = await setupGame(testDb.db);
 
-    mockInvokeAgent.mockResolvedValue({
-      action: { type: 'suggestion', suspect: SOSPECHOSO, weapon: ARMA, room: HABITACION },
-      reasoning: 'test',
-      done: true,
-    });
+    mockInvokeAgent.mockResolvedValue(
+      agentResult({ type: 'suggestion', suspect: SOSPECHOSO, weapon: ARMA, room: HABITACION }),
+    );
 
     await advanceTurn(gameId);
 
@@ -279,11 +277,9 @@ describe('Coordinator — advanceTurn', () => {
       envelop: { sospechoso: SOSPECHOSO, arma: ARMA, habitacion: HABITACION },
     });
 
-    mockInvokeAgent.mockResolvedValue({
-      action: { type: 'accusation', suspect: SOSPECHOSO, weapon: ARMA, room: HABITACION },
-      reasoning: 'I know the answer',
-      done: true,
-    });
+    mockInvokeAgent.mockResolvedValue(
+      agentResult({ type: 'accusation', suspect: SOSPECHOSO, weapon: ARMA, room: HABITACION }),
+    );
 
     const result = await advanceTurn(gameId);
 
@@ -306,16 +302,9 @@ describe('Coordinator — advanceTurn', () => {
       envelop: { sospechoso: SOSPECHOSO, arma: ARMA, habitacion: HABITACION },
     });
 
-    mockInvokeAgent.mockResolvedValue({
-      action: {
-        type: 'accusation',
-        suspect: SOSPECHOSO_INCORRECTO,
-        weapon: ARMA,
-        room: HABITACION,
-      },
-      reasoning: 'wrong guess',
-      done: true,
-    });
+    mockInvokeAgent.mockResolvedValue(
+      agentResult({ type: 'accusation', suspect: SOSPECHOSO_INCORRECTO, weapon: ARMA, room: HABITACION }),
+    );
 
     const result = await advanceTurn(gameId);
 
@@ -339,16 +328,9 @@ describe('Coordinator — advanceTurn', () => {
       teamCards: { 'team-a': ['Dra. Peacock', 'Cable de red', 'El Open Space'] },
     });
 
-    mockInvokeAgent.mockResolvedValue({
-      action: {
-        type: 'accusation',
-        suspect: SOSPECHOSO_INCORRECTO,
-        weapon: ARMA,
-        room: HABITACION,
-      },
-      reasoning: 'last team wrong guess',
-      done: true,
-    });
+    mockInvokeAgent.mockResolvedValue(
+      agentResult({ type: 'accusation', suspect: SOSPECHOSO_INCORRECTO, weapon: ARMA, room: HABITACION }),
+    );
 
     const result = await advanceTurn(gameId);
 
@@ -388,11 +370,9 @@ describe('Coordinator — advanceTurn', () => {
   it('throws CoordinatorError(422) when agent returns invalid action type', async () => {
     const { gameId } = await setupGame(testDb.db);
 
-    mockInvokeAgent.mockResolvedValue({
-      action: { type: 'show_card', card: 'SomeCard' }, // invalid for play_turn
-      reasoning: 'bad',
-      done: true,
-    });
+    mockInvokeAgent.mockResolvedValue(
+      agentResult({ type: 'show_card', card: 'SomeCard' }), // invalid for play_turn
+    );
 
     await expect(advanceTurn(gameId)).rejects.toMatchObject({ statusCode: 422 });
   });

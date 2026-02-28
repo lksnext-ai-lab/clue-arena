@@ -125,6 +125,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
         id: pe.id,
         equipoId: pe.equipoId,
         equipoNombre: e.nombre,
+        avatarUrl: e.avatarUrl ?? null,
         orden: pe.orden,
         eliminado: pe.eliminado,
         puntos: pe.puntos,

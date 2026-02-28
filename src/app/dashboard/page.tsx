@@ -7,15 +7,12 @@ import {
   equipos,
   partidas,
   partidaEquipos,
-  sugerencias,
-  acusaciones,
 } from '@/lib/db/schema';
 import { eq, desc } from 'drizzle-orm';
 import { RankingPodium, type RankingEntry } from '@/components/dashboard/RankingPodium';
 import { TeamStatsSection } from '@/components/dashboard/TeamStatsSection';
-import { ActivityFeed } from '@/components/dashboard/ActivityFeed';
+import { RecentFinishedGames, type FinishedGameEntry } from '@/components/dashboard/RecentFinishedGames';
 import { LastGameCard, type LastGameData } from '@/components/dashboard/LastGameCard';
-import type { ActivityEvent } from '@/components/dashboard/ActivityItem';
 
 // ---------------------------------------------------------------------------
 // Server-side data helpers
@@ -46,6 +43,7 @@ async function fetchRankingFromDb(): Promise<RankingEntry[]> {
       return {
         equipoId: team.id,
         equipoNombre: team.nombre,
+        avatarUrl: team.avatarUrl ?? null,
         puntos: totalPuntos,
         partidasJugadas: finishedRows.length,
         aciertos,
@@ -57,70 +55,48 @@ async function fetchRankingFromDb(): Promise<RankingEntry[]> {
   return rankingData.map((entry, idx) => ({ ...entry, posicion: idx + 1 }));
 }
 
-async function fetchRecentActivityFromDb(limit = 10): Promise<ActivityEvent[]> {
-  const allEquipos = await db.select().from(equipos).all();
-  const equipoMap = new Map(allEquipos.map((e) => [e.id, e.nombre]));
-
-  const recentSugs = await db
+async function fetchRecentFinishedGamesFromDb(limit = 5): Promise<FinishedGameEntry[]> {
+  const finishedPartidas = await db
     .select()
-    .from(sugerencias)
-    .orderBy(desc(sugerencias.createdAt))
+    .from(partidas)
+    .where(eq(partidas.estado, 'finalizada'))
+    .orderBy(desc(partidas.finishedAt))
     .limit(limit)
     .all();
 
-  const recentAcus = await db
-    .select()
-    .from(acusaciones)
-    .orderBy(desc(acusaciones.createdAt))
-    .limit(limit)
-    .all();
+  if (finishedPartidas.length === 0) return [];
 
-  type EventType = ActivityEvent['tipo'];
-  const events: ActivityEvent[] = [];
+  const toMs = (v: Date | number | null | undefined): number | null => {
+    if (v == null) return null;
+    if (v instanceof Date) return v.getTime();
+    return (v as number) * 1000;
+  };
 
-  for (const s of recentSugs) {
-    const nombre = equipoMap.get(s.equipoId) ?? 'Equipo desconocido';
-    const tsMs =
-      s.createdAt instanceof Date
-        ? s.createdAt.getTime()
-        : (s.createdAt as unknown as number) * 1000;
+  return Promise.all(
+    finishedPartidas.map(async (p) => {
+      const gameTeams = await db
+        .select({ pe: partidaEquipos, e: equipos })
+        .from(partidaEquipos)
+        .innerJoin(equipos, eq(partidaEquipos.equipoId, equipos.id))
+        .where(eq(partidaEquipos.partidaId, p.id))
+        .all();
 
-    const tipo: EventType = s.refutadaPor ? 'descarte' : 'sugerencia';
-    const descripcion = s.refutadaPor
-      ? `${nombre} descartó la hipótesis con '${s.sospechoso}' usando el '${s.arma}'.`
-      : `${nombre} interrogó sobre '${s.sospechoso}' con '${s.arma}' en '${s.habitacion}'.`;
-
-    events.push({
-      id: `sug-${s.id}`,
-      timestampMs: tsMs,
-      tipo,
-      actorNombre: nombre,
-      actorEquipoId: s.equipoId,
-      descripcion,
-    });
-  }
-
-  for (const a of recentAcus) {
-    const nombre = equipoMap.get(a.equipoId) ?? 'Equipo desconocido';
-    const tsMs =
-      a.createdAt instanceof Date
-        ? a.createdAt.getTime()
-        : (a.createdAt as unknown as number) * 1000;
-
-    events.push({
-      id: `acu-${a.id}`,
-      timestampMs: tsMs,
-      tipo: 'acusacion',
-      actorNombre: nombre,
-      actorEquipoId: a.equipoId,
-      descripcion: a.correcta
-        ? `${nombre} resolvió el caso: '${a.sospechoso}' con '${a.arma}' en '${a.habitacion}'. ¡Correcto!`
-        : `${nombre} hizo una acusación incorrecta sobre '${a.sospechoso}'.`,
-    });
-  }
-
-  events.sort((a, b) => b.timestampMs - a.timestampMs);
-  return events.slice(0, limit);
+      return {
+        id: p.id,
+        nombre: p.nombre,
+        finishedAtMs: toMs(p.finishedAt),
+        startedAtMs: toMs(p.startedAt),
+        turnoActual: p.turnoActual,
+        maxTurnos: p.maxTurnos ?? null,
+        equipos: gameTeams.map(({ pe, e }) => ({
+          equipoId: pe.equipoId,
+          equipoNombre: e.nombre,
+          puntos: pe.puntos,
+          eliminado: pe.eliminado,
+        })),
+      };
+    })
+  );
 }
 
 async function fetchLastGameFromDb(): Promise<LastGameData | null> {
@@ -187,9 +163,9 @@ export default async function DashboardPage() {
     miEquipoId = (session.user as { equipo?: { id: string } }).equipo?.id ?? null;
   }
 
-  const [ranking, activity, lastGame] = await Promise.all([
+  const [ranking, recentFinishedGames, lastGame] = await Promise.all([
     fetchRankingFromDb(),
-    fetchRecentActivityFromDb(10),
+    fetchRecentFinishedGamesFromDb(5),
     fetchLastGameFromDb(),
   ]);
 
@@ -201,7 +177,7 @@ export default async function DashboardPage() {
 
       {miEquipoId && <TeamStatsSection equipoId={miEquipoId} />}
 
-      <ActivityFeed initialEvents={activity} miEquipoId={miEquipoId} />
+      <RecentFinishedGames games={recentFinishedGames} miEquipoId={miEquipoId} />
     </div>
   );
 }

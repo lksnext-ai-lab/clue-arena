@@ -16,6 +16,27 @@ vi.mock('@/lib/ai/tools/cluedo-tools', () => ({
   REFUTE_TOOLS: [],
 }));
 
+// Mock MCP tool wrappers and context to avoid DB/logger/pino dependencies
+vi.mock('@/lib/mcp/tools/context', () => ({
+  createMcpCallContext: vi.fn(() => ({ invocacionId: 'test', gameId: 'g1', teamId: 't1', turnoId: 'tr1', nextSequence: () => 1 })),
+  mcpContextStorage: { run: vi.fn((_ctx: unknown, fn: () => unknown) => fn()) },
+}));
+vi.mock('@/lib/mcp/tools/_log-wrapper', () => ({
+  withMcpLog: vi.fn((_name: string, handler: (...args: unknown[]) => unknown) => handler),
+}));
+vi.mock('@/lib/mcp/tools/get-game-state', () => ({
+  getGameStateTool: {
+    handler: vi.fn().mockResolvedValue({ content: [{ text: '{}' }] }),
+    schema: {},
+  },
+}));
+vi.mock('@/lib/ai/agent-memory', () => ({
+  getAgentMemory: vi.fn().mockResolvedValue({}),
+  saveAgentMemory: vi.fn().mockResolvedValue(undefined),
+}));
+
+const TEST_OPTIONS = { invocacionId: 'test-invocation-id', turnoId: 'test-turno-id' };
+
 import { invokeAgent, AgentResponseError } from '@/lib/api/local-agent';
 import { ai } from '@/lib/ai/genkit';
 
@@ -45,7 +66,7 @@ describe('invokeAgent — play_turn', () => {
     };
     mockGenerate.mockResolvedValueOnce(fakeResponse(expected) as never);
 
-    const result = await invokeAgent({ type: 'play_turn', gameId: 'g1', teamId: 't1' });
+    const result = await invokeAgent({ type: 'play_turn', gameId: 'g1', teamId: 't1' }, TEST_OPTIONS);
 
     expect(result.action.type).toBe('suggestion');
     expect(result.done).toBe(true);
@@ -58,7 +79,7 @@ describe('invokeAgent — play_turn', () => {
     };
     mockGenerate.mockResolvedValueOnce(fakeResponse(expected) as never);
 
-    const result = await invokeAgent({ type: 'play_turn', gameId: 'g1', teamId: 't1' });
+    const result = await invokeAgent({ type: 'play_turn', gameId: 'g1', teamId: 't1' }, TEST_OPTIONS);
 
     expect(result.action.type).toBe('accusation');
   });
@@ -67,7 +88,7 @@ describe('invokeAgent — play_turn', () => {
     mockGenerate.mockResolvedValueOnce(fakeResponse({ action: { type: 'invalid' } }) as never);
 
     await expect(
-      invokeAgent({ type: 'play_turn', gameId: 'g1', teamId: 't1' })
+      invokeAgent({ type: 'play_turn', gameId: 'g1', teamId: 't1' }, TEST_OPTIONS)
     ).rejects.toThrow(AgentResponseError);
   });
 
@@ -75,7 +96,7 @@ describe('invokeAgent — play_turn', () => {
     mockGenerate.mockResolvedValueOnce(fakeResponse({ foo: 'bar' }) as never);
 
     await expect(
-      invokeAgent({ type: 'play_turn', gameId: 'g1', teamId: 't1' })
+      invokeAgent({ type: 'play_turn', gameId: 'g1', teamId: 't1' }, TEST_OPTIONS)
     ).rejects.toThrow(AgentResponseError);
   });
 });
@@ -96,7 +117,7 @@ describe('invokeAgent — refute', () => {
       suspect: 'Mustard',
       weapon: 'Wrench',
       room: 'Library',
-    });
+    }, TEST_OPTIONS);
 
     expect(result.action.type).toBe('show_card');
     if (result.action.type === 'show_card') {
@@ -115,7 +136,7 @@ describe('invokeAgent — refute', () => {
       suspect: 'Green',
       weapon: 'Rope',
       room: 'Kitchen',
-    });
+    }, TEST_OPTIONS);
 
     expect(result.action.type).toBe('cannot_refute');
   });
@@ -134,7 +155,7 @@ describe('invokeAgent — refute', () => {
         suspect: 'Plum',
         weapon: 'Lead Pipe',
         room: 'Study',
-      })
+      }, TEST_OPTIONS)
     ).rejects.toThrow(AgentResponseError);
   });
 });

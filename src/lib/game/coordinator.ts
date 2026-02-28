@@ -29,6 +29,7 @@ import { gameEventEmitter } from '@/lib/ws/GameEventEmitter';
 type TeamRow = InferSelectModel<typeof partidaEquipos>;
 import { v4 as uuidv4 } from 'uuid';
 import { invokeAgent } from '@/lib/api/agent';
+import { logInvocacionValidity } from '@/lib/utils/log';
 import type { Carta } from '@/types/domain';
 
 // ---------------------------------------------------------------------------
@@ -135,15 +136,24 @@ export async function advanceTurn(gameId: string): Promise<AdvanceTurnResult> {
   }
 
   // ── 4. Invoke the agent for the current team ──────────────────────────────
-  const agentResponse = await invokeAgent({
-    type: 'play_turn',
-    gameId,
-    teamId: currentTeam.equipoId,
-  });
+  const { response: agentResponse, invocacionId } = await invokeAgent(
+    { type: 'play_turn', gameId, teamId: currentTeam.equipoId },
+    { turnoId: turno.id },
+  );
 
   const { action } = agentResponse;
 
-  if (action.type !== 'suggestion' && action.type !== 'accusation') {
+  const isValidAction = action.type === 'suggestion' || action.type === 'accusation';
+  logInvocacionValidity(
+    invocacionId,
+    gameId,
+    currentTeam.equipoId,
+    turno.id,
+    isValidAction,
+    isValidAction ? null : `Tipo de acción inválido para play_turn: "${action.type}"`,
+  );
+
+  if (!isValidAction) {
     throw new CoordinatorError(
       422,
       `Tipo de acción inválido para play_turn: "${action.type}". ` +
@@ -282,16 +292,21 @@ async function handleSuggestion(p: SuggestionParams): Promise<boolean> {
 
   // ── Refutation sub-flow ────────────────────────────────────────────────
   if (refutadaPor) {
-    const refuteResponse = await invokeAgent({
-      type: 'refute',
-      gameId,
-      teamId: refutadaPor,
-      suspect,
-      weapon,
-      room,
-    });
+    const { response: refuteResponse, invocacionId: refuteInvocacionId } = await invokeAgent(
+      { type: 'refute', gameId, teamId: refutadaPor, suspect, weapon, room },
+      { turnoId },
+    );
 
     const refAction = refuteResponse.action;
+    const isValidRefute = refAction.type === 'show_card' || refAction.type === 'cannot_refute';
+    logInvocacionValidity(
+      refuteInvocacionId,
+      gameId,
+      refutadaPor,
+      turnoId,
+      isValidRefute,
+      isValidRefute ? null : `Tipo de acción inválido para refute: "${refAction.type}"`,
+    );
 
     if (refAction.type === 'show_card') {
       // Validate the card belongs to the refutador and matches the suggestion

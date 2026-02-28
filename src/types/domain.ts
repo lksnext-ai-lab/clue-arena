@@ -91,6 +91,7 @@ export interface RankingEntry {
   id: string;
   equipoId: string;
   equipoNombre: string;
+  avatarUrl: string | null;
   puntos: number;
   posicion: number;
   partidasJugadas: number;

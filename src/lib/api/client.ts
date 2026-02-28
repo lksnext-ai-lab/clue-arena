@@ -5,11 +5,13 @@ type ApiOptions = RequestInit & { skipAuth?: boolean };
 export async function apiFetch<T>(path: string, options: ApiOptions = {}): Promise<T> {
   const { skipAuth: _skip, ...fetchOptions } = options;
 
+  // Do NOT set Content-Type when body is FormData — the browser sets it with the boundary.
+  const isFormData = fetchOptions.body instanceof FormData;
+
   const res = await fetch(`/api${path}`, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...fetchOptions.headers,
-    },
+    headers: isFormData
+      ? { ...fetchOptions.headers }
+      : { 'Content-Type': 'application/json', ...fetchOptions.headers },
     credentials: 'include', // sends httpOnly session cookie
     ...fetchOptions,
   });

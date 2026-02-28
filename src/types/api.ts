@@ -15,7 +15,9 @@ export interface SessionUser {
 export interface TeamResponse {
   id: string;
   nombre: string;
+  descripcion: string | null;
   agentId: string;
+  avatarUrl: string | null;
   usuarioId: string;
   estado: TeamStatus;
   createdAt: string;
@@ -28,7 +30,9 @@ export interface CreateTeamRequest {
 
 export interface UpdateTeamRequest {
   nombre?: string;
+  descripcion?: string | null;
   agentId?: string;
+  avatarUrl?: string | null;
   estado?: TeamStatus;
 }
 
@@ -51,6 +55,7 @@ export interface GameTeamResponse {
   id: string;
   equipoId: string;
   equipoNombre: string;
+  avatarUrl: string | null;
   orden: number;
   eliminado: boolean;
   puntos: number;
@@ -193,4 +198,20 @@ export interface AgentResponse {
   reasoning: string;
   /** Always true; allows future streaming extension */
   done: boolean;
+}
+
+// ── F012 — Agent invocation context ─────────────────────────────────────────
+
+/**
+ * Extra context passed alongside an AgentRequest so the coordinator can emit
+ * structured interaction log entries correlated by invocacionId.
+ */
+export interface AgentInvocationContext {
+  /** Turn record ID — used as correlation field in log entries */
+  turnoId: string;
+  /**
+   * SHA-256 of the GameStateView sent to the agent.
+   * Undefined when the view was not pre-computed by the caller.
+   */
+  gameStateViewHash?: string;
 }

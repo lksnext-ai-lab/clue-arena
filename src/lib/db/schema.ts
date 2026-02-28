@@ -16,7 +16,9 @@ export const usuarios = sqliteTable('usuarios', {
 export const equipos = sqliteTable('equipos', {
   id: text('id').primaryKey(),
   nombre: text('nombre').notNull().unique(),
+  descripcion: text('descripcion'),
   agentId: text('agent_id').notNull(),
+  avatarUrl: text('avatar_url'),
   usuarioId: text('usuario_id')
     .references(() => usuarios.id)
     .notNull(),

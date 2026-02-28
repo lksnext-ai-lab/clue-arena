@@ -132,6 +132,7 @@ async function loadArenaData(gameId: string): Promise<GameDetailResponse | null>
         id: pe.id,
         equipoId: pe.equipoId,
         equipoNombre: e.nombre,
+        avatarUrl: e.avatarUrl ?? null,
         orden: pe.orden,
         eliminado: pe.eliminado,
         puntos: pe.puntos,

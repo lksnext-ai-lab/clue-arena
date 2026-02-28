@@ -6,7 +6,7 @@
  * and set GENKIT_MODEL=ollama/llama3.2 in .env.local.
  */
 import { genkit } from 'genkit';
-import { googleAI } from '@genkit-ai/googleai';
+import { googleAI } from '@genkit-ai/google-genai';
 // import { ollama } from 'genkitx-ollama';
 
 export const ai = genkit({
@@ -17,4 +17,4 @@ export const ai = genkit({
 });
 
 /** Default model. Override with GENKIT_MODEL env var. */
-export const DEFAULT_MODEL = process.env.GENKIT_MODEL ?? 'googleai/gemini-2.0-flash-exp';
+export const DEFAULT_MODEL = process.env.GENKIT_MODEL ?? 'googleai/gemini-3-flash-preview';

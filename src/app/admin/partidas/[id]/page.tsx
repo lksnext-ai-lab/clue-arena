@@ -14,6 +14,7 @@ import {
   type Arma,
   type Habitacion,
 } from '@/types/domain';
+import { AgentLogPanel } from '@/components/admin/AgentLogPanel';
 
 /**
  * UI-008 — Detalle de partida (Admin)
@@ -205,6 +206,11 @@ function AdminPartidaContent({ gameId }: { gameId: string }) {
       {/* ── SobreReveal (admin always; others only on finalizada) ── */}
       {partida.sobre && (
         <SobreReveal sobre={partida.sobre} finalizada={estado === 'finalizada'} />
+      )}
+
+      {/* ── F012: Agent interaction log (real-time, admin only) ── */}
+      {estado !== 'pendiente' && (
+        <AgentLogPanel gameId={gameId} />
       )}
     </div>
   );

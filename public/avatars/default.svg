@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 110" fill="none">
+  <!-- Shield background -->
+  <path d="M50 4 L94 22 L94 60 C94 83 72 102 50 108 C28 102 6 83 6 60 L6 22 Z"
+        fill="#1e293b" stroke="#334155" stroke-width="2"/>
+  <!-- Inner shield -->
+  <path d="M50 14 L84 28 L84 60 C84 78 68 94 50 100 C32 94 16 78 16 60 L16 28 Z"
+        fill="#0f172a" stroke="#475569" stroke-width="1"/>
+  <!-- Magnifying glass -->
+  <circle cx="44" cy="50" r="14" stroke="#f59e0b" stroke-width="3" fill="none"/>
+  <line x1="54" y1="60" x2="66" y2="72" stroke="#f59e0b" stroke-width="4" stroke-linecap="round"/>
+  <!-- Question mark inside glass -->
+  <text x="44" y="55" font-family="serif" font-size="14" font-weight="bold"
+        fill="#f59e0b" text-anchor="middle">?</text>
+  <!-- Crown at top -->
+  <path d="M34 26 L38 20 L44 25 L50 18 L56 25 L62 20 L66 26 L62 30 L38 30 Z"
+        fill="#f59e0b" opacity="0.8"/>
+</svg>

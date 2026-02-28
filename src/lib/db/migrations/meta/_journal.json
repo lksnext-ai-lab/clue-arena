@@ -29,6 +29,13 @@
       "when": 1772216156336,
       "tag": "0003_wakeful_guardian",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1772229571139,
+      "tag": "0004_fine_red_wolf",
+      "breakpoints": true
     }
   ]
 }

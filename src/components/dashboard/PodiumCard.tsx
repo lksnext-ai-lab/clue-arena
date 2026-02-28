@@ -5,14 +5,15 @@ import { useTranslations, useFormatter } from 'next-intl';
 interface PodiumCardProps {
   posicion: 1 | 2 | 3;
   nombre: string;
+  avatarUrl: string | null;
   puntos: number;
   porcentajeInvestigacion: number;
 }
 
 const MEDAL = {
-  1: { emoji: '🥇', glow: '0 0 20px rgba(234,179,8,0.35)', border: '1px solid rgba(234,179,8,0.45)', nameColor: '#22d3ee', mb: 0 },
-  2: { emoji: '🥈', glow: '0 0 14px rgba(148,163,184,0.25)', border: '1px solid rgba(148,163,184,0.35)', nameColor: '#f1f5f9', mb: 28 },
-  3: { emoji: '🥉', glow: '0 0 14px rgba(180,83,9,0.25)', border: '1px solid rgba(205,127,50,0.35)', nameColor: '#f1f5f9', mb: 44 },
+  1: { emoji: '🥇', glow: '0 0 20px rgba(234,179,8,0.35)', border: '1px solid rgba(234,179,8,0.45)', nameColor: '#22d3ee', mb: 0, ring: '#eab308' },
+  2: { emoji: '🥈', glow: '0 0 14px rgba(148,163,184,0.25)', border: '1px solid rgba(148,163,184,0.35)', nameColor: '#f1f5f9', mb: 28, ring: '#94a3b8' },
+  3: { emoji: '🥉', glow: '0 0 14px rgba(180,83,9,0.25)', border: '1px solid rgba(205,127,50,0.35)', nameColor: '#f1f5f9', mb: 44, ring: '#b45309' },
 };
 
 const BADGE_BG: Record<number, string> = {
@@ -21,10 +22,11 @@ const BADGE_BG: Record<number, string> = {
   3: 'linear-gradient(135deg,#92400e,#b45309)',
 };
 
-export function PodiumCard({ posicion, nombre, puntos, porcentajeInvestigacion }: PodiumCardProps) {
+export function PodiumCard({ posicion, nombre, avatarUrl, puntos, porcentajeInvestigacion }: PodiumCardProps) {
   const m = MEDAL[posicion];
   const t = useTranslations('dashboard');
   const format = useFormatter();
+
   return (
     <div style={{
       display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
@@ -33,7 +35,25 @@ export function PodiumCard({ posicion, nombre, puntos, porcentajeInvestigacion }
       border: m.border, boxShadow: m.glow,
       alignSelf: 'flex-end', marginBottom: m.mb,
     }}>
-      <span style={{ fontSize: 26, lineHeight: 1 }}>{m.emoji}</span>
+      {/* Avatar or medal emoji */}
+      {avatarUrl ? (
+        <div style={{
+          width: 56, height: 56, borderRadius: 12, overflow: 'hidden',
+          border: `2px solid ${m.ring}`,
+          boxShadow: `0 0 10px ${m.ring}55`,
+          flexShrink: 0,
+        }}>
+          <img
+            src={avatarUrl}
+            alt={`Avatar de ${nombre}`}
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          />
+        </div>
+      ) : (
+        <span style={{ fontSize: 26, lineHeight: 1 }}>{m.emoji}</span>
+      )}
+
+      {/* Position badge */}
       <div style={{
         width: 28, height: 28, borderRadius: '50%',
         background: BADGE_BG[posicion], display: 'flex',
@@ -43,6 +63,7 @@ export function PodiumCard({ posicion, nombre, puntos, porcentajeInvestigacion }
       }}>
         {posicion}
       </div>
+
       <span style={{ fontSize: 12, fontWeight: 700, color: m.nameColor, textAlign: 'center', lineHeight: 1.3 }}>
         {nombre}
       </span>

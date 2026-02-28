@@ -32,6 +32,7 @@ export async function GET() {
       return {
         equipoId: team.id,
         equipoNombre: team.nombre,
+        avatarUrl: team.avatarUrl ?? null,
         puntos: totalPuntos,
         partidasJugadas: finishedGameRows.length,
         aciertos,

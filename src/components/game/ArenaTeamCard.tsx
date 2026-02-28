@@ -5,14 +5,10 @@ import type { GameTeamResponse } from '@/types/api';
 
 interface ArenaTeamCardProps {
   equipo: GameTeamResponse;
-  position: number;
   isActiveTurn: boolean;
 }
 
-const POSITION_MEDALS: Record<number, string> = { 1: '🥇', 2: '🥈', 3: '🥉' };
-
-export function ArenaTeamCard({ equipo, position, isActiveTurn }: ArenaTeamCardProps) {
-  const medal = POSITION_MEDALS[position] ?? `#${position}`;
+export function ArenaTeamCard({ equipo, isActiveTurn }: ArenaTeamCardProps) {
 
   return (
     <div
@@ -27,18 +23,37 @@ export function ArenaTeamCard({ equipo, position, isActiveTurn }: ArenaTeamCardP
     >
       {/* Header row */}
       <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <div className="flex items-center gap-1.5">
-            <span className="text-base">{medal}</span>
-            <span className="font-semibold text-sm text-white break-words leading-snug">{equipo.equipoNombre}</span>
+        <div className="flex items-center gap-3 min-w-0">
+          {/* Avatar */}
+          <div
+            className={cn(
+              'shrink-0 w-10 h-10 rounded-lg overflow-hidden flex items-center justify-center text-xl',
+              isActiveTurn && !equipo.eliminado
+                ? 'ring-2 ring-cyan-400'
+                : 'ring-1 ring-slate-600'
+            )}
+            style={{ background: '#1e293b' }}
+          >
+            {equipo.avatarUrl
+              ? <img src={equipo.avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              : <span>🛡️</span>
+            }
           </div>
-          {isActiveTurn && !equipo.eliminado && (
-            <span className="inline-flex items-center gap-1 mt-1 text-xs font-medium text-cyan-400 animate-pulse">
-              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
-              TURNO ACTIVO
-            </span>
-          )}
+
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5">
+
+              <span className="font-semibold text-sm text-white break-words leading-snug">{equipo.equipoNombre}</span>
+            </div>
+            {isActiveTurn && !equipo.eliminado && (
+              <span className="inline-flex items-center gap-1 mt-1 text-xs font-medium text-cyan-400 animate-pulse">
+                <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+                TURNO ACTIVO
+              </span>
+            )}
+          </div>
         </div>
+
         {equipo.eliminado ? (
           <span className="shrink-0 px-2 py-0.5 rounded-full text-xs font-semibold bg-red-400/10 text-red-400">
             ELIMINADO

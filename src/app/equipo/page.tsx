@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
 import { useInterval } from '@/lib/utils/useInterval';
 import { apiFetch } from '@/lib/api/client';
 import { useAppSession } from '@/contexts/SessionContext';
@@ -67,9 +68,26 @@ export default function EquipoPage() {
         className="rounded-xl p-6"
         style={{ background: '#1a1a2e' }}
       >
-        <h2 className="text-lg font-semibold mb-2" style={{ color: '#f59e0b' }}>
+        <h2 className="text-lg font-semibold mb-4" style={{ color: '#f59e0b' }}>
           {t('tuEquipo')}
         </h2>
+
+        {/* Avatar */}
+        {team?.avatarUrl && (
+          <div className="flex justify-center mb-4">
+            <div className="w-24 h-24 rounded-xl overflow-hidden" style={{ border: '2px solid #f59e0b55' }}>
+              <Image
+                src={team.avatarUrl}
+                alt={`Avatar de ${equipo.nombre}`}
+                width={96}
+                height={96}
+                className="object-cover w-full h-full"
+                unoptimized
+              />
+            </div>
+          </div>
+        )}
+
         <dl className="grid grid-cols-2 gap-4 text-sm">
           <div>
             <dt style={{ color: '#64748b' }}>{t('nombreLabel')}</dt>
@@ -85,6 +103,12 @@ export default function EquipoPage() {
               <dd>
                 <TeamStatusBadge estado={team.estado} />
               </dd>
+            </div>
+          )}
+          {team?.descripcion && (
+            <div className="col-span-2">
+              <dt style={{ color: '#64748b' }}>{t('descripcionLabel')}</dt>
+              <dd className="text-sm mt-1" style={{ color: '#cbd5e1' }}>{team.descripcion}</dd>
             </div>
           )}
         </dl>

@@ -107,6 +107,9 @@ export function AdminTeamsSection() {
           <table className="w-full text-sm">
             <thead>
               <tr style={{ borderBottom: '1px solid #334155' }}>
+                <th className="px-4 py-3 text-left w-12" style={{ color: '#64748b' }}>
+                  {t('avatar')}
+                </th>
                 <th className="px-4 py-3 text-left" style={{ color: '#64748b' }}>
                   {t('nombre')}
                 </th>

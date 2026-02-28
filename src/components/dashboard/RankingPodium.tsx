@@ -9,6 +9,7 @@ import { PodiumCard } from './PodiumCard';
 export interface RankingEntry {
   equipoId: string;
   equipoNombre: string;
+  avatarUrl?: string | null;
   puntos: number;
   posicion: number;
   aciertos: number;
@@ -83,6 +84,7 @@ export function RankingPodium({ initialRanking, miEquipoId }: RankingPodiumProps
                 key={entry.equipoId}
                 posicion={pos}
                 nombre={entry.equipoNombre}
+                avatarUrl={entry.avatarUrl ?? null}
                 puntos={entry.puntos}
                 porcentajeInvestigacion={calcPorcentaje(entry)}
               />
@@ -111,6 +113,16 @@ export function RankingPodium({ initialRanking, miEquipoId }: RankingPodiumProps
                 <span style={{ fontSize: 12, fontWeight: 600, width: 22, textAlign: 'right', color: isOwn ? '#22d3ee' : '#64748b' }}>
                   {entry.posicion}.
                 </span>
+                {/* Avatar thumbnail for 4+ rows */}
+                <div style={{
+                  width: 24, height: 24, borderRadius: 6, overflow: 'hidden', flexShrink: 0,
+                  background: '#1e293b', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 12,
+                }}>
+                  {entry.avatarUrl
+                    ? <img src={entry.avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    : '🛡️'}
+                </div>
                 <span style={{ flex: 1, fontSize: 13, fontWeight: isOwn ? 700 : 400, color: isOwn ? '#22d3ee' : '#e2e8f0' }}>
                   {entry.equipoNombre}
                   {isOwn && (
