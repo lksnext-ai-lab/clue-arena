@@ -38,7 +38,11 @@ function agentResult(action: Record<string, unknown>) {
 // ── Import after mocks ────────────────────────────────────────────────────────
 import { advanceTurn, CoordinatorError } from '@/lib/game/coordinator';
 import { getGameStateTool } from '@/lib/mcp/tools/get-game-state';
+import { makeSuggestionTool } from '@/lib/mcp/tools/make-suggestion';
+import { makeAccusationTool } from '@/lib/mcp/tools/make-accusation';
 import { showCardTool } from '@/lib/mcp/tools/show-card';
+import { saveAgentMemoryTool } from '@/lib/mcp/tools/save-agent-memory';
+import { getAgentMemoryTool } from '@/lib/mcp/tools/get-agent-memory';
 
 // ── Schema imports for test data setup ───────────────────────────────────────
 import {
@@ -50,6 +54,7 @@ import {
   turnos,
   sugerencias,
   acusaciones,
+  agentMemories,
 } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 
@@ -501,5 +506,423 @@ describe('show_card MCP tool', () => {
     await expect(
       showCardTool.handler({ game_id: gameId, team_id: 'team-b', suggestion_id: sgId }),
     ).rejects.toThrow();
+  });
+});
+
+// ── MCP tool: make_suggestion ─────────────────────────────────────────────────
+
+describe('make_suggestion MCP tool', () => {
+  let testDb: TestDb;
+
+  beforeEach(() => {
+    testDb = createTestDb();
+    testDbContainer.db = testDb.db;
+  });
+
+  afterEach(() => {
+    testDb.close();
+    testDbContainer.db = null;
+  });
+
+  it('persists suggestion with no refutador when no team holds the matching cards', async () => {
+    const { gameId } = await setupGame(testDb.db, {
+      teamCards: {
+        'team-a': ['Dra. Peacock', 'Cable de red', 'El Open Space'],
+        'team-b': ['Sr. Green', 'Grapadora industrial', 'Recursos Humanos'],
+        'team-c': ['Sra. White', 'Termo de acero', 'El Almacén de IT'],
+      },
+    });
+
+    const result = await makeSuggestionTool.handler({
+      game_id: gameId,
+      team_id: 'team-a',
+      suspect: SOSPECHOSO,
+      weapon: ARMA,
+      room: HABITACION,
+    });
+
+    const data = JSON.parse(result.content[0].text);
+    expect(data.refutada).toBe(false);
+    expect(data.refutadaPor).toBeNull();
+
+    const [sg] = await testDb.db.select().from(sugerencias).where(eq(sugerencias.partidaId, gameId));
+    expect(sg.sospechoso).toBe(SOSPECHOSO);
+    expect(sg.arma).toBe(ARMA);
+    expect(sg.habitacion).toBe(HABITACION);
+    expect(sg.refutadaPor).toBeNull();
+    expect(sg.cartaMostrada).toBeNull();
+  });
+
+  it('identifies the first refutador in turn order that holds a matching card', async () => {
+    const { gameId } = await setupGame(testDb.db, {
+      teamCards: {
+        'team-a': ['Dra. Peacock', 'Cable de red', 'El Open Space'],
+        'team-b': ['Coronel Mustard', 'Teclado mecánico', 'Recursos Humanos'], // holds SOSPECHOSO + ARMA
+        'team-c': ['Sra. White', 'Termo de acero', 'La Cafetería'],            // holds HABITACION
+      },
+    });
+
+    const result = await makeSuggestionTool.handler({
+      game_id: gameId,
+      team_id: 'team-a',
+      suspect: SOSPECHOSO,
+      weapon: ARMA,
+      room: HABITACION,
+    });
+
+    const data = JSON.parse(result.content[0].text);
+    expect(data.refutada).toBe(true);
+    // team-b is next in order and holds a matching card → should be the refutador
+    expect(data.refutadaPor).toBe('team-b');
+
+    const [sg] = await testDb.db.select().from(sugerencias).where(eq(sugerencias.partidaId, gameId));
+    expect(sg.refutadaPor).toBe('team-b');
+    // cartaMostrada must be one of the three suggestion cards
+    expect([SOSPECHOSO, ARMA, HABITACION]).toContain(sg.cartaMostrada);
+  });
+
+  it('skips eliminated teams when searching for refutador', async () => {
+    const { gameId } = await setupGame(testDb.db, {
+      teamCards: {
+        'team-a': ['Dra. Peacock', 'Cable de red', 'El Open Space'],
+        'team-b': ['Coronel Mustard', 'Grapadora industrial', 'Recursos Humanos'], // holds SOSPECHOSO
+        'team-c': ['Sra. White', 'Teclado mecánico', 'El Almacén de IT'],           // holds ARMA
+      },
+    });
+
+    // Eliminate team-b
+    await testDb.db
+      .update(partidaEquipos)
+      .set({ eliminado: true })
+      .where(and(eq(partidaEquipos.partidaId, gameId), eq(partidaEquipos.equipoId, 'team-b')));
+
+    const result = await makeSuggestionTool.handler({
+      game_id: gameId,
+      team_id: 'team-a',
+      suspect: SOSPECHOSO,
+      weapon: ARMA,
+      room: HABITACION,
+    });
+
+    const data = JSON.parse(result.content[0].text);
+    // team-b is skipped → team-c is refutador (holds ARMA)
+    expect(data.refutadaPor).toBe('team-c');
+  });
+
+  it('throws when there is no active turn for the team', async () => {
+    const { gameId } = await setupGame(testDb.db);
+
+    await expect(
+      makeSuggestionTool.handler({
+        game_id: gameId,
+        team_id: 'team-b', // turn belongs to team-a, not team-b
+        suspect: SOSPECHOSO,
+        weapon: ARMA,
+        room: HABITACION,
+      }),
+    ).rejects.toThrow('No hay turno activo');
+  });
+
+  it('throws when game is not en_curso', async () => {
+    const gameId = uuidv4();
+    await testDb.db.insert(partidas).values({
+      id: gameId,
+      nombre: 'Finished',
+      estado: 'finalizada',
+      turnoActual: 0,
+      modoEjecucion: 'manual',
+      turnoDelayMs: 0,
+      autoRunActivoDesde: null,
+      createdAt: new Date(),
+      startedAt: new Date(),
+      finishedAt: new Date(),
+    });
+
+    await expect(
+      makeSuggestionTool.handler({
+        game_id: gameId,
+        team_id: 'team-a',
+        suspect: SOSPECHOSO,
+        weapon: ARMA,
+        room: HABITACION,
+      }),
+    ).rejects.toThrow('no en curso');
+  });
+});
+
+// ── MCP tool: make_accusation ─────────────────────────────────────────────────
+
+describe('make_accusation MCP tool', () => {
+  let testDb: TestDb;
+
+  beforeEach(() => {
+    testDb = createTestDb();
+    testDbContainer.db = testDb.db;
+  });
+
+  afterEach(() => {
+    testDb.close();
+    testDbContainer.db = null;
+  });
+
+  it('correct accusation: marks game finalizada, awards 100 points, returns correcta=true', async () => {
+    const { gameId } = await setupGame(testDb.db, {
+      envelop: { sospechoso: SOSPECHOSO, arma: ARMA, habitacion: HABITACION },
+    });
+
+    const result = await makeAccusationTool.handler({
+      game_id: gameId,
+      team_id: 'team-a',
+      suspect: SOSPECHOSO,
+      weapon: ARMA,
+      room: HABITACION,
+    });
+
+    const data = JSON.parse(result.content[0].text);
+    expect(data.correcta).toBe(true);
+    expect(data.ganador).toBe('team-a');
+    expect(data.eliminado).toBe(false);
+
+    const [partida] = await testDb.db.select().from(partidas).where(eq(partidas.id, gameId));
+    expect(partida.estado).toBe('finalizada');
+
+    const [teamA] = await testDb.db
+      .select()
+      .from(partidaEquipos)
+      .where(and(eq(partidaEquipos.partidaId, gameId), eq(partidaEquipos.equipoId, 'team-a')));
+    expect(teamA.puntos).toBe(100);
+    expect(teamA.eliminado).toBe(false);
+  });
+
+  it('incorrect accusation: eliminates the team, game stays en_curso', async () => {
+    const { gameId } = await setupGame(testDb.db, {
+      envelop: { sospechoso: SOSPECHOSO, arma: ARMA, habitacion: HABITACION },
+    });
+
+    const result = await makeAccusationTool.handler({
+      game_id: gameId,
+      team_id: 'team-a',
+      suspect: SOSPECHOSO_INCORRECTO,
+      weapon: ARMA,
+      room: HABITACION,
+    });
+
+    const data = JSON.parse(result.content[0].text);
+    expect(data.correcta).toBe(false);
+    expect(data.ganador).toBeNull();
+    expect(data.eliminado).toBe(true);
+
+    const [partida] = await testDb.db.select().from(partidas).where(eq(partidas.id, gameId));
+    expect(partida.estado).toBe('en_curso');
+
+    const [teamA] = await testDb.db
+      .select()
+      .from(partidaEquipos)
+      .where(and(eq(partidaEquipos.partidaId, gameId), eq(partidaEquipos.equipoId, 'team-a')));
+    expect(teamA.eliminado).toBe(true);
+  });
+
+  it('incorrect accusation with last remaining team: finalizes game with no winner', async () => {
+    const { gameId } = await setupGame(testDb.db, {
+      teams: ['team-a'],
+      envelop: { sospechoso: SOSPECHOSO, arma: ARMA, habitacion: HABITACION },
+      teamCards: { 'team-a': ['Dra. Peacock', 'Cable de red', 'El Open Space'] },
+    });
+
+    const result = await makeAccusationTool.handler({
+      game_id: gameId,
+      team_id: 'team-a',
+      suspect: SOSPECHOSO_INCORRECTO,
+      weapon: ARMA,
+      room: HABITACION,
+    });
+
+    const data = JSON.parse(result.content[0].text);
+    expect(data.correcta).toBe(false);
+
+    const [partida] = await testDb.db.select().from(partidas).where(eq(partidas.id, gameId));
+    expect(partida.estado).toBe('finalizada');
+  });
+
+  it('persists accusation row in DB with correct fields', async () => {
+    const { gameId } = await setupGame(testDb.db, {
+      envelop: { sospechoso: SOSPECHOSO, arma: ARMA, habitacion: HABITACION },
+    });
+
+    await makeAccusationTool.handler({
+      game_id: gameId,
+      team_id: 'team-a',
+      suspect: SOSPECHOSO,
+      weapon: ARMA,
+      room: HABITACION,
+    });
+
+    const [ac] = await testDb.db.select().from(acusaciones).where(eq(acusaciones.partidaId, gameId));
+    expect(ac.equipoId).toBe('team-a');
+    expect(ac.sospechoso).toBe(SOSPECHOSO);
+    expect(ac.arma).toBe(ARMA);
+    expect(ac.habitacion).toBe(HABITACION);
+    expect(ac.correcta).toBe(true);
+  });
+
+  it('marks the active turn as completado after accusation', async () => {
+    const { gameId, turnoId } = await setupGame(testDb.db, {
+      envelop: { sospechoso: SOSPECHOSO, arma: ARMA, habitacion: HABITACION },
+    });
+
+    await makeAccusationTool.handler({
+      game_id: gameId,
+      team_id: 'team-a',
+      suspect: SOSPECHOSO,
+      weapon: ARMA,
+      room: HABITACION,
+    });
+
+    const [turno] = await testDb.db.select().from(turnos).where(eq(turnos.id, turnoId));
+    expect(turno.estado).toBe('completado');
+    expect(turno.finishedAt).not.toBeNull();
+  });
+
+  it('throws when there is no active turn for the team', async () => {
+    const { gameId } = await setupGame(testDb.db);
+
+    await expect(
+      makeAccusationTool.handler({
+        game_id: gameId,
+        team_id: 'team-b', // turn belongs to team-a
+        suspect: SOSPECHOSO,
+        weapon: ARMA,
+        room: HABITACION,
+      }),
+    ).rejects.toThrow('No hay turno activo');
+  });
+
+  it('throws when game is not en_curso', async () => {
+    const gameId = uuidv4();
+    await testDb.db.insert(partidas).values({
+      id: gameId,
+      nombre: 'Finished',
+      estado: 'finalizada',
+      turnoActual: 0,
+      modoEjecucion: 'manual',
+      turnoDelayMs: 0,
+      autoRunActivoDesde: null,
+      createdAt: new Date(),
+      startedAt: new Date(),
+      finishedAt: new Date(),
+    });
+
+    await expect(
+      makeAccusationTool.handler({
+        game_id: gameId,
+        team_id: 'team-a',
+        suspect: SOSPECHOSO,
+        weapon: ARMA,
+        room: HABITACION,
+      }),
+    ).rejects.toThrow('no en curso');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MCP tool — save_agent_memory / get_agent_memory
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('MCP tool — save_agent_memory / get_agent_memory', () => {
+  let testDb: TestDb;
+
+  beforeEach(() => {
+    testDb = createTestDb();
+    testDbContainer.db = testDb.db;
+  });
+
+  afterEach(() => {
+    testDb.close();
+    testDbContainer.db = null;
+  });
+
+  it('get_agent_memory returns empty object when no row exists', async () => {
+    const result = await getAgentMemoryTool.handler({
+      game_id: 'game-1',
+      team_id: 'team-1',
+    });
+
+    const parsed = JSON.parse(result.content[0].text);
+    expect(parsed.memory).toEqual({});
+    expect(parsed.updatedAt).toBeNull();
+  });
+
+  it('save_agent_memory inserts a new row and get_agent_memory retrieves it', async () => {
+    const memory = { cards_seen: ['Coronel Mustard', 'Teclado mecánico'], confidence: 0.85 };
+
+    await saveAgentMemoryTool.handler({
+      game_id: 'game-1',
+      team_id: 'team-1',
+      memory,
+    });
+
+    const result = await getAgentMemoryTool.handler({
+      game_id: 'game-1',
+      team_id: 'team-1',
+    });
+
+    const parsed = JSON.parse(result.content[0].text);
+    expect(parsed.memory).toEqual(memory);
+    expect(parsed.updatedAt).not.toBeNull();
+  });
+
+  it('save_agent_memory upserts — second call overwrites without creating a duplicate row', async () => {
+    await saveAgentMemoryTool.handler({
+      game_id: 'game-1',
+      team_id: 'team-1',
+      memory: { step: 1 },
+    });
+
+    await saveAgentMemoryTool.handler({
+      game_id: 'game-1',
+      team_id: 'team-1',
+      memory: { step: 2, extra: true },
+    });
+
+    const rows = await testDb.db.select().from(agentMemories);
+    expect(rows).toHaveLength(1);
+
+    const result = await getAgentMemoryTool.handler({
+      game_id: 'game-1',
+      team_id: 'team-1',
+    });
+    expect(JSON.parse(result.content[0].text).memory).toEqual({ step: 2, extra: true });
+  });
+
+  it('save_agent_memory returns ok:true with updatedAt timestamp', async () => {
+    const result = await saveAgentMemoryTool.handler({
+      game_id: 'game-1',
+      team_id: 'team-1',
+      memory: { note: 'hello' },
+    });
+
+    const parsed = JSON.parse(result.content[0].text);
+    expect(parsed.ok).toBe(true);
+    expect(typeof parsed.updatedAt).toBe('string');
+  });
+
+  it('memories are isolated per (game_id, team_id)', async () => {
+    await saveAgentMemoryTool.handler({ game_id: 'game-1', team_id: 'team-a', memory: { src: 'a' } });
+    await saveAgentMemoryTool.handler({ game_id: 'game-1', team_id: 'team-b', memory: { src: 'b' } });
+    await saveAgentMemoryTool.handler({ game_id: 'game-2', team_id: 'team-a', memory: { src: 'c' } });
+
+    const r1 = JSON.parse(
+      (await getAgentMemoryTool.handler({ game_id: 'game-1', team_id: 'team-a' })).content[0].text,
+    );
+    const r2 = JSON.parse(
+      (await getAgentMemoryTool.handler({ game_id: 'game-1', team_id: 'team-b' })).content[0].text,
+    );
+    const r3 = JSON.parse(
+      (await getAgentMemoryTool.handler({ game_id: 'game-2', team_id: 'team-a' })).content[0].text,
+    );
+
+    expect(r1.memory).toEqual({ src: 'a' });
+    expect(r2.memory).toEqual({ src: 'b' });
+    expect(r3.memory).toEqual({ src: 'c' });
   });
 });

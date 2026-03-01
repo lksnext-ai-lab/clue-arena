@@ -1,11 +1,6 @@
 import { NextResponse } from 'next/server';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
-import { getGameStateTool } from '@/lib/mcp/tools/get-game-state';
-import { makeSuggestionTool } from '@/lib/mcp/tools/make-suggestion';
-import { showCardTool } from '@/lib/mcp/tools/show-card';
-import { makeAccusationTool } from '@/lib/mcp/tools/make-accusation';
-import { withMcpLog } from '@/lib/mcp/tools/_log-wrapper';
+import { createMcpServer, MCP_SERVER_INFO, MCP_TOOL_NAMES } from '@/lib/mcp/server';
 import { createMcpCallContext, mcpContextStorage } from '@/lib/mcp/tools/context';
 
 /**
@@ -32,15 +27,7 @@ export async function POST(request: Request) {
   try {
     // All tool handlers run within the McpCallContext so withMcpLog can correlate entries
     return await mcpContextStorage.run(mcpCtx, async () => {
-      const server = new McpServer({
-        name: 'clue-arena-cluedo',
-        version: '1.0.0',
-      });
-
-      server.tool('get_game_state', getGameStateTool.schema, withMcpLog('get_game_state', getGameStateTool.handler));
-      server.tool('make_suggestion', makeSuggestionTool.schema, withMcpLog('make_suggestion', makeSuggestionTool.handler));
-      server.tool('show_card', showCardTool.schema, withMcpLog('show_card', showCardTool.handler));
-      server.tool('make_accusation', makeAccusationTool.schema, withMcpLog('make_accusation', makeAccusationTool.handler));
+      const server = createMcpServer();
 
       const transport = new WebStandardStreamableHTTPServerTransport({
         sessionIdGenerator: undefined, // stateless
@@ -58,8 +45,7 @@ export async function POST(request: Request) {
 // Support GET for MCP discovery / health
 export async function GET() {
   return NextResponse.json({
-    name: 'clue-arena-cluedo',
-    version: '1.0.0',
-    tools: ['get_game_state', 'make_suggestion', 'show_card', 'make_accusation'],
+    ...MCP_SERVER_INFO,
+    tools: MCP_TOOL_NAMES,
   });
 }
