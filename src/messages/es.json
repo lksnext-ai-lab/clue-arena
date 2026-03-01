@@ -32,6 +32,7 @@
     "devMode": "⚠ DEV MODE — Auth desactivada",
     "entrarAdmin": "Entrar como Admin",
     "entrarEquipo": "Entrar como Equipo",
+    "entrarSinEquipo": "Entrar sin equipo",
     "descripcionLogin": "Plataforma de competición gamificada con agentes IA. Inicia sesión con tu cuenta corporativa para participar."
   },
   "dashboard": {
@@ -83,7 +84,19 @@
     "sinPartidas": "No hay partidas en curso en este momento.",
     "turnoEquipos": "Turno {turno} · {n} equipos",
     "verPartida": "Ver partida",
-    "estadoLabel": "Estado"
+    "estadoLabel": "Estado",
+    "miembros": "Miembros del equipo",
+    "miembrosDesc": "Añade los emails de las personas que forman parte del equipo.",
+    "miembrosPlaceholder": "email@empresa.com",
+    "miembrosVacio": "Sin miembros añadidos aún.",
+    "miembrosAgregar": "Añadir",
+    "miembrosEliminar": "Eliminar",
+    "miembrosGuardar": "Guardar miembros",
+    "miembrosGuardando": "Guardando...",
+    "miembrosGuardado": "Miembros guardados correctamente",
+    "miembrosError": "Error al guardar los miembros",
+    "miembrosEmailInvalido": "Email no válido",
+    "miembrosEmailDuplicado": "Este email ya está en la lista"
   },
   "ranking": {
     "titulo": "Ranking del Evento",
@@ -153,7 +166,19 @@
     "generandoAvatar": "Generando...",
     "generandoAvatarDesc": "La IA está creando el escudo. Puede tardar unos segundos.",
     "errorGenerarAvatar": "Error al generar el avatar con IA",
-    "errorSubirAvatar": "Error al subir el avatar"
+    "errorSubirAvatar": "Error al subir el avatar",
+    "miembros": "Miembros",
+    "miembrosDesc": "Emails de los miembros del equipo",
+    "miembrosPlaceholder": "email@empresa.com",
+    "miembrosVacio": "Sin miembros.",
+    "miembrosAgregar": "Añadir",
+    "miembrosEliminar": "Eliminar",
+    "miembrosGuardar": "Guardar miembros",
+    "miembrosGuardando": "Guardando...",
+    "miembrosGuardado": "Miembros actualizados",
+    "miembrosError": "Error al guardar los miembros",
+    "miembrosEmailInvalido": "Email no válido",
+    "miembrosEmailDuplicado": "Este email ya está en la lista"
   },
   "juego": {
     "titulo": "El Juego",

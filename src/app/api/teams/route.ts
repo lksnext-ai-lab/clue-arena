@@ -18,7 +18,12 @@ export async function GET() {
 
   if (userRol === 'admin') {
     const allTeams = await db.select().from(equipos).all();
-    return NextResponse.json({ teams: allTeams });
+    return NextResponse.json({
+      teams: allTeams.map((t) => ({
+        ...t,
+        miembros: JSON.parse(t.miembros ?? '[]') as string[],
+      })),
+    });
   }
 
   // Rol equipo/espectador: devolver solo el equipo del usuario
@@ -38,7 +43,12 @@ export async function GET() {
     .where(eq(equipos.usuarioId, user.id))
     .all();
 
-  return NextResponse.json({ teams: userTeams });
+  return NextResponse.json({
+    teams: userTeams.map((t) => ({
+      ...t,
+      miembros: JSON.parse(t.miembros ?? '[]') as string[],
+    })),
+  });
 }
 
 // POST /api/teams
@@ -105,6 +115,7 @@ export async function POST(request: Request) {
     id: uuidv4(),
     nombre: parsed.data.nombre,
     agentId: parsed.data.agentId,
+    miembros: JSON.stringify(parsed.data.miembros ?? []),
     usuarioId: user.id,
     estado: 'registrado' as const,
     createdAt: new Date(),
@@ -112,5 +123,8 @@ export async function POST(request: Request) {
 
   await db.insert(equipos).values(newTeam);
 
-  return NextResponse.json({ equipo: newTeam }, { status: 201 });
+  return NextResponse.json(
+    { equipo: { ...newTeam, miembros: parsed.data.miembros ?? [] } },
+    { status: 201 }
+  );
 }

@@ -10,7 +10,7 @@ import { DEV_COOKIE } from '@/lib/auth/dev';
 export default function DevLoginButtons() {
   const t = useTranslations('auth');
 
-  function loginAs(role: 'admin' | 'equipo') {
+  function loginAs(role: 'admin' | 'equipo' | 'sinEquipo') {
     document.cookie = `${DEV_COOKIE}=${role}; path=/; max-age=86400; SameSite=Lax`;
     window.location.href = '/';
   }
@@ -34,6 +34,13 @@ export default function DevLoginButtons() {
           style={{ borderColor: '#94a3b8', color: '#94a3b8', background: 'transparent' }}
         >
           {t('entrarEquipo')}
+        </button>
+        <button
+          onClick={() => loginAs('sinEquipo')}
+          className="px-5 py-2 rounded-lg text-sm font-semibold border transition-opacity hover:opacity-80"
+          style={{ borderColor: '#64748b', color: '#64748b', background: 'transparent' }}
+        >
+          {t('entrarSinEquipo')}
         </button>
       </div>
     </div>

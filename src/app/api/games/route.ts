@@ -7,10 +7,10 @@ import { CreateGameSchema } from '@/lib/schemas/game';
 import { initGame } from '@/lib/game/engine';
 import { v4 as uuidv4 } from 'uuid';
 
-// GET /api/games  (Admin only)
+// GET /api/games  (Admin: all games; Equipo: only their games)
 export async function GET(request: Request) {
   const session = await getAuthSession();
-  if (!session?.user || session.user.rol !== 'admin') {
+  if (!session?.user || (session.user.rol !== 'admin' && session.user.rol !== 'equipo')) {
     return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 });
   }
 
@@ -53,7 +53,13 @@ export async function GET(request: Request) {
     })
   );
 
-  return NextResponse.json({ games: enriched });
+  // Equipo role: only return games their team participates in
+  const result =
+    session.user.rol === 'equipo' && session.equipo
+      ? enriched.filter((g) => g.equipos.some((e) => e.equipoId === session.equipo!.id))
+      : enriched;
+
+  return NextResponse.json({ games: result });
 }
 
 // POST /api/games  (Admin only)

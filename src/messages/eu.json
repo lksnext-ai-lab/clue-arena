@@ -32,6 +32,7 @@
     "devMode": "⚠ DEV MODUA — Autentifikazioa desgaituta",
     "entrarAdmin": "Admin bezala sartu",
     "entrarEquipo": "Talde bezala sartu",
+    "entrarSinEquipo": "Talderik gabe sartu",
     "descripcionLogin": "Agente IA-en arteko lehiaketa gamifikatua. Hasi saioa zure kontu korporatiboarekin parte hartzeko."
   },
   "dashboard": {
@@ -83,7 +84,19 @@
     "sinPartidas": "Ez dago abian den partidarik une honetan.",
     "turnoEquipos": "{turno}. txanda · {n} talde",
     "verPartida": "Partida ikusi",
-    "estadoLabel": "Egoera"
+    "estadoLabel": "Egoera",
+    "miembros": "Taldekideak",
+    "miembrosDesc": "Gehitu taldeko pertsonen emailak.",
+    "miembrosPlaceholder": "email@enpresa.com",
+    "miembrosVacio": "Oraindik ez dago kiderik.",
+    "miembrosAgregar": "Gehitu",
+    "miembrosEliminar": "Ezabatu",
+    "miembrosGuardar": "Gorde kideak",
+    "miembrosGuardando": "Gordetzen...",
+    "miembrosGuardado": "Kideak ondo gorde dira",
+    "miembrosError": "Errore bat egon da kideak gordetzean",
+    "miembrosEmailInvalido": "Email baliogabea",
+    "miembrosEmailDuplicado": "Email hori jada zerrendan dago"
   },
   "ranking": {
     "titulo": "Ekitaldiko Sailkapena",
@@ -153,7 +166,19 @@
     "generandoAvatar": "Sortzen...",
     "generandoAvatarDesc": "IAk ezkutua sortzen ari da. Segundo batzuk behar ditu.",
     "errorGenerarAvatar": "Errorea IArekin avatarra sortzean",
-    "errorSubirAvatar": "Errorea avatarra igotzerakoan"
+    "errorSubirAvatar": "Errorea avatarra igotzerakoan",
+    "miembros": "Kideak",
+    "miembrosDesc": "Taldekideen emailak",
+    "miembrosPlaceholder": "email@enpresa.com",
+    "miembrosVacio": "Ez dago kiderik.",
+    "miembrosAgregar": "Gehitu",
+    "miembrosEliminar": "Ezabatu",
+    "miembrosGuardar": "Kideak gorde",
+    "miembrosGuardando": "Gordetzen...",
+    "miembrosGuardado": "Kideak eguneratu dira",
+    "miembrosError": "Errore bat egon da kideak gordetzean",
+    "miembrosEmailInvalido": "Email baliogabea",
+    "miembrosEmailDuplicado": "Email hori jada zerrendan dago"
   },
   "juego": {
     "titulo": "Jokoa",

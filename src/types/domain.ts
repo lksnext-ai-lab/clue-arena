@@ -20,6 +20,7 @@ export interface Team {
   agentId: string;
   usuarioId: string;
   estado: TeamStatus;
+  miembros: string[]; // lista de emails de miembros del equipo
   createdAt: Date;
 }
 

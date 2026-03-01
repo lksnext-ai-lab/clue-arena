@@ -19,6 +19,7 @@ export const equipos = sqliteTable('equipos', {
   descripcion: text('descripcion'),
   agentId: text('agent_id').notNull(),
   avatarUrl: text('avatar_url'),
+  miembros: text('miembros').notNull().default('[]'), // JSON array of member emails
   usuarioId: text('usuario_id')
     .references(() => usuarios.id)
     .notNull(),

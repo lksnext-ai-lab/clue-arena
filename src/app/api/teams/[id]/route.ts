@@ -34,7 +34,7 @@ export async function GET(_req: Request, { params }: Params) {
     }
   }
 
-  return NextResponse.json(team);
+  return NextResponse.json({ ...team, miembros: JSON.parse(team.miembros ?? '[]') as string[] });
 }
 
 // PUT /api/teams/:id — Solo Admin (G-03)
@@ -80,14 +80,21 @@ export async function PUT(request: Request, { params }: Params) {
     }
   }
 
+  const { miembros: miembrosArray, ...restData } = parsed.data;
+
   const updated = await db
     .update(equipos)
-    .set(parsed.data)
+    .set({
+      ...restData,
+      ...(miembrosArray !== undefined
+        ? { miembros: JSON.stringify(miembrosArray) }
+        : {}),
+    })
     .where(eq(equipos.id, id))
     .returning()
     .get();
 
-  return NextResponse.json(updated);
+  return NextResponse.json({ ...updated, miembros: JSON.parse(updated.miembros ?? '[]') as string[] });
 }
 
 // DELETE /api/teams/:id — Solo Admin, con comprobación de partida activa (G-05)

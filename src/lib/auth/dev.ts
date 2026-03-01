@@ -20,6 +20,13 @@ export const DEV_USERS = {
     rol: 'equipo' as const,
     equipo: { id: 'dev-team-id', nombre: 'Dev Team', agentId: 'dev-agent' },
   },
+  sinEquipo: {
+    id: 'dev-sin-equipo-id',
+    name: 'Dev Sin Equipo',
+    email: 'dev-sin-equipo@clue-arena.local',
+    rol: 'equipo' as const,
+    equipo: null,
+  },
 };
 
 export function isAuthDisabled(): boolean {

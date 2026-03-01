@@ -1,0 +1,1 @@
+ALTER TABLE `equipos` ADD `miembros` text DEFAULT '[]' NOT NULL;

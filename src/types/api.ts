@@ -20,12 +20,14 @@ export interface TeamResponse {
   avatarUrl: string | null;
   usuarioId: string;
   estado: TeamStatus;
+  miembros: string[]; // lista de emails de miembros del equipo
   createdAt: string;
 }
 
 export interface CreateTeamRequest {
   nombre: string;
   agentId: string;
+  miembros?: string[];
 }
 
 export interface UpdateTeamRequest {
@@ -34,6 +36,7 @@ export interface UpdateTeamRequest {
   agentId?: string;
   avatarUrl?: string | null;
   estado?: TeamStatus;
+  miembros?: string[];
 }
 
 // --- Games ---

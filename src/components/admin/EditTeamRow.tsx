@@ -9,6 +9,7 @@ import { useTranslations } from 'next-intl';
 import type { TeamResponse } from '@/types/api';
 import { DeleteTeamButton } from './DeleteTeamButton';
 import Image from 'next/image';
+import { MembersEditor } from '@/components/team/MembersEditor';
 
 interface Props {
   team: TeamResponse;
@@ -27,6 +28,7 @@ export function EditTeamRow({ team, statusColors, onUpdated, onDeleted }: Props)
 
   const [editing, setEditing] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
+  const [members, setMembers] = useState<string[]>(team.miembros ?? []);
 
   const [avatarUrl, setAvatarUrl] = useState<string | null>(team.avatarUrl ?? null);
   const [avatarLoading, setAvatarLoading] = useState(false);
@@ -77,6 +79,7 @@ export function EditTeamRow({ team, statusColors, onUpdated, onDeleted }: Props)
   const handleCancel = () => {
     setEditing(false);
     setServerError(null);
+    setMembers(team.miembros ?? []);
     setAvatarUrl(team.avatarUrl ?? null);
     reset({ nombre: team.nombre, descripcion: team.descripcion ?? '', agentId: team.agentId });
   };
@@ -246,6 +249,19 @@ export function EditTeamRow({ team, statusColors, onUpdated, onDeleted }: Props)
                   <p className="text-xs" style={{ color: '#64748b' }}>{t('generandoAvatarDesc')}</p>
                 )}
               </div>
+            </div>
+
+            {/* Members section */}
+            <div
+              className="rounded-lg p-3"
+              style={{ background: '#0f172a', border: '1px solid #334155' }}
+            >
+              <MembersEditor
+                teamId={team.id}
+                ns="admin"
+                initialMembers={members}
+                onSaved={(updated) => setMembers(updated)}
+              />
             </div>
 
             {/* Submit / cancel */}

@@ -7,6 +7,7 @@ import { apiFetch } from '@/lib/api/client';
 import { useAppSession } from '@/contexts/SessionContext';
 import { useTranslations } from 'next-intl';
 import type { GameResponse, TeamResponse } from '@/types/api';
+import { MembersEditor } from '@/components/team/MembersEditor';
 
 /**
  * UI-003 — Panel de equipo
@@ -113,6 +114,21 @@ export default function EquipoPage() {
           )}
         </dl>
       </section>
+
+      {/* Miembros del equipo */}
+      {equipo && team && (
+        <section
+          className="rounded-xl p-6"
+          style={{ background: '#1a1a2e' }}
+        >
+          <MembersEditor
+            key={equipo.id}
+            teamId={equipo.id}
+            ns="equipo"
+            initialMembers={team.miembros ?? []}
+          />
+        </section>
+      )}
 
       <section>
         <h2 className="text-lg font-semibold mb-3" style={{ color: '#f59e0b' }}>
