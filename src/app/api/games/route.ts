@@ -55,8 +55,8 @@ export async function GET(request: Request) {
 
   // Equipo role: only return games their team participates in
   const result =
-    session.user.rol === 'equipo' && session.equipo
-      ? enriched.filter((g) => g.equipos.some((e) => e.equipoId === session.equipo!.id))
+    session.user.rol === 'equipo' && session.user.equipo
+      ? enriched.filter((g) => g.equipos.some((e) => e.equipoId === session.user.equipo!.id))
       : enriched;
 
   return NextResponse.json({ games: result });
