@@ -28,11 +28,14 @@ env:
 
   # ─── Azure EntraID OIDC ───────────────────────────────────────────────────
   - variable: ENTRA_TENANT_ID
-    secret: ENTRA_TENANT_ID
+    value: ""
+  #  secret: ENTRA_TENANT_ID
   - variable: ENTRA_CLIENT_ID
-    secret: ENTRA_CLIENT_ID
+    value: ""
+  #  secret: ENTRA_CLIENT_ID
   - variable: ENTRA_CLIENT_SECRET
-    secret: ENTRA_CLIENT_SECRET
+    value: ""
+  #  secret: ENTRA_CLIENT_SECRET
 
   # ─── Base de datos SQLite ─────────────────────────────────────────────────
   - variable: DATABASE_URL
@@ -46,22 +49,28 @@ env:
     availability:
       - RUNTIME
   - variable: MATTIN_API_KEY
-    secret: MATTIN_API_KEY
+    value: ""
+  #  secret: MATTIN_API_KEY
 
   # ─── MCP Server ───────────────────────────────────────────────────────────
   - variable: MCP_AUTH_TOKEN
-    secret: MCP_AUTH_TOKEN
+    value: ""
+  #  secret: MCP_AUTH_TOKEN
 
   # ─── App ──────────────────────────────────────────────────────────────────
+  - variable: NEXT_PUBLIC_APP_URL
+    value: https://clue-arena-app--clue-arena.europe-west4.hosted.app
+    availability:
+      - BUILD
   - variable: NODE_ENV
-    value: production
+    value: development
     availability:
       - BUILD
       - RUNTIME
 
   # ─── Agente (RFC F006) ────────────────────────────────────────────────────
   - variable: AGENT_BACKEND
-    value: mattin
+    value: local
     availability:
       - RUNTIME
   - variable: GENKIT_MODEL
