@@ -18,6 +18,8 @@
   "dependencies": {
     "@auth/drizzle-adapter": "^1.7.4",
     "@cfworker/json-schema": "^4.1.1",
+    "@google-cloud/firestore": "7.11.6",
+    "@swc/helpers": "0.5.19",
     "@genkit-ai/google-genai": "^1.29.0",
     "@genkit-ai/googleai": "^1.28.0",
     "@hookform/resolvers": "^3.10.0",
@@ -34,6 +36,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "drizzle-orm": "^0.39.3",
+    "firebase": "^12.10.0",
     "genkit": "^1.29.0",
     "genkitx-ollama": "^1.29.0",
     "lucide-react": "^0.479.0",
@@ -48,6 +51,7 @@
     "tailwind-merge": "^2.6.0",
     "tailwindcss": "^4.0.0",
     "uuid": "^11.1.0",
+    "winston": "3.19.0",
     "ws": "^8.19.0",
     "zod": "^3.24.1"
   },
@@ -58,6 +62,7 @@
     "@testing-library/user-event": "^14.6.1",
     "@types/better-sqlite3": "^7.6.12",
     "@types/node": "^22.13.5",
+    "@types/pg": "8.6.1",
     "@types/pino": "^7.0.4",
     "@types/react": "^19.0.10",
     "@types/react-dom": "^19.0.4",
