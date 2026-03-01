@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import Image from 'next/image';
 import { cn } from '@/lib/utils/cn';
 import type { GameDetailResponse, SuggestionResponse, TurnResponse } from '@/types/api';
+import { useGame } from '@/contexts/GameContext';
 import { PERSONAJE_META, ARMA_META, ESCENARIO_META } from '@/types/domain';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -88,6 +89,9 @@ function buildCards(sug: SuggestionResponse): CardData[] {
 
 // Stagger delays in milliseconds for the entering animation
 const STAGGER_DELAYS = [0, 160, 320] as const;
+
+// how long the overlay should remain visible before fading out (ms)
+const OVERLAY_VISIBLE_MS = 2_000;
 
 // ── SuggestionCardStrip (exported, reusable) ──────────────────────────────────
 
@@ -267,6 +271,17 @@ export function SuggestionCardStrip({
 
 export function SuggestionRevealOverlay({ partida }: SuggestionRevealOverlayProps) {
   const [anim, setAnim] = useState<ActiveAnim | null>(null);
+  const { notifySuggestionAnimationStart, notifySuggestionAnimationEnd } = useGame();
+
+  // Inform context when an animation enters or leaves; this allows the
+  // activeEquipoId display to be deferred until the overlay has finished.
+  useEffect(() => {
+    if (anim) {
+      notifySuggestionAnimationStart();
+    } else {
+      notifySuggestionAnimationEnd();
+    }
+  }, [anim, notifySuggestionAnimationStart, notifySuggestionAnimationEnd]);
 
   // Suggestions whose animation has fully completed — never show again
   const shownSugIdsRef    = useRef<Set<string>>(new Set());
@@ -289,8 +304,13 @@ export function SuggestionRevealOverlay({ partida }: SuggestionRevealOverlayProp
     if (dissolveTimerRef.current) { clearTimeout(dissolveTimerRef.current); dissolveTimerRef.current = null; }
   }, []);
 
-  /** Schedule: refuted/no_refutation → dissolving → null */
-  const scheduleDissolve = useCallback((sugId: string, delayMs = 5_000) => {
+  /** Schedule: refuted/no_refutation → dissolving → null
+   *
+   * We default to a short visibility period (OVERLAY_VISIBLE_MS) so that the
+   * “última jugada” overlay never lingers indefinitely.  The caller can still
+   * override the delay for special cases but most paths rely on the default.
+   */
+  const scheduleDissolve = useCallback((sugId: string, delayMs = OVERLAY_VISIBLE_MS) => {
     if (dissolveTimerRef.current) clearTimeout(dissolveTimerRef.current);
     dissolveTimerRef.current = setTimeout(() => {
       setAnim((prev) => prev ? { ...prev, phase: 'dissolving' } : null);
@@ -331,7 +351,7 @@ export function SuggestionRevealOverlay({ partida }: SuggestionRevealOverlayProp
       if (sug.refutadaPor) {
         // Already refuted by the time we first see it
         setAnim({ suggestion: sug, turnoNumero: turno.numero, equipoNombre, refutadorNombre, phase: 'refuted' });
-        scheduleDissolve(sug.id, 5_000);
+        scheduleDissolve(sug.id);
       } else {
         // Animate entering → pending, waiting for refutation
         setAnim({ suggestion: sug, turnoNumero: turno.numero, equipoNombre, refutadorNombre, phase: 'entering' });
@@ -340,6 +360,8 @@ export function SuggestionRevealOverlay({ partida }: SuggestionRevealOverlayProp
             prev?.suggestion.id === sug.id ? { ...prev, phase: 'pending' } : prev
           );
         }, 900);
+        // always hide after a fixed period even if no one refutes
+        scheduleDissolve(sug.id);
       }
       return;
     }
@@ -352,7 +374,7 @@ export function SuggestionRevealOverlay({ partida }: SuggestionRevealOverlayProp
           ? { ...prev, suggestion: sug, refutadorNombre, phase: 'refuted' }
           : prev
       );
-      scheduleDissolve(sug.id, 5_000);
+      scheduleDissolve(sug.id);
       return;
     }
 
@@ -366,7 +388,7 @@ export function SuggestionRevealOverlay({ partida }: SuggestionRevealOverlayProp
       setAnim((prev) =>
         prev?.suggestion.id === sug.id ? { ...prev, phase: 'no_refutation' } : prev
       );
-      scheduleDissolve(sug.id, 3_000);
+      scheduleDissolve(sug.id);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [partida]);

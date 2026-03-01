@@ -13,6 +13,15 @@ interface GameContextValue {
   lastUpdated: Date | null;
   error: Error | null;
   refresh: () => void; // fallback HTTP manual
+  /**
+   * Allows consumers (tests or the WS handler) to request that the displayed
+   * active team be changed.  If an animation is in progress the change is
+   * deferred until it finishes; otherwise it applies immediately.
+   */
+  scheduleActiveEquipoId: (id: string | null) => void;
+  /** Called by SuggestionRevealOverlay when an animation starts/ends. */
+  notifySuggestionAnimationStart: () => void;
+  notifySuggestionAnimationEnd: () => void;
 }
 
 const GameContext = createContext<GameContextValue>({
@@ -22,6 +31,9 @@ const GameContext = createContext<GameContextValue>({
   lastUpdated: null,
   error: null,
   refresh: () => {},
+  scheduleActiveEquipoId: () => {},
+  notifySuggestionAnimationStart: () => {},
+  notifySuggestionAnimationEnd: () => {},
 });
 
 interface GameProviderProps {
@@ -35,6 +47,43 @@ export function GameProvider({ children, gameId }: GameProviderProps) {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<Error | null>(null);
+
+  // ---------- animation / pending-team bookkeeping ----------
+  const animatingRef = useRef(false);
+  const pendingEquipoRef = useRef<string | null>(null);
+
+  const scheduleActiveEquipoId = useCallback((id: string | null) => {
+    // Store the requested id.  We'll flush it in one of two ways:
+    // 1. If an animation is currently in progress (`animatingRef` true), it
+    //    will be flushed when notifySuggestionAnimationEnd() runs.
+    // 2. If no animation yet, we start a short timer.  That timer gives the
+    //    overlay a chance to start shortly after the call; if animatingRef
+    //    becomes true before the timeout fires we skip the flush here and let
+    //    the notify-end handler apply the pending value instead.  Otherwise we
+    //    commit after the delay, effectively making the change "when the overlay
+    //    disappears" in the common case where no overlay ever shows.
+    pendingEquipoRef.current = id;
+    if (!animatingRef.current) {
+      setTimeout(() => {
+        if (!animatingRef.current && pendingEquipoRef.current !== null) {
+          setActiveEquipoId(pendingEquipoRef.current);
+          pendingEquipoRef.current = null;
+        }
+      }, 20); // short grace period to absorb races
+    }
+  }, []);
+
+  const notifySuggestionAnimationStart = useCallback(() => {
+    animatingRef.current = true;
+  }, []);
+
+  const notifySuggestionAnimationEnd = useCallback(() => {
+    animatingRef.current = false;
+    if (pendingEquipoRef.current !== null) {
+      setActiveEquipoId(pendingEquipoRef.current);
+      pendingEquipoRef.current = null;
+    }
+  }, []);
 
   // Monotonic counter to discard out-of-order HTTP responses.
   // Multiple WS events (e.g. rapid auto-run turns) can trigger concurrent
@@ -52,14 +101,15 @@ export function GameProvider({ children, gameId }: GameProviderProps) {
       // Only accept this response if no newer request has completed after us
       if (seq < fetchSeqRef.current) return;
       setPartida(data);
-      setActiveEquipoId(data.activeEquipoId);
+      // route updates also use the scheduling logic so animation is respected
+      scheduleActiveEquipoId(data.activeEquipoId);
       setLastUpdated(new Date());
       setError(null);
     } catch (err) {
       if (seq < fetchSeqRef.current) return;
       setError(err instanceof Error ? err : new Error('Error desconocido'));
     }
-  }, [gameId]);
+  }, [gameId, scheduleActiveEquipoId]);
 
   // Carga inicial
   React.useEffect(() => {
@@ -75,10 +125,10 @@ export function GameProvider({ children, gameId }: GameProviderProps) {
       return;
     }
     if (msg.type === 'game:turn_completed') {
-      // Immediately apply coordinator's authoritative next-team indicator,
-      // then also re-fetch for full state refresh
+      // coordinator tells us which team is up next; delay visible change until
+      // any running suggestion animation has finished.
       if (msg.nextEquipoId !== undefined) {
-        setActiveEquipoId(msg.nextEquipoId);
+        scheduleActiveEquipoId(msg.nextEquipoId);
       }
       fetchGame();
       return;
@@ -87,7 +137,7 @@ export function GameProvider({ children, gameId }: GameProviderProps) {
       // Re-fetch completo del estado actual (simple y robusto)
       fetchGame();
     }
-  }, [fetchGame]);
+  }, [fetchGame, scheduleActiveEquipoId]);
 
   const handleWsDisconnect = useCallback(() => {
     setIsConnected(false);
@@ -108,6 +158,9 @@ export function GameProvider({ children, gameId }: GameProviderProps) {
     lastUpdated,
     error,
     refresh: fetchGame,
+    scheduleActiveEquipoId,
+    notifySuggestionAnimationStart,
+    notifySuggestionAnimationEnd,
   };
 
   return <GameContext.Provider value={value}>{children}</GameContext.Provider>;
