@@ -1,0 +1,76 @@
+# Settings for Backend (on Cloud Run).
+# See https://firebase.google.com/docs/app-hosting/configure#cloud-run
+runConfig:
+  minInstances: 0
+  # maxInstances: 100
+  # concurrency: 80
+  # cpu: 1
+  # memoryMiB: 512
+
+# Environment variables and secrets.
+# See https://firebase.google.com/docs/app-hosting/configure#user-defined-environment
+# See https://firebase.google.com/docs/app-hosting/configure#secret-parameters
+env:
+  # ─── Auth mode (NEVER true in production) ────────────────────────────────
+  - variable: DISABLE_AUTH
+    value: "true"
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_DISABLE_AUTH
+    value: "true"
+    availability:
+      - BUILD
+
+  # ─── Auth.js ─────────────────────────────────────────────────────────────
+  - variable: AUTH_SECRET
+    secret: AUTH_SECRET
+
+  # ─── Azure EntraID OIDC ───────────────────────────────────────────────────
+  - variable: ENTRA_TENANT_ID
+    secret: ENTRA_TENANT_ID
+  - variable: ENTRA_CLIENT_ID
+    secret: ENTRA_CLIENT_ID
+  - variable: ENTRA_CLIENT_SECRET
+    secret: ENTRA_CLIENT_SECRET
+
+  # ─── Base de datos SQLite ─────────────────────────────────────────────────
+  - variable: DATABASE_URL
+    value: ./data/clue-arena.db
+    availability:
+      - RUNTIME
+
+  # ─── MattinAI ─────────────────────────────────────────────────────────────
+  - variable: MATTIN_API_URL
+    value: https://mattin.lksnext.com
+    availability:
+      - RUNTIME
+  - variable: MATTIN_API_KEY
+    secret: MATTIN_API_KEY
+
+  # ─── MCP Server ───────────────────────────────────────────────────────────
+  - variable: MCP_AUTH_TOKEN
+    secret: MCP_AUTH_TOKEN
+
+  # ─── App ──────────────────────────────────────────────────────────────────
+  - variable: NODE_ENV
+    value: production
+    availability:
+      - BUILD
+      - RUNTIME
+
+  # ─── Agente (RFC F006) ────────────────────────────────────────────────────
+  - variable: AGENT_BACKEND
+    value: mattin
+    availability:
+      - RUNTIME
+  - variable: GENKIT_MODEL
+    value: googleai/gemini-3-flash-preview
+    availability:
+      - RUNTIME
+  - variable: GEMINI_API_KEY
+    secret: GEMINI_API_KEY
+  - variable: OLLAMA_SERVER_URL
+    value: http://localhost:11434
+    availability:
+      - RUNTIME
