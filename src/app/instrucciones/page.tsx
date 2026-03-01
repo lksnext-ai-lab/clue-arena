@@ -3,6 +3,7 @@ import { SectionWrapper } from '@/components/instructions/SectionWrapper';
 import { CodeBlock } from '@/components/instructions/CodeBlock';
 import { SuspectsTable, WeaponsTable, ScenariosTable } from '@/components/instructions/ElementsTable';
 import { ScoringTable } from '@/components/instructions/ScoringTable';
+import { getTranslations } from 'next-intl/server';
 
 // ── Code snippets ──────────────────────────────────────────────────────────────
 
@@ -302,7 +303,9 @@ const FAQ_ROWS = [
 
 // ── Page ───────────────────────────────────────────────────────────────────────
 
-export default function InstruccionesPage() {
+export default async function InstruccionesPage() {
+  const t = await getTranslations('instrucciones');
+  const tJuego = await getTranslations('juego');
   return (
     <InstructionsLayout>
       {/* §1 Hero / Introducción */}
@@ -311,20 +314,23 @@ export default function InstruccionesPage() {
         className="scroll-mt-20 rounded-xl border border-slate-800 bg-gradient-to-br from-slate-900 to-slate-950 p-8 md:p-12"
       >
         <div className="mb-2 text-xs font-semibold uppercase tracking-widest text-cyan-500">
-          Evento Mayo 2026
+          {t('eventoLabel')}
         </div>
         <h1 className="mb-3 text-3xl font-extrabold tracking-tight text-white md:text-4xl">
-          El Algoritmo Asesinado
+          {tJuego('subtitulo')}
         </h1>
         <p className="mb-6 text-lg text-slate-400 max-w-2xl">
-          Guía técnica para construir un agente IA que juegue al Cluedo en la plataforma
-          <strong className="text-slate-200"> Clue Arena</strong>.
+          {t('heroBannerDesc').split('Clue Arena').map((part, i, arr) =>
+            i < arr.length - 1
+              ? <span key={i}>{part}<strong className="text-slate-200"> Clue Arena</strong></span>
+              : <span key={i}>{part}</span>
+          )}
         </p>
         <div className="flex flex-wrap gap-3 text-sm">
           {[
-            { label: 'Protocolo', value: 'MCP (HTTP + JSON-RPC)' },
-            { label: 'Lenguajes', value: 'Python · TypeScript · cualquiera' },
-            { label: 'Auth', value: 'Bearer token por equipo' },
+            { label: t('protocolo'), value: 'MCP (HTTP + JSON-RPC)' },
+            { label: t('lenguajes'), value: 'Python · TypeScript · cualquiera' },
+            { label: t('auth'), value: 'Bearer token por equipo' },
           ].map(({ label, value }) => (
             <div
               key={label}
@@ -338,7 +344,7 @@ export default function InstruccionesPage() {
       </section>
 
       {/* §2 Cómo funciona un agente */}
-      <SectionWrapper id="como-funciona" title="Cómo funciona un agente Clue Arena" titleNumber="2">
+      <SectionWrapper id="como-funciona" title={t('sec2Titulo')} titleNumber="2">
         <p>
           El motor de juego invoca al agente de tu equipo en dos situaciones durante la partida:
         </p>
@@ -381,7 +387,7 @@ export default function InstruccionesPage() {
       </SectionWrapper>
 
       {/* §3 Contrato MCP */}
-      <SectionWrapper id="contrato-mcp" title="Contrato MCP" titleNumber="3">
+      <SectionWrapper id="contrato-mcp" title={t('sec3Titulo')} titleNumber="3">
         <h3 className="font-semibold text-slate-200 mb-2">Endpoint</h3>
         <CodeBlock
           language="http"
@@ -428,7 +434,7 @@ export default function InstruccionesPage() {
       </SectionWrapper>
 
       {/* §4 Herramientas disponibles */}
-      <SectionWrapper id="herramientas" title="Herramientas disponibles" titleNumber="4">
+      <SectionWrapper id="herramientas" title={t('sec4Titulo')} titleNumber="4">
         <p>
           Las tres herramientas disponibles son de <strong>solo consulta</strong> (lectura de estado
           y memoria). Las acciones de juego se expresan exclusivamente en la respuesta devuelta al
@@ -510,7 +516,7 @@ export default function InstruccionesPage() {
       </SectionWrapper>
 
       {/* §5 Estructura de la respuesta del agente */}
-      <SectionWrapper id="respuesta" title="Estructura de la respuesta del agente" titleNumber="5">
+      <SectionWrapper id="respuesta" title={t('sec5Titulo')} titleNumber="5">
         <p>
           El motor espera un objeto{' '}
           <code className="font-mono bg-slate-800 px-1 rounded text-cyan-300">AgentResponse</code>{' '}
@@ -572,7 +578,7 @@ export default function InstruccionesPage() {
       </SectionWrapper>
 
       {/* §6 Elementos del juego */}
-      <SectionWrapper id="elementos" title="Elementos del juego" titleNumber="6">
+      <SectionWrapper id="elementos" title={t('sec6Titulo')} titleNumber="6">
         <p>
           Los valores de <code className="font-mono bg-slate-800 px-1 rounded text-cyan-300">sospechoso</code>,{' '}
           <code className="font-mono bg-slate-800 px-1 rounded text-cyan-300">arma</code> y{' '}
@@ -594,7 +600,7 @@ export default function InstruccionesPage() {
       </SectionWrapper>
 
       {/* §7 Sistema de puntuación */}
-      <SectionWrapper id="puntuacion" title="Sistema de puntuación" titleNumber="7">
+      <SectionWrapper id="puntuacion" title={t('sec7Titulo')} titleNumber="7">
         <ScoringTable />
 
         <div className="mt-6 rounded-lg border border-slate-700 bg-slate-900/50 p-4">
@@ -626,7 +632,7 @@ export default function InstruccionesPage() {
       </SectionWrapper>
 
       {/* §8 Inicio rápido */}
-      <SectionWrapper id="quickstart" title="Inicio rápido" titleNumber="8">
+      <SectionWrapper id="quickstart" title={t('sec8Titulo')} titleNumber="8">
         <p>
           Las plantillas implementan el{' '}
           <strong>agente mínimo funcional</strong>: siempre propone la misma sugerencia como
@@ -676,7 +682,7 @@ export default function InstruccionesPage() {
       </SectionWrapper>
 
       {/* §9 Registro del agente */}
-      <SectionWrapper id="registro" title="Registro del agente" titleNumber="9">
+      <SectionWrapper id="registro" title={t('sec9Titulo')} titleNumber="9">
         <p>
           Una vez desplegado el agente en un servidor accesible, regístralo en la plataforma para
           que participe en las partidas:
@@ -705,7 +711,7 @@ export default function InstruccionesPage() {
       </SectionWrapper>
 
       {/* §10 FAQ y errores comunes */}
-      <SectionWrapper id="faq" title="FAQ y errores comunes" titleNumber="10">
+      <SectionWrapper id="faq" title={t('sec10Titulo')} titleNumber="10">
         <div className="overflow-x-auto rounded-lg border border-slate-700">
           <table className="w-full text-sm text-left">
             <caption className="sr-only">Tabla de errores frecuentes y soluciones</caption>

@@ -1,14 +1,16 @@
 import Image from 'next/image';
 import { ARMAS, ARMA_META } from '@/types/domain';
+import { getTranslations } from 'next-intl/server';
 
-export function JuegoArmas() {
+export async function JuegoArmas() {
+  const t = await getTranslations('juego');
   return (
     <section aria-labelledby="armas-heading">
       <h2
         id="armas-heading"
         className="text-xs font-semibold tracking-widest uppercase text-cyan-400 mb-5"
       >
-        Armas del crimen
+        {t('armasHeading')}
       </h2>
 
       {/* Weapon cards */}
@@ -44,7 +46,7 @@ export function JuegoArmas() {
       </div>
 
       <p className="text-xs text-slate-600 mt-3">
-        Una de estas 6 armas figura en el sobre secreto. Las otras 5 están repartidas entre los jugadores.
+        {t('armasNota')}
       </p>
     </section>
   );

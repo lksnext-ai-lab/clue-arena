@@ -1,14 +1,16 @@
 import { HABITACIONES, ESCENARIO_META } from '@/types/domain';
 import Image from 'next/image';
+import { getTranslations } from 'next-intl/server';
 
-export function JuegoEscenarios() {
+export async function JuegoEscenarios() {
+  const t = await getTranslations('juego');
   return (
     <section aria-labelledby="escenarios-heading">
       <h2
         id="escenarios-heading"
         className="text-xs font-semibold tracking-widest uppercase text-cyan-400 mb-5"
       >
-        Escenarios — habitaciones de la empresa
+        {t('escenariosHeading')}
       </h2>
 
       {/* Room grid with individual scenario images */}
@@ -40,7 +42,7 @@ export function JuegoEscenarios() {
       </div>
 
       <p className="text-xs text-slate-600 mt-3">
-        9 habitaciones forman la empresa. El crimen ocurrió en una de ellas. Las sugerencias siempre han de especificar una habitación.
+        {t('escenariosNota')}
       </p>
     </section>
   );

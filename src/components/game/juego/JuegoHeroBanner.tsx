@@ -1,4 +1,8 @@
-export function JuegoHeroBanner() {
+import { getTranslations } from 'next-intl/server';
+
+export async function JuegoHeroBanner() {
+  const t = await getTranslations('juego');
+  const pre = t('heroBannerTitlePre');
   return (
     <section aria-label="Banner del evento">
       <div
@@ -8,7 +12,7 @@ export function JuegoHeroBanner() {
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/game/banner.png"
-          alt="Banner del evento Clue Arena — El Algoritmo Asesinado"
+          alt={`Banner del evento Clue Arena — ${t('heroBannerTitleCyan')} ${t('heroBannerTitlePost')}`}
           style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top' }}
         />
         {/* Gradient overlay left → transparent */}
@@ -22,16 +26,15 @@ export function JuegoHeroBanner() {
         {/* Text content */}
         <div className="absolute inset-0 flex flex-col justify-center px-8 sm:px-12">
           <p className="text-xs font-semibold tracking-widest uppercase text-cyan-400 mb-2">
-            Challenge corporativo
+            {t('heroBannerLabel')}
           </p>
           <h1 className="text-3xl sm:text-4xl font-bold text-white leading-tight">
-            El{' '}
-            <span className="text-cyan-400">Algoritmo</span>{' '}
-            Asesinado
+            {pre && <>{pre}{' '}</>}
+            <span className="text-cyan-400">{t('heroBannerTitleCyan')}</span>{' '}
+            {t('heroBannerTitlePost')}
           </h1>
           <p className="text-slate-400 text-base mt-2 max-w-md">
-            Construye un agente IA capaz de resolver el crimen antes que nadie.
-            Estrategia, deducción y código.
+            {t('heroBannerTagline')}
           </p>
         </div>
       </div>

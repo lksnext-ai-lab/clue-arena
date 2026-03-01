@@ -1,56 +1,23 @@
 import { Brain, Cpu, Users, BarChart3 } from 'lucide-react';
+import { getTranslations } from 'next-intl/server';
 
-interface ObjetivoItem {
-  id: string;
-  Icon: React.ComponentType<{ size?: number; className?: string }>;
-  titulo: string;
-  descripcion: string;
-}
+export async function JuegoObjetivos() {
+  const t = await getTranslations('juego');
 
-interface KpiItem {
-  label: string;
-  valor: string;
-}
+  const OBJETIVO_ITEMS = [
+    { id: 'OBJ-01', Icon: Brain,     titulo: t('obj01Titulo'), descripcion: t('obj01Desc') },
+    { id: 'OBJ-02', Icon: Cpu,      titulo: t('obj02Titulo'), descripcion: t('obj02Desc') },
+    { id: 'OBJ-03', Icon: Users,    titulo: t('obj03Titulo'), descripcion: t('obj03Desc') },
+    { id: 'OBJ-04', Icon: BarChart3, titulo: t('obj04Titulo'), descripcion: t('obj04Desc') },
+  ];
 
-const OBJETIVO_ITEMS: ObjetivoItem[] = [
-  {
-    id: 'OBJ-01',
-    Icon: Brain,
-    titulo: 'Aprendizaje práctico de IA agencial',
-    descripcion:
-      'Los empleados construyen y compiten con agentes IA reales, no solo leen sobre ellos. La experiencia directa acelera la comprensión.',
-  },
-  {
-    id: 'OBJ-02',
-    Icon: Cpu,
-    titulo: 'Adopción de herramientas IA corporativas',
-    descripcion:
-      'Familiaridad directa con MattinAI y el Model Context Protocol (MCP) como estándar de integración para agentes IA.',
-  },
-  {
-    id: 'OBJ-03',
-    Icon: Users,
-    titulo: 'Cultura de innovación y competición interna',
-    descripcion:
-      'El challenge crea un espacio seguro para experimentar, fallar y aprender en equipo con una dinámica motivadora.',
-  },
-  {
-    id: 'OBJ-04',
-    Icon: BarChart3,
-    titulo: 'Medición de comprensión IA post-evento',
-    descripcion:
-      'Meta: ≥ 4/5 en encuesta "¿Entiendo mejor qué es un agente IA?". Evidencia cuantitativa del impacto formativo.',
-  },
-];
-
-export function JuegoObjetivos() {
   return (
     <section aria-labelledby="objetivos-heading">
       <h2
         id="objetivos-heading"
         className="text-xs font-semibold tracking-widest uppercase text-cyan-400 mb-5"
       >
-        Objetivos del evento
+        {t('objetivosHeading')}
       </h2>
 
       {/* Objetivo cards */}

@@ -1,14 +1,16 @@
 import Image from 'next/image';
 import { SOSPECHOSOS, PERSONAJE_META } from '@/types/domain';
+import { getTranslations } from 'next-intl/server';
 
-export function JuegoPersonajes() {
+export async function JuegoPersonajes() {
+  const t = await getTranslations('juego');
   return (
     <section aria-labelledby="personajes-heading">
       <h2
         id="personajes-heading"
         className="text-xs font-semibold tracking-widest uppercase text-cyan-400 mb-5"
       >
-        Personajes sospechosos
+        {t('personajesHeading')}
       </h2>
 
       {/* Character cards */}
@@ -53,7 +55,7 @@ export function JuegoPersonajes() {
       </div>
 
       <p className="text-xs text-slate-600 mt-3">
-        Los 6 sospechosos participan en cada partida. El sobre secreto contiene exactamente uno de ellos.
+        {t('personajesNota')}
       </p>
     </section>
   );
