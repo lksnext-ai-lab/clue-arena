@@ -142,8 +142,8 @@ function ArenaContent({ gameId: _gameId, initialData }: ArenaViewProps) {
       {/* Main grid: teams + deduction board + (when en_curso) activity feed */}
       <div className={
         data.estado === 'en_curso'
-          ? 'grid grid-cols-1 lg:grid-cols-[280px_1fr_300px] gap-4'
-          : 'grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-4'
+          ? 'grid grid-cols-1 lg:grid-cols-[300px_1fr_500px] gap-4'
+          : 'grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-4'
       }>
         <ArenaTeamPanel partida={data} />
         {/* Relative wrapper so the overlay can be absolutely positioned over the board */}
