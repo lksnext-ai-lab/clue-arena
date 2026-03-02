@@ -114,9 +114,11 @@ export interface EquipoStateView {
   equipoId: string;
   orden: number;
   cartas: Carta[]; // Only own cards; empty for others
+  numCartas: number; // Public: number of cards in hand
   esPropio: boolean;
   eliminado: boolean;
   puntos: number;
+  turnosJugados: number; // Public: how many turns this team has played
 }
 
 export interface ActionRecordView {
@@ -127,7 +129,8 @@ export interface ActionRecordView {
   arma?: string;
   habitacion?: string;
   refutadaPor?: string | null;
-  cartaMostrada?: Carta | null; // Only for requesting team
+  cartaMostrada?: Carta | null;     // Private: only for the team that made the suggestion
+  cartaMostradaPorMi?: Carta | null; // Private: only for the team that refuted
   correcta?: boolean;
   timestamp: number;
 }

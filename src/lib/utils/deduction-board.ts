@@ -16,6 +16,8 @@ export interface DeductionCell {
   teamId: string;
   /** Turn numbers in which this team mentioned this card in a suggestion */
   turnos: number[];
+  /** Subset of `turnos` where the suggestion was refuted by another team */
+  turnosRefutados: number[];
 }
 
 /** Indexed by `${teamId}::${card}` */
@@ -48,26 +50,37 @@ export function buildDeductionBoard(
   for (const { card, category } of ALL_CARDS) {
     for (const teamId of equipoIds) {
       const key = boardKey(teamId, card);
-      board.set(key, { card, category, teamId, turnos: [] });
+      board.set(key, { card, category, teamId, turnos: [], turnosRefutados: [] });
     }
   }
 
   // Fill in from suggestion history
   for (const turno of turnos) {
     for (const s of turno.sugerencias) {
+      // The card that was actually shown as proof — only known to admin/suggester
+      const refutedCard = s.cartaMostrada ?? null;
+
       const cards: { card: string; category: CardCategory }[] = [
         { card: s.sospechoso, category: 'sospechoso' },
         { card: s.arma, category: 'arma' },
         { card: s.habitacion, category: 'habitacion' },
       ];
       for (const { card, category } of cards) {
+        const isRefutedCard = refutedCard !== null && card === refutedCard;
         const key = boardKey(s.equipoId, card);
         const existing = board.get(key);
         if (existing) {
           existing.turnos.push(turno.numero);
+          if (isRefutedCard) existing.turnosRefutados.push(turno.numero);
         } else {
           // Card not in canonical list (custom game), still track it
-          board.set(key, { card, category, teamId: s.equipoId, turnos: [turno.numero] });
+          board.set(key, {
+            card,
+            category,
+            teamId: s.equipoId,
+            turnos: [turno.numero],
+            turnosRefutados: isRefutedCard ? [turno.numero] : [],
+          });
         }
       }
     }

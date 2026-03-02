@@ -232,3 +232,71 @@ export interface AgentInvocationContext {
    */
   gameStateViewHash?: string;
 }
+
+// ── F015 — Training Arena types ──────────────────────────────────────────────
+
+export interface AgentToolCall {
+  tool:       'get_game_state' | 'get_agent_memory' | 'save_agent_memory';
+  args:       Record<string, unknown>;
+  result:     Record<string, unknown>;
+  durationMs: number;
+}
+
+export interface AgentLlmExchange {
+  /** 0-based index within the same turn (ReAct may produce N exchanges) */
+  index:        number;
+  systemPrompt: string;
+  userPrompt:   string;
+  rawResponse:  string;
+  toolCalls:    AgentToolCall[];
+  durationMs:   number;
+}
+
+export interface AgentInteractionTrace {
+  type:           'play_turn' | 'refute';
+  exchanges:      AgentLlmExchange[];
+  totalToolCalls: number;
+  parsedAction:   AgentResponse | null;
+  parseError:     string | null;
+}
+
+export interface TrainingGameResponse {
+  id:          string;
+  equipoId:    string;
+  estado:      'en_curso' | 'finalizada' | 'abortada';
+  numBots:     number;
+  seed:        string | null;
+  numTurnos:   number;
+  ganador:     string | null;  // equipoId that won, or null
+  sobres:      { sospechoso: string; arma: string; habitacion: string } | null; // visible when finalizada
+  resultado:   TrainingResultado | null;
+  motivoAbort: string | null;
+  createdAt:   string;
+  finishedAt:  string | null;
+}
+
+export interface TrainingResultado {
+  ganadorId:     string | null;
+  puntosSimulados: number;
+  turnosJugados: number;
+}
+
+export interface TrainingTurnResponse {
+  id:             string;
+  partidaId:      string;
+  equipoId:       string;
+  esBot:          boolean;
+  numero:         number;
+  accion:         AgentResponse | null;
+  gameStateView:  unknown | null;          // GameStateView JSON — null for bot turns in non-admin context
+  agentTrace:     AgentInteractionTrace | null;  // null for bot turns
+  memoriaInicial: Record<string, unknown> | null;
+  memoriaFinal:   Record<string, unknown> | null;
+  durationMs:     number | null;
+  createdAt:      string;
+}
+
+export interface CreateTrainingGameBody {
+  numBots: number;
+  seed?:   string;
+}

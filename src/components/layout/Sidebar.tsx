@@ -13,6 +13,7 @@ import {
   BookOpen,
   Shield,
   Bot,
+  Dumbbell,
 } from 'lucide-react';
 import { useAppSession } from '@/contexts/SessionContext';
 import { LocaleSwitcher } from './LocaleSwitcher';
@@ -26,7 +27,7 @@ const ACCENT_BORDER = 'rgba(34,211,238,0.25)';
 const TEXT_MUTED = '#64748b';
 const TEXT_ACTIVE = '#f1f5f9';
 
-type NavKey = 'dashboard' | 'miEquipo' | 'admin' | 'arena' | 'juego' | 'ranking' | 'instrucciones' | 'perfil';
+type NavKey = 'dashboard' | 'miEquipo' | 'admin' | 'arena' | 'juego' | 'ranking' | 'instrucciones' | 'entrenamiento' | 'perfil';
 
 interface NavItem {
   href: string;
@@ -41,8 +42,9 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/admin',           Icon: Shield,          labelKey: 'admin',     roles: ['admin'] },
   { href: '/arena',           Icon: Swords,          labelKey: 'arena',     roles: ['admin', 'equipo', 'espectador'] },
   { href: '/dashboard/juego', Icon: BookOpen,        labelKey: 'juego',         roles: ['admin', 'equipo', 'espectador'] },
-  { href: '/ranking',         Icon: Trophy,          labelKey: 'ranking',       roles: ['admin', 'equipo', 'espectador'] },
-  { href: '/instrucciones',   Icon: Bot,             labelKey: 'instrucciones', roles: ['admin', 'equipo', 'espectador'] },
+  { href: '/ranking',         Icon: Trophy,          labelKey: 'ranking',           roles: ['admin', 'equipo', 'espectador'] },
+  { href: '/equipo/entrenamiento', Icon: Dumbbell, labelKey: 'entrenamiento',     roles: ['equipo'] },
+  { href: '/instrucciones',   Icon: Bot,             labelKey: 'instrucciones',     roles: ['admin', 'equipo', 'espectador'] },
 ];
 
 const BTM_ITEMS: NavItem[] = [

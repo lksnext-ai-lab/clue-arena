@@ -82,6 +82,7 @@ async function loadArenaData(gameId: string): Promise<GameDetailResponse | null>
           arma: s.arma,
           habitacion: s.habitacion,
           refutadaPor: s.refutadaPor,
+          cartaMostrada: s.cartaMostrada ?? null,
           createdAt: s.createdAt?.toISOString() ?? null,
         })),
         acusacion: turnAcusacion

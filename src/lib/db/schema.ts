@@ -228,6 +228,55 @@ export const scoreEventsRelations = relations(scoreEvents, ({ one }) => ({
   equipo: one(equipos, { fields: [scoreEvents.equipoId], references: [equipos.id] }),
 }));
 
+// --- partidas_entrenamiento (F015) ---
+export const partidasEntrenamiento = sqliteTable('partidas_entrenamiento', {
+  id:         text('id').primaryKey(),                      // UUID v4
+  equipoId:   text('equipo_id')
+                .notNull()
+                .references(() => equipos.id),              // Owner of the session
+  estado:     text('estado', {
+                enum: ['en_curso', 'finalizada', 'abortada'],
+              }).notNull().default('en_curso'),
+  numBots:    integer('num_bots').notNull().default(2),     // 1–5 bot opponents
+  seed:       text('seed'),                                 // Reproducible seed (optional)
+  sobresJson: text('sobres_json'),                          // JSON envelope (visible when finished)
+  resultadoJson: text('resultado_json'),                    // Simulated score result JSON
+  motivoAbort:  text('motivo_abort'),                       // Abort reason if abortada
+  createdAt:  integer('created_at', { mode: 'timestamp' }).notNull(),
+  finishedAt: integer('finished_at', { mode: 'timestamp' }),
+});
+
+// --- turnos_entrenamiento (F015) ---
+export const turnosEntrenamiento = sqliteTable('turnos_entrenamiento', {
+  id:             text('id').primaryKey(),
+  partidaId:      text('partida_id')
+                    .notNull()
+                    .references(() => partidasEntrenamiento.id, { onDelete: 'cascade' }),
+  equipoId:       text('equipo_id').notNull(),              // May be real team or bot ID
+  esBot:          integer('es_bot', { mode: 'boolean' }).notNull().default(false),
+  numero:         integer('numero').notNull(),
+  accion:         text('accion_json'),                      // AgentResponse JSON
+  gameStateView:  text('game_state_view_json'),             // GameStateView received by agent
+  agentTrace:     text('agent_trace_json'),                 // AgentInteractionTrace JSON (real team only)
+  memoriaInicial: text('memoria_inicial_json'),             // Memory state before turn
+  memoriaFinal:   text('memoria_final_json'),               // Memory state after turn
+  durationMs:     integer('duration_ms'),
+  createdAt:      integer('created_at', { mode: 'timestamp' }).notNull(),
+});
+
+// --- Relations for F015 tables ---
+export const partidasEntrenamientoRelations = relations(partidasEntrenamiento, ({ one, many }) => ({
+  equipo: one(equipos, { fields: [partidasEntrenamiento.equipoId], references: [equipos.id] }),
+  turnos: many(turnosEntrenamiento),
+}));
+
+export const turnosEntrenamientoRelations = relations(turnosEntrenamiento, ({ one }) => ({
+  partida: one(partidasEntrenamiento, {
+    fields: [turnosEntrenamiento.partidaId],
+    references: [partidasEntrenamiento.id],
+  }),
+}));
+
 export const acusacionesRelations = relations(acusaciones, ({ one }) => ({
   turno: one(turnos, { fields: [acusaciones.turnoId], references: [turnos.id] }),
   partida: one(partidas, { fields: [acusaciones.partidaId], references: [partidas.id] }),

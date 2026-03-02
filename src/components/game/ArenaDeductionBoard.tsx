@@ -53,9 +53,13 @@ export function ArenaDeductionBoard({ partida }: ArenaDeductionBoardProps) {
 
   const board = useMemo(
     () => buildDeductionBoard(partida.turnos ?? [], partida.equipos.map((e) => e.equipoId)),
-    // Re-run when turns or team list changes (deep comparison via JSON.stringify below)
+    // Track suggestion IDs and their cartaMostrada so the board recomputes when
+    // live data arrives with refuted-card info (same turn IDs, updated suggestions).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [JSON.stringify(partida.turnos?.map((t) => t.id)), JSON.stringify(equipoIds)]
+    [
+      JSON.stringify(partida.turnos?.flatMap((t) => t.sugerencias.map((s) => `${s.id}:${s.cartaMostrada ?? ''}`))),
+      JSON.stringify(equipoIds),
+    ]
   );
 
   return (
@@ -102,11 +106,26 @@ export function ArenaDeductionBoard({ partida }: ArenaDeductionBoardProps) {
                   {partida.equipos.map((e) => {
                     const cell = board.get(boardKey(e.equipoId, card));
                     const seen = cell && cell.turnos.length > 0;
+                    const refuted = seen && cell!.turnosRefutados.length > 0;
+                    const tooltipText = seen
+                      ? cell!.turnos
+                          .map((t) =>
+                            cell!.turnosRefutados.includes(t) ? `T${t}↩` : `T${t}`
+                          )
+                          .join(', ')
+                      : '';
                     return (
                       <td key={e.equipoId} className="py-1 px-1 text-center">
                         {seen ? (
-                          <Tooltip text={`T${cell!.turnos.join(', T')}`}>
-                            <span className="inline-block w-5 h-5 rounded bg-cyan-500/20 text-cyan-300 leading-5 cursor-default select-none">
+                          <Tooltip text={tooltipText}>
+                            <span
+                              className={cn(
+                                'inline-block w-5 h-5 rounded leading-5 cursor-default select-none',
+                                refuted
+                                  ? 'bg-orange-500/20 text-orange-300'
+                                  : 'bg-cyan-500/20 text-cyan-300'
+                              )}
+                            >
                               ✦
                             </span>
                           </Tooltip>
@@ -124,6 +143,22 @@ export function ArenaDeductionBoard({ partida }: ArenaDeductionBoardProps) {
           ))}
         </tbody>
       </table>
+
+      {/* Legend */}
+      <div className="flex flex-wrap gap-3 mt-3 pt-2 border-t border-slate-700/40 text-xs text-slate-500">
+        <span className="flex items-center gap-1">
+          <span className="inline-block w-4 h-4 rounded bg-slate-700/50 text-slate-600 leading-4 text-center">·</span>
+          No propuesta
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="inline-block w-4 h-4 rounded bg-cyan-500/20 text-cyan-300 leading-4 text-center">✦</span>
+          Sugerida (sin refutar)
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="inline-block w-4 h-4 rounded bg-orange-500/20 text-orange-300 leading-4 text-center">✦</span>
+          Refutada
+        </span>
+      </div>
 
       {(partida.turnos ?? []).length === 0 && (
         <p className="text-slate-600 text-xs mt-3">La partida no ha comenzado todavía.</p>

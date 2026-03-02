@@ -536,9 +536,11 @@ export function getGameStateView(state: GameState, requestingTeamId: string): Ga
       equipoId: e.equipoId,
       orden: e.orden,
       cartas: e.equipoId === requestingTeamId ? e.cartas : [],
+      numCartas: e.cartas.length, // Public: always exposed
       esPropio: e.equipoId === requestingTeamId,
       eliminado: e.eliminado,
       puntos: e.puntos,
+      turnosJugados: e.turnosJugados, // Public: always exposed
     })),
     historial: state.historial.map((r) => {
       const base = {
@@ -559,6 +561,9 @@ export function getGameStateView(state: GameState, requestingTeamId: string): Ga
           // Only reveal cartaMostrada to the team that made the suggestion
           cartaMostrada:
             r.equipoId === requestingTeamId ? res?.cartaMostrada ?? null : undefined,
+          // Only reveal cartaMostradaPorMi to the team that refuted
+          cartaMostradaPorMi:
+            res?.refutadaPor === requestingTeamId ? res?.cartaMostrada ?? null : undefined,
         };
       }
 

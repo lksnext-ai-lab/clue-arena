@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { initGame, applyAction, isGameOver, getWinner, calcEfficiencyBonus } from '@/lib/game/engine';
+import {
+  initGame,
+  applyAction,
+  isGameOver,
+  getWinner,
+  calcEfficiencyBonus,
+  getGameStateView,
+} from '@/lib/game/engine';
 import type { SuggestionAction, AccusationAction } from '@/lib/game/types';
 
 describe('Game Engine', () => {
@@ -238,5 +245,142 @@ describe('Game Engine', () => {
     expect(calcEfficiencyBonus(10)).toBe(300);
     expect(calcEfficiencyBonus(22)).toBe(0);  // 500 - (22-2)*25 = 0
     expect(calcEfficiencyBonus(25)).toBe(0); // clamped to 0
+  });
+
+  // --------------- getGameStateView tests (G003) ---------------
+
+  describe('getGameStateView', () => {
+    it('hides envelope cards (sobre never exposed)', () => {
+      const state = initGame(TEAM_IDS, 42);
+      const view = getGameStateView(state, 'team-a');
+      // GameStateView has no "sobre" field — sobre is fully absent
+      expect((view as unknown as Record<string, unknown>)['sobre']).toBeUndefined();
+    });
+
+    it('returns own cards and empty array for opponents', () => {
+      const state = initGame(TEAM_IDS, 42);
+      const view = getGameStateView(state, 'team-a');
+      const own = view.equipos.find((e) => e.equipoId === 'team-a')!;
+      const other = view.equipos.find((e) => e.equipoId === 'team-b')!;
+      expect(own.cartas.length).toBeGreaterThan(0);
+      expect(own.esPropio).toBe(true);
+      expect(other.cartas).toHaveLength(0);
+      expect(other.esPropio).toBe(false);
+    });
+
+    it('exposes numCartas for all teams (public info)', () => {
+      const state = initGame(TEAM_IDS, 42);
+      const view = getGameStateView(state, 'team-a');
+      for (const e of view.equipos) {
+        const internalTeam = state.equipos.find((t) => t.equipoId === e.equipoId)!;
+        expect(e.numCartas).toBe(internalTeam.cartas.length);
+      }
+    });
+
+    it('exposes turnosJugados for all teams (public info)', () => {
+      let state = initGame(TEAM_IDS, 42);
+      // team-a makes a pass (turnosJugados = 1 for team-a)
+      const r1 = applyAction(state, { type: 'pass', equipoId: 'team-a' });
+      state = r1.state;
+      const view = getGameStateView(state, 'team-b');
+      const teamA = view.equipos.find((e) => e.equipoId === 'team-a')!;
+      const teamB = view.equipos.find((e) => e.equipoId === 'team-b')!;
+      expect(teamA.turnosJugados).toBe(1);
+      expect(teamB.turnosJugados).toBe(0);
+    });
+
+    it('historial contains completed turns with correct public data', () => {
+      const state = initGame(TEAM_IDS, 42);
+      const suggestion: SuggestionAction = {
+        type: 'suggestion',
+        equipoId: 'team-a',
+        sospechoso: 'Coronel Mustard',
+        arma: 'Teclado mecánico',
+        habitacion: 'La Cafetería',
+      };
+      const r1 = applyAction(state, suggestion);
+      const view = getGameStateView(r1.state, 'team-b');
+      expect(view.historial).toHaveLength(1);
+      const entry = view.historial[0];
+      expect(entry.tipo).toBe('suggestion');
+      expect(entry.sospechoso).toBe('Coronel Mustard');
+      expect(entry.arma).toBe('Teclado mecánico');
+      expect(entry.habitacion).toBe('La Cafetería');
+      // refutadaPor is public regardless of requesting team
+      expect('refutadaPor' in entry).toBe(true);
+    });
+
+    it('cartaMostrada is visible only to the sugeridor', () => {
+      let state = initGame(TEAM_IDS, 42);
+      state = { ...state, estado: 'en_curso' };
+      const suggestion: SuggestionAction = {
+        type: 'suggestion',
+        equipoId: 'team-a',
+        sospechoso: 'Coronel Mustard',
+        arma: 'Teclado mecánico',
+        habitacion: 'La Cafetería',
+      };
+      const r1 = applyAction(state, suggestion);
+      const refutadaPor = r1.suggestionResult?.refutadaPor;
+
+      // If there was a refutation, cartaMostrada should be visible to team-a (sugeridor)
+      // but hidden from others
+      if (refutadaPor) {
+        const viewSugeridor = getGameStateView(r1.state, 'team-a');
+        const viewOther = getGameStateView(r1.state, refutadaPor);
+        expect(viewSugeridor.historial[0].cartaMostrada).toBeDefined();
+        // cartaMostrada should not appear to other teams (undefined, not null)
+        expect(viewOther.historial[0].cartaMostrada).toBeUndefined();
+      }
+    });
+
+    it('cartaMostradaPorMi is visible only to the refutador', () => {
+      let state = initGame(TEAM_IDS, 42);
+      state = { ...state, estado: 'en_curso' };
+      const suggestion: SuggestionAction = {
+        type: 'suggestion',
+        equipoId: 'team-a',
+        sospechoso: 'Coronel Mustard',
+        arma: 'Teclado mecánico',
+        habitacion: 'La Cafetería',
+      };
+      const r1 = applyAction(state, suggestion);
+      const refutadaPor = r1.suggestionResult?.refutadaPor;
+
+      if (refutadaPor) {
+        const viewRefutador = getGameStateView(r1.state, refutadaPor);
+        const viewSugeridor = getGameStateView(r1.state, 'team-a');
+        // The refutador sees cartaMostradaPorMi
+        expect(viewRefutador.historial[0].cartaMostradaPorMi).toBeDefined();
+        // The sugeridor does NOT see cartaMostradaPorMi (undefined, not null)
+        expect(viewSugeridor.historial[0].cartaMostradaPorMi).toBeUndefined();
+      }
+    });
+
+    it('accusation entry shows correcta field', () => {
+      const state = initGame(TEAM_IDS, 42);
+      const r = applyAction(state, {
+        type: 'accusation',
+        equipoId: 'team-a',
+        sospechoso: state.sobre.sospechoso,
+        arma: state.sobre.arma,
+        habitacion: state.sobre.habitacion,
+      });
+      const view = getGameStateView(r.state, 'team-b');
+      const entry = view.historial[0];
+      expect(entry.tipo).toBe('accusation');
+      expect(entry.correcta).toBe(true);
+      // accusation entries must NOT expose sobre-level secrets beyond correcta
+      expect((entry as unknown as Record<string, unknown>)['cartaMostrada']).toBeUndefined();
+    });
+
+    it('esElTurnoDeEquipo is true only for the active team', () => {
+      const state = initGame(TEAM_IDS, 42);
+      // team-a starts (turnoActual = 0, first active equipo)
+      const viewA = getGameStateView(state, 'team-a');
+      const viewB = getGameStateView(state, 'team-b');
+      expect(viewA.esElTurnoDeEquipo).toBe(true);
+      expect(viewB.esElTurnoDeEquipo).toBe(false);
+    });
   });
 });

@@ -71,12 +71,14 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
           arma: s.arma,
           habitacion: s.habitacion,
           refutadaPor: s.refutadaPor,
-          // Admin sees cartaMostrada; equipo only sees their own
+          // Admin and espectador see all cartaMostrada (for the deduction board).
+          // equipo role only sees their own suggestions' cartaMostrada.
           cartaMostrada:
-            requestingUser?.rol === 'admin' ||
+/*            requestingUser?.rol === 'admin' ||
+            requestingUser?.rol === 'espectador' ||
             s.equipoId === (session?.user as any)?.equipo?.id
               ? s.cartaMostrada
-              : undefined,
+              : undefined*/ s.cartaMostrada, 
           createdAt: s.createdAt?.toISOString() ?? null,
         })),
         acusacion: turnAcusacion
