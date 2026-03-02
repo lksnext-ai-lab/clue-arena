@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { cn } from '@/lib/utils/cn';
 import {
   buildDeductionBoard,
@@ -89,9 +89,9 @@ export function ArenaDeductionBoard({ partida }: ArenaDeductionBoardProps) {
         </thead>
         <tbody>
           {SECTIONS.map(({ category, cards }) => (
-            <>
+            <React.Fragment key={category}>
               {/* Section header row */}
-              <tr key={`header-${category}`}>
+              <tr>
                 <td
                   colSpan={partida.equipos.length + 1}
                   className="pt-3 pb-1 text-xs font-semibold text-slate-500 uppercase tracking-widest"
@@ -139,7 +139,7 @@ export function ArenaDeductionBoard({ partida }: ArenaDeductionBoardProps) {
                   })}
                 </tr>
               ))}
-            </>
+            </React.Fragment>
           ))}
         </tbody>
       </table>
