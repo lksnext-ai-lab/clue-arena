@@ -5,6 +5,8 @@ import { useGameSocket } from '@/lib/utils/useGameSocket';
 import { apiFetch } from '@/lib/api/client';
 import type { GameDetailResponse } from '@/types/api';
 import type { ServerMessage } from '@/lib/ws/protocol';
+import type { TurnActivityState, TurnActivityEntry, TurnMicroEventUI } from '@/types/domain';
+import { TURN_ACTIVITY_HISTORY_LIMIT } from '@/types/domain';
 
 interface GameContextValue {
   partida: GameDetailResponse | null;
@@ -22,7 +24,11 @@ interface GameContextValue {
   /** Called by SuggestionRevealOverlay when an animation starts/ends. */
   notifySuggestionAnimationStart: () => void;
   notifySuggestionAnimationEnd: () => void;
+  /** F016: live coordinator micro-events for the current turn. */
+  currentTurnActivity: TurnActivityState;
 }
+
+const EMPTY_TURN_ACTIVITY: TurnActivityState = { active: null, history: [] };
 
 const GameContext = createContext<GameContextValue>({
   partida: null,
@@ -34,6 +40,7 @@ const GameContext = createContext<GameContextValue>({
   scheduleActiveEquipoId: () => {},
   notifySuggestionAnimationStart: () => {},
   notifySuggestionAnimationEnd: () => {},
+  currentTurnActivity: EMPTY_TURN_ACTIVITY,
 });
 
 interface GameProviderProps {
@@ -47,6 +54,7 @@ export function GameProvider({ children, gameId }: GameProviderProps) {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<Error | null>(null);
+  const [currentTurnActivity, setCurrentTurnActivity] = useState<TurnActivityState>(EMPTY_TURN_ACTIVITY);
 
   // ---------- animation / pending-team bookkeeping ----------
   const animatingRef = useRef(false);
@@ -116,6 +124,32 @@ export function GameProvider({ children, gameId }: GameProviderProps) {
     fetchGame();
   }, [fetchGame]);
 
+  // ── F016: helpers to accumulate turn micro-events ──────────────────────────
+  const appendTurnMicroEvent = useCallback((ev: TurnMicroEventUI, turnoId: string, turnoNumero: number) => {
+    setCurrentTurnActivity((prev) => {
+      // If there is an active entry for the same turn, append the event to it.
+      if (prev.active && prev.active.turnoId === turnoId) {
+        return {
+          ...prev,
+          active: { ...prev.active, events: [...prev.active.events, ev] },
+        };
+      }
+      // New turn — create a fresh active entry (the old one was already sealed
+      // when game:turn_completed fired, but guard here in case of ordering).
+      const fresh: TurnActivityEntry = { turnoId, turnoNumero, events: [ev], isCompleted: false };
+      return { ...prev, active: fresh };
+    });
+  }, []);
+
+  const sealActiveTurn = useCallback(() => {
+    setCurrentTurnActivity((prev) => {
+      if (!prev.active) return prev;
+      const sealed = { ...prev.active, isCompleted: true };
+      const history = [sealed, ...prev.history].slice(0, TURN_ACTIVITY_HISTORY_LIMIT);
+      return { active: null, history };
+    });
+  }, []);
+
   // Manejador de mensajes WebSocket
   const handleWsMessage = useCallback((msg: ServerMessage) => {
     if (msg.type === 'subscribed') {
@@ -125,6 +159,8 @@ export function GameProvider({ children, gameId }: GameProviderProps) {
       return;
     }
     if (msg.type === 'game:turn_completed') {
+      // Seal the current feed entry before fetching fresh data.
+      sealActiveTurn();
       // coordinator tells us which team is up next; delay visible change until
       // any running suggestion animation has finished.
       if (msg.nextEquipoId !== undefined) {
@@ -136,8 +172,56 @@ export function GameProvider({ children, gameId }: GameProviderProps) {
     if (msg.type === 'game:status_changed') {
       // Re-fetch completo del estado actual (simple y robusto)
       fetchGame();
+      return;
     }
-  }, [fetchGame, scheduleActiveEquipoId]);
+    // ── F016 micro-events ────────────────────────────────────────────────────
+    if (msg.type === 'turn:agent_invoked') {
+      const ev: TurnMicroEventUI = {
+        type: 'turn:agent_invoked',
+        equipoId: msg.equipoId,
+        equipoNombre: msg.equipoNombre,
+        ts: msg.ts,
+      };
+      appendTurnMicroEvent(ev, msg.turnoId, msg.turnoNumero);
+      return;
+    }
+    if (msg.type === 'turn:agent_responded') {
+      const ev: TurnMicroEventUI = {
+        type: 'turn:agent_responded',
+        equipoId: msg.equipoId,
+        equipoNombre: msg.equipoNombre,
+        accion: msg.accion,
+        sugerencia: msg.sugerencia,
+        durationMs: msg.durationMs,
+        ts: msg.ts,
+      };
+      appendTurnMicroEvent(ev, msg.turnoId, msg.turnoNumero);
+      return;
+    }
+    if (msg.type === 'turn:refutation_requested') {
+      const ev: TurnMicroEventUI = {
+        type: 'turn:refutation_requested',
+        equipoSugeridor: msg.equipoSugeridor,
+        refutadoresIds: msg.refutadoresIds,
+        ts: msg.ts,
+      };
+      appendTurnMicroEvent(ev, msg.turnoId, msg.turnoNumero);
+      return;
+    }
+    if (msg.type === 'turn:refutation_received') {
+      const ev: TurnMicroEventUI = {
+        type: 'turn:refutation_received',
+        equipoId: msg.equipoId,
+        equipoNombre: msg.equipoNombre,
+        resultado: msg.resultado,
+        cartaMostrada: msg.cartaMostrada,
+        durationMs: msg.durationMs,
+        ts: msg.ts,
+      };
+      appendTurnMicroEvent(ev, msg.turnoId, msg.turnoNumero);
+      return;
+    }
+  }, [fetchGame, scheduleActiveEquipoId, appendTurnMicroEvent, sealActiveTurn]);
 
   const handleWsDisconnect = useCallback(() => {
     setIsConnected(false);
@@ -161,6 +245,7 @@ export function GameProvider({ children, gameId }: GameProviderProps) {
     scheduleActiveEquipoId,
     notifySuggestionAnimationStart,
     notifySuggestionAnimationEnd,
+    currentTurnActivity,
   };
 
   return <GameContext.Provider value={value}>{children}</GameContext.Provider>;

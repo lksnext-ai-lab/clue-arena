@@ -27,6 +27,58 @@ export const ServerMessageSchema = z.discriminatedUnion('type', [
     nuevoEstado: z.enum(['pendiente', 'en_curso', 'pausada', 'finalizada']),
     ts: z.number(),
   }),
+  // Micro-evento: el coordinador solicita el turno al agente activo
+  z.object({
+    type: z.literal('turn:agent_invoked'),
+    gameId: z.string(),
+    turnoId: z.string(),
+    turnoNumero: z.number(),
+    equipoId: z.string(),
+    equipoNombre: z.string(),
+    ts: z.number(),
+  }),
+  // Micro-evento: el agente activo ha respondido
+  z.object({
+    type: z.literal('turn:agent_responded'),
+    gameId: z.string(),
+    turnoId: z.string(),
+    turnoNumero: z.number(),
+    equipoId: z.string(),
+    equipoNombre: z.string(),
+    accion: z.enum(['sugerencia', 'acusacion', 'pasar', 'timeout', 'formato_invalido']),
+    // Presente cuando accion === 'sugerencia': expuesto al espectador para máximo dinamismo
+    sugerencia: z.object({
+      sospechoso: z.string(),
+      arma: z.string(),
+      habitacion: z.string(),
+    }).optional(),
+    durationMs: z.number(),
+    ts: z.number(),
+  }),
+  // Micro-evento: el coordinador solicita refutación a uno o más agentes
+  z.object({
+    type: z.literal('turn:refutation_requested'),
+    gameId: z.string(),
+    turnoId: z.string(),
+    turnoNumero: z.number(),
+    equipoSugeridor: z.string(),
+    refutadoresIds: z.array(z.string()),
+    ts: z.number(),
+  }),
+  // Micro-evento: un agente refutador ha respondido
+  // cartaMostrada: la carta usada para refutar, visible para espectadores pero NO enviada al GameStateView de otros agentes
+  z.object({
+    type: z.literal('turn:refutation_received'),
+    gameId: z.string(),
+    turnoId: z.string(),
+    turnoNumero: z.number(),
+    equipoId: z.string(),
+    equipoNombre: z.string(),
+    resultado: z.enum(['refutada', 'no_puede_refutar']),
+    cartaMostrada: z.string().optional(),
+    durationMs: z.number(),
+    ts: z.number(),
+  }),
   // Heartbeat para mantener la conexión
   z.object({ type: z.literal('ping'), ts: z.number() }),
   // Confirmación de suscripción

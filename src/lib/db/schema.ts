@@ -91,6 +91,10 @@ export const turnos = sqliteTable('turnos', {
     .default('pendiente'),
   startedAt: integer('started_at', { mode: 'timestamp' }),
   finishedAt: integer('finished_at', { mode: 'timestamp' }),
+  // F016: ms que tardó el agente activo en responder su acción de turno
+  agentDurationMs: integer('agent_duration_ms'),
+  // F016: ms que tardó el primer refutador exitoso en responder (null si no hubo refutación)
+  refutacionDurationMs: integer('refutacion_duration_ms'),
 });
 
 // --- sugerencias ---

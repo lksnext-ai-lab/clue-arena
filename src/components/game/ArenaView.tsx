@@ -9,6 +9,7 @@ import { ArenaDeductionBoard } from './ArenaDeductionBoard';
 import { ArenaActionFeed } from './ArenaActionFeed';
 import { ArenaFinalResult } from './ArenaFinalResult';
 import { SuggestionRevealOverlay } from './SuggestionRevealOverlay';
+import { TurnActivityFeed } from './TurnActivityFeed';
 
 interface ArenaViewProps {
   gameId: string;
@@ -138,8 +139,12 @@ function ArenaContent({ gameId: _gameId, initialData }: ArenaViewProps) {
       {/* Result banner (shown when finished) */}
       {data.estado === 'finalizada' && <ArenaFinalResult partida={data} />}
 
-      {/* Main grid: teams + deduction board */}
-      <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-4">
+      {/* Main grid: teams + deduction board + (when en_curso) activity feed */}
+      <div className={
+        data.estado === 'en_curso'
+          ? 'grid grid-cols-1 lg:grid-cols-[280px_1fr_300px] gap-4'
+          : 'grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-4'
+      }>
         <ArenaTeamPanel partida={data} />
         {/* Relative wrapper so the overlay can be absolutely positioned over the board */}
         <div className="relative">
@@ -148,6 +153,8 @@ function ArenaContent({ gameId: _gameId, initialData }: ArenaViewProps) {
             <SuggestionRevealOverlay partida={data} />
           )}
         </div>
+        {/* F016: real-time coordinator activity feed — third column, en_curso only */}
+        {data.estado === 'en_curso' && <TurnActivityFeed />}
       </div>
 
       {/* Action feed */}

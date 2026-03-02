@@ -22,9 +22,10 @@ import {
   sobres,
   pases,
   scoreEvents,
+  equipos,
 } from '@/lib/db/schema';
 import { SOSPECHOSOS, ARMAS, HABITACIONES } from '@/types/domain';
-import { eq, and, count, sql } from 'drizzle-orm';
+import { eq, and, count, sql, inArray } from 'drizzle-orm';
 import type { ScoreEventType } from '@/lib/game/types';
 import type { InferSelectModel } from 'drizzle-orm';
 import { gameEventEmitter } from '@/lib/ws/GameEventEmitter';
@@ -191,6 +192,14 @@ export async function advanceTurn(gameId: string): Promise<AdvanceTurnResult> {
     .all();
   allTeams.sort((a, b) => a.orden - b.orden);
 
+  // Load human-readable team names for micro-event messages (F016)
+  const equipoRows = await db
+    .select({ id: equipos.id, nombre: equipos.nombre })
+    .from(equipos)
+    .where(inArray(equipos.id, allTeams.map((t) => t.equipoId)))
+    .all();
+  const teamNombres = new Map(equipoRows.map((e) => [e.id, e.nombre]));
+
   const activeTeams = allTeams.filter((t) => !t.eliminado);
   if (activeTeams.length === 0) {
     await db
@@ -238,6 +247,19 @@ export async function advanceTurn(gameId: string): Promise<AdvanceTurnResult> {
   let agentAction!: import('@/types/api').AgentAction;
   let invocacionId!: string;
   let passOrigen: 'timeout' | 'invalid_format' | null = null;
+  let agentDurationMs = 0;
+
+  // F016: emit turn:agent_invoked before calling the agent
+  gameEventEmitter.emitTurnMicroEvent({
+    type: 'turn:agent_invoked',
+    gameId,
+    turnoId: turno.id,
+    turnoNumero: turno.numero,
+    equipoId: currentTeam.equipoId,
+    equipoNombre: teamNombres.get(currentTeam.equipoId) ?? currentTeam.equipoId,
+    ts: Date.now(),
+  });
+  const tsAgentInvoke = Date.now();
 
   try {
     const { response: agentResponse, invocacionId: invId } = await invokeAgent(
@@ -259,15 +281,31 @@ export async function advanceTurn(gameId: string): Promise<AdvanceTurnResult> {
       throw err;
     }
 
+    // F016: emit turn:agent_responded for forced-pass cases
+    agentDurationMs = Date.now() - tsAgentInvoke;
+    gameEventEmitter.emitTurnMicroEvent({
+      type: 'turn:agent_responded',
+      gameId,
+      turnoId: turno.id,
+      turnoNumero: turno.numero,
+      equipoId: currentTeam.equipoId,
+      equipoNombre: teamNombres.get(currentTeam.equipoId) ?? currentTeam.equipoId,
+      accion: passOrigen === 'timeout' ? 'timeout' : 'formato_invalido',
+      durationMs: agentDurationMs,
+      ts: Date.now(),
+    });
+
     const { maxTurnsReached, nextEquipoId: nextTeamId } = await handlePass({
       gameId,
       teamId: currentTeam.equipoId,
       turnoId: turno.id,
+      turnoNumero: turno.numero,
       turnoActual: partida.turnoActual,
       activeTeamCount: activeTeams.length,
       allTeams,
       maxTurnos: partida.maxTurnos,
       origen: passOrigen!,
+      agentDurationMs,
     });
 
     // Apply scoring for forced passes via score events
@@ -320,6 +358,25 @@ export async function advanceTurn(gameId: string): Promise<AdvanceTurnResult> {
 
   const action = agentAction;
 
+  // F016: emit turn:agent_responded for the successful agent response
+  agentDurationMs = Date.now() - tsAgentInvoke;
+  gameEventEmitter.emitTurnMicroEvent({
+    type: 'turn:agent_responded',
+    gameId,
+    turnoId: turno.id,
+    turnoNumero: turno.numero,
+    equipoId: currentTeam.equipoId,
+    equipoNombre: teamNombres.get(currentTeam.equipoId) ?? currentTeam.equipoId,
+    accion:
+      action.type === 'suggestion' ? 'sugerencia' :
+      action.type === 'accusation' ? 'acusacion' : 'pasar',
+    sugerencia:
+      action.type === 'suggestion'
+        ? { sospechoso: action.suspect, arma: action.weapon, habitacion: action.room }
+        : undefined,
+    durationMs: agentDurationMs,
+    ts: Date.now(),
+  });
   const isValidAction =
     action.type === 'suggestion' ||
     action.type === 'accusation' ||
@@ -347,6 +404,7 @@ export async function advanceTurn(gameId: string): Promise<AdvanceTurnResult> {
       gameId,
       teamId: currentTeam.equipoId,
       turnoId: turno.id,
+      turnoNumero: turno.numero,
       suspect: action.suspect,
       weapon: action.weapon,
       room: action.room,
@@ -354,6 +412,8 @@ export async function advanceTurn(gameId: string): Promise<AdvanceTurnResult> {
       turnoActual: partida.turnoActual,
       activeTeamCount: activeTeams.length,
       maxTurnos: partida.maxTurnos,
+      agentDurationMs,
+      teamNombres,
     });
 
     gameEventEmitter.emitTurnCompleted(gameId, {
@@ -386,12 +446,14 @@ export async function advanceTurn(gameId: string): Promise<AdvanceTurnResult> {
       gameId,
       teamId: currentTeam.equipoId,
       turnoId: turno.id,
+      turnoNumero: turno.numero,
       suspect: action.suspect,
       weapon: action.weapon,
       room: action.room,
       turnoActual: partida.turnoActual,
       allTeams,
       maxTurnos: partida.maxTurnos,
+      agentDurationMs,
     });
 
     gameEventEmitter.emitTurnCompleted(gameId, {
@@ -425,11 +487,13 @@ export async function advanceTurn(gameId: string): Promise<AdvanceTurnResult> {
       gameId,
       teamId: currentTeam.equipoId,
       turnoId: turno.id,
+      turnoNumero: turno.numero,
       turnoActual: partida.turnoActual,
       activeTeamCount: activeTeams.length,
       allTeams,
       maxTurnos: partida.maxTurnos,
       origen: 'voluntario',
+      agentDurationMs,
     });
 
     gameEventEmitter.emitTurnCompleted(gameId, {
@@ -468,6 +532,7 @@ interface SuggestionParams {
   gameId: string;
   teamId: string;
   turnoId: string;
+  turnoNumero: number;
   suspect: string;
   weapon: string;
   room: string;
@@ -475,10 +540,12 @@ interface SuggestionParams {
   turnoActual: number;
   activeTeamCount: number;
   maxTurnos: number | null;
+  agentDurationMs: number;
+  teamNombres: Map<string, string>;
 }
 
 async function handleSuggestion(p: SuggestionParams): Promise<{ maxTurnsReached: boolean; nextEquipoId: string | null }> {
-  const { gameId, teamId, turnoId, suspect, weapon, room, allTeams, turnoActual, activeTeamCount, maxTurnos } = p;
+  const { gameId, teamId, turnoId, turnoNumero, suspect, weapon, room, allTeams, turnoActual, activeTeamCount, maxTurnos, agentDurationMs, teamNombres } = p;
 
   // ── Validate suggestion (invalid card + redundant checks) ─────────────
   const isInvalidCard =
@@ -499,7 +566,7 @@ async function handleSuggestion(p: SuggestionParams): Promise<{ maxTurnsReached:
     });
     await db
       .update(turnos)
-      .set({ estado: 'completado', finishedAt: new Date() })
+      .set({ estado: 'completado', finishedAt: new Date(), agentDurationMs })
       .where(eq(turnos.id, turnoId));
     return _advanceTurnoIndex(gameId, turnoActual, activeTeamCount, allTeams, maxTurnos);
   }
@@ -586,11 +653,26 @@ async function handleSuggestion(p: SuggestionParams): Promise<{ maxTurnsReached:
   }
 
   // ── Refutation sub-flow ────────────────────────────────────────────────
+  let refutacionDurationMs: number | null = null;
   if (refutadaPor) {
+    // F016: notify that refutation is being requested
+    const refutadorNombre = teamNombres.get(refutadaPor) ?? refutadaPor;
+    gameEventEmitter.emitTurnMicroEvent({
+      type: 'turn:refutation_requested',
+      gameId,
+      turnoId,
+      turnoNumero,
+      equipoSugeridor: teamNombres.get(teamId) ?? teamId,
+      refutadoresIds: [refutadaPor],
+      ts: Date.now(),
+    });
+    const tsRef = Date.now();
+
     const { response: refuteResponse, invocacionId: refuteInvocacionId } = await invokeAgent(
       { type: 'refute', gameId, teamId: refutadaPor, suspect, weapon, room },
       { turnoId },
     );
+    refutacionDurationMs = Date.now() - tsRef;
 
     const refAction = refuteResponse.action;
     const isValidRefute = refAction.type === 'show_card' || refAction.type === 'cannot_refute';
@@ -603,6 +685,7 @@ async function handleSuggestion(p: SuggestionParams): Promise<{ maxTurnsReached:
       isValidRefute ? null : `Tipo de acción inválido para refute: "${refAction.type}"`,
     );
 
+    let cartaMostradaValue: string | undefined;
     if (refAction.type === 'show_card') {
       // Validate the card belongs to the refutador and matches the suggestion
       const refTeam = allTeams.find((t) => t.equipoId === refutadaPor)!;
@@ -612,6 +695,7 @@ async function handleSuggestion(p: SuggestionParams): Promise<{ maxTurnsReached:
         (refAction.card === suspect || refAction.card === weapon || refAction.card === room);
 
       if (isValid) {
+        cartaMostradaValue = refAction.card;
         await db
           .update(sugerencias)
           .set({ cartaMostrada: refAction.card })
@@ -620,12 +704,26 @@ async function handleSuggestion(p: SuggestionParams): Promise<{ maxTurnsReached:
       // If invalid card claimed: treat as cannot_refute; cartaMostrada stays null
     }
     // cannot_refute: cartaMostrada remains null
+
+    // F016: emit result of refutation (cartaMostrada visible to spectators)
+    gameEventEmitter.emitTurnMicroEvent({
+      type: 'turn:refutation_received',
+      gameId,
+      turnoId,
+      turnoNumero,
+      equipoId: refutadaPor,
+      equipoNombre: refutadorNombre,
+      resultado: cartaMostradaValue ? 'refutada' : 'no_puede_refutar',
+      cartaMostrada: cartaMostradaValue,
+      durationMs: refutacionDurationMs,
+      ts: Date.now(),
+    });
   }
 
-  // ── Mark turn as completed and advance ────────────────────────────────
+  // ── Mark turn as completed and advance ──────────────────────────────
   await db
     .update(turnos)
-    .set({ estado: 'completado', finishedAt: new Date() })
+    .set({ estado: 'completado', finishedAt: new Date(), agentDurationMs, refutacionDurationMs })
     .where(eq(turnos.id, turnoId));
 
   return _advanceTurnoIndex(gameId, turnoActual, activeTeamCount, allTeams, maxTurnos);
@@ -639,19 +737,21 @@ interface AccusationParams {
   gameId: string;
   teamId: string;
   turnoId: string;
+  turnoNumero: number;
   suspect: string;
   weapon: string;
   room: string;
   turnoActual: number;
   allTeams: TeamRow[];
   maxTurnos: number | null;
+  agentDurationMs: number;
 }
 
 /**
  * Returns gameOver flag and the next team's equipoId (null when the game ends).
  */
 async function handleAccusation(p: AccusationParams): Promise<{ gameOver: boolean; nextEquipoId: string | null }> {
-  const { gameId, teamId, turnoId, suspect, weapon, room, turnoActual, allTeams, maxTurnos } = p;
+  const { gameId, teamId, turnoId, suspect, weapon, room, turnoActual, allTeams, maxTurnos, agentDurationMs } = p;
 
   // Load the envelope
   const sobre = await db.select().from(sobres).where(eq(sobres.partidaId, gameId)).get();
@@ -676,7 +776,7 @@ async function handleAccusation(p: AccusationParams): Promise<{ gameOver: boolea
   // Mark turn as completed
   await db
     .update(turnos)
-    .set({ estado: 'completado', finishedAt: new Date() })
+    .set({ estado: 'completado', finishedAt: new Date(), agentDurationMs })
     .where(eq(turnos.id, turnoId));
 
   if (correcta) {
@@ -765,11 +865,13 @@ interface PassParams {
   gameId: string;
   teamId: string;
   turnoId: string;
+  turnoNumero: number;
   turnoActual: number;
   activeTeamCount: number;
   allTeams: TeamRow[];
   maxTurnos: number | null;
   origen: 'voluntario' | 'timeout' | 'invalid_format';
+  agentDurationMs: number;
 }
 
 /**
@@ -778,7 +880,7 @@ interface PassParams {
  * Returns true if maxTurnos was reached (game ended).
  */
 async function handlePass(p: PassParams): Promise<{ maxTurnsReached: boolean; nextEquipoId: string | null }> {
-  const { gameId, teamId, turnoId, turnoActual, activeTeamCount, allTeams, maxTurnos, origen } = p;
+  const { gameId, teamId, turnoId, turnoActual, activeTeamCount, allTeams, maxTurnos, origen, agentDurationMs } = p;
 
   // Persist pass in `pases` table
   await db.insert(pases).values({
@@ -801,7 +903,7 @@ async function handlePass(p: PassParams): Promise<{ maxTurnsReached: boolean; ne
   // Mark turn as completed
   await db
     .update(turnos)
-    .set({ estado: 'completado', finishedAt: new Date() })
+    .set({ estado: 'completado', finishedAt: new Date(), agentDurationMs })
     .where(eq(turnos.id, turnoId));
 
   return _advanceTurnoIndex(gameId, turnoActual, activeTeamCount, allTeams, maxTurnos);

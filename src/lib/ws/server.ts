@@ -7,12 +7,15 @@ import type { Server } from 'http';
 import { parse } from 'url';
 import { gameEventEmitter } from './GameEventEmitter';
 import { ClientMessageSchema, type ServerMessage, type GameStateEvent } from './protocol';
+import type { TurnMicroEvent } from './GameEventEmitter';
 import { validateWsSession } from './auth';
 
 // Map gameId → Set de WebSockets suscritos
 const subscriptions = new Map<string, Set<WebSocket>>();
-// Map gameId → unsubscribe function desde GameEventEmitter
+// Map gameId → unsubscribe function desde GameEventEmitter (game events)
 const gameListeners = new Map<string, () => void>();
+// Map gameId → unsubscribe function desde GameEventEmitter (turn micro-events, F016)
+const microListeners = new Map<string, () => void>();
 // Map userId → número de conexiones activas (rate limiting por sesión)
 const connectionsByUser = new Map<string, number>();
 
@@ -41,6 +44,14 @@ function ensureGameListener(gameId: string) {
     broadcastGameEvent(gameId, event);
   });
   gameListeners.set(gameId, unsubscribe);
+
+  // F016: also set up micro-event listener if not already registered
+  if (!microListeners.has(gameId)) {
+    const unsubMicro = gameEventEmitter.onTurnMicroEvent(gameId, (event: TurnMicroEvent) => {
+      broadcastTurnMicroEvent(gameId, event);
+    });
+    microListeners.set(gameId, unsubMicro);
+  }
 }
 
 function cleanupGameListener(gameId: string) {
@@ -50,6 +61,12 @@ function cleanupGameListener(gameId: string) {
   if (unsubscribe) {
     unsubscribe();
     gameListeners.delete(gameId);
+  }
+  // F016: also clean up micro-event listener
+  const unsubMicro = microListeners.get(gameId);
+  if (unsubMicro) {
+    unsubMicro();
+    microListeners.delete(gameId);
   }
   if (!subs || subs.size === 0) {
     subscriptions.delete(gameId);
@@ -82,6 +99,12 @@ function broadcastGameEvent(gameId: string, event: GameStateEvent) {
       ts: Date.now(),
     });
   }
+}
+
+// ── F016: broadcast turn micro-events ───────────────────────────────────────
+function broadcastTurnMicroEvent(gameId: string, event: TurnMicroEvent) {
+  // Re-use the same type literal as the WS protocol — they match 1:1
+  broadcast(gameId, { ...event, ts: event.ts ?? Date.now() } as ServerMessage);
 }
 
 export function attachWebSocketServer(httpServer: Server) {

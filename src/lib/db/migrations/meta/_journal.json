@@ -64,6 +64,13 @@
       "when": 1772441623556,
       "tag": "0008_exotic_goblin_queen",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1772458520902,
+      "tag": "0009_harsh_ultimo",
+      "breakpoints": true
     }
   ]
 }

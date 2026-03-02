@@ -4,6 +4,19 @@
 import { EventEmitter } from 'events';
 import type { GameStateEvent } from './protocol';
 
+// ── Tipos de micro-eventos de turno (F016) ────────────────────────────────────
+export interface SugerenciaCombo {
+  sospechoso: string;
+  arma: string;
+  habitacion: string;
+}
+
+export type TurnMicroEvent =
+  | { type: 'turn:agent_invoked';        gameId: string; turnoId: string; turnoNumero: number; equipoId: string; equipoNombre: string; ts: number }
+  | { type: 'turn:agent_responded';      gameId: string; turnoId: string; turnoNumero: number; equipoId: string; equipoNombre: string; accion: 'sugerencia' | 'acusacion' | 'pasar' | 'timeout' | 'formato_invalido'; sugerencia?: SugerenciaCombo; durationMs: number; ts: number }
+  | { type: 'turn:refutation_requested'; gameId: string; turnoId: string; turnoNumero: number; equipoSugeridor: string; refutadoresIds: string[]; ts: number }
+  | { type: 'turn:refutation_received';  gameId: string; turnoId: string; turnoNumero: number; equipoId: string; equipoNombre: string; resultado: 'refutada' | 'no_puede_refutar'; cartaMostrada?: string; durationMs: number; ts: number };
+
 class GameEventEmitter extends EventEmitter {
   emitTurnCompleted(gameId: string, payload: GameStateEvent) {
     this.emit(`game:${gameId}`, payload);
@@ -12,6 +25,16 @@ class GameEventEmitter extends EventEmitter {
   onGameUpdate(gameId: string, listener: (event: GameStateEvent) => void) {
     this.on(`game:${gameId}`, listener);
     return () => this.off(`game:${gameId}`, listener);
+  }
+
+  // ── F016: micro-eventos de turno ─────────────────────────────────────────
+  emitTurnMicroEvent(event: TurnMicroEvent) {
+    this.emit(`game:${event.gameId}:micro`, event);
+  }
+
+  onTurnMicroEvent(gameId: string, listener: (event: TurnMicroEvent) => void) {
+    this.on(`game:${gameId}:micro`, listener);
+    return () => this.off(`game:${gameId}:micro`, listener);
   }
 }
 

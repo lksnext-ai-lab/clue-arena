@@ -99,6 +99,54 @@ export interface RankingEntry {
   aciertos: number;
 }
 
+// ── F016: Turn micro-event types (coordinator activity feed) ────────────────
+
+export interface SugerenciaComboUI {
+  sospechoso: string;
+  arma: string;
+  habitacion: string;
+}
+
+/**
+ * Snapshot of a single coordinator micro-event, ready for rendering in
+ * `TurnActivityFeed`.  Optional fields depend on the event type.
+ */
+export interface TurnMicroEventUI {
+  type:
+    | 'turn:agent_invoked'
+    | 'turn:agent_responded'
+    | 'turn:refutation_requested'
+    | 'turn:refutation_received';
+  equipoId?: string;
+  equipoNombre?: string;
+  equipoSugeridor?: string;
+  refutadoresIds?: string[];
+  accion?: string;
+  resultado?: string;
+  cartaMostrada?: string;
+  sugerencia?: SugerenciaComboUI;
+  durationMs?: number;
+  ts: number;
+}
+
+/** One turn's worth of micro-events, with completion status. */
+export interface TurnActivityEntry {
+  turnoId: string;
+  turnoNumero: number;
+  events: TurnMicroEventUI[];
+  isCompleted: boolean;
+}
+
+/** Shape exposed by GameContext for turn activity. */
+export interface TurnActivityState {
+  /** The current (or most recent) in-progress turn. */
+  active: TurnActivityEntry | null;
+  /** Most recent N completed turn entries (newest-first). */
+  history: TurnActivityEntry[];
+}
+
+export const TURN_ACTIVITY_HISTORY_LIMIT = 3;
+
 // ── Cluedo game constants — nombres corporativos canónicos del evento ─────────
 // Fuente de verdad única para motor, MCP, datos y UI.
 // NO usar nombres del Cluedo clásico en ninguna capa.

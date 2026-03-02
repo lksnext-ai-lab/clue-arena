@@ -1,14 +1,38 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils/cn';
 import type { GameTeamResponse } from '@/types/api';
+import type { PendingRequest } from './ArenaTeamPanel';
 
 interface ArenaTeamCardProps {
   equipo: GameTeamResponse;
   isActiveTurn: boolean;
+  pendingRequest?: PendingRequest;
 }
 
-export function ArenaTeamCard({ equipo, isActiveTurn }: ArenaTeamCardProps) {
+/** Live elapsed counter — updates every 100 ms while active. */
+function useElapsed(fromTs: number | undefined): number {
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    if (fromTs === undefined) { setElapsed(0); return; }
+    setElapsed(Date.now() - fromTs);
+    const id = setInterval(() => setElapsed(Date.now() - fromTs), 100);
+    return () => clearInterval(id);
+  }, [fromTs]);
+  return elapsed;
+}
+
+function formatMs(ms: number): string {
+  return ms >= 1000 ? `${(ms / 1000).toFixed(1)} s` : `${ms} ms`;
+}
+
+export function ArenaTeamCard({ equipo, isActiveTurn, pendingRequest }: ArenaTeamCardProps) {
+  const elapsed = useElapsed(pendingRequest?.fromTs);
+
+  const requestLabel = pendingRequest?.type === 'turno'
+    ? 'Coordinador solicitando turno'
+    : 'Coordinador solicitando refutación';
 
   return (
     <div
@@ -74,6 +98,15 @@ export function ArenaTeamCard({ equipo, isActiveTurn }: ArenaTeamCardProps) {
           🃏 {equipo.numCartas} cartas
         </span>
       </div>
+
+      {/* F016: coordinator pending-request indicator (no result shown) */}
+      {pendingRequest && !equipo.eliminado && (
+        <div className="mt-2 flex items-center gap-2 rounded-md bg-amber-400/5 border border-amber-400/20 px-2.5 py-1.5">
+          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400 animate-pulse" />
+          <span className="text-xs text-amber-300 leading-tight flex-1">{requestLabel}</span>
+          <span className="shrink-0 font-mono text-xs text-amber-400/80">{formatMs(elapsed)}</span>
+        </div>
+      )}
     </div>
   );
 }
