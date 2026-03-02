@@ -51,6 +51,19 @@ function Tooltip({ text, children }: TooltipProps) {
 export function ArenaDeductionBoard({ partida }: ArenaDeductionBoardProps) {
   const equipoIds = partida.equipos.map((e) => e.equipoId);
 
+  // Cartas en mano por equipo (solo visibles para el equipo propio o admin)
+  const handCardsByTeam = useMemo(() => {
+    const map = new Map<string, Set<string>>();
+    for (const equipo of partida.equipos) {
+      if (equipo.cartas && equipo.cartas.length > 0) {
+        map.set(equipo.equipoId, new Set(equipo.cartas));
+      }
+    }
+    return map;
+  }, [partida.equipos]);
+
+  const hasAnyHandCards = handCardsByTeam.size > 0;
+
   const board = useMemo(
     () => buildDeductionBoard(partida.turnos ?? [], partida.equipos.map((e) => e.equipoId)),
     // Track suggestion IDs and their cartaMostrada so the board recomputes when
@@ -104,10 +117,13 @@ export function ArenaDeductionBoard({ partida }: ArenaDeductionBoardProps) {
                 <tr key={card} className="border-t border-slate-700/40">
                   <td className="py-1 pr-4 text-slate-400 whitespace-nowrap">{card}</td>
                   {partida.equipos.map((e) => {
+                    const inHand = handCardsByTeam.get(e.equipoId)?.has(card) ?? false;
                     const cell = board.get(boardKey(e.equipoId, card));
                     const seen = cell && cell.turnos.length > 0;
                     const refuted = seen && cell!.turnosRefutados.length > 0;
-                    const tooltipText = seen
+                    const tooltipText = inHand
+                      ? 'En tu mano'
+                      : seen
                       ? cell!.turnos
                           .map((t) =>
                             cell!.turnosRefutados.includes(t) ? `T${t}↩` : `T${t}`
@@ -116,7 +132,13 @@ export function ArenaDeductionBoard({ partida }: ArenaDeductionBoardProps) {
                       : '';
                     return (
                       <td key={e.equipoId} className="py-1 px-1 text-center">
-                        {seen ? (
+                        {inHand ? (
+                          <Tooltip text={tooltipText}>
+                            <span className="inline-block w-5 h-5 rounded leading-5 cursor-default select-none bg-red-500/20 text-red-400">
+                              ♦
+                            </span>
+                          </Tooltip>
+                        ) : seen ? (
                           <Tooltip text={tooltipText}>
                             <span
                               className={cn(
@@ -158,6 +180,12 @@ export function ArenaDeductionBoard({ partida }: ArenaDeductionBoardProps) {
           <span className="inline-block w-4 h-4 rounded bg-orange-500/20 text-orange-300 leading-4 text-center">✦</span>
           Refutada
         </span>
+        {hasAnyHandCards && (
+          <span className="flex items-center gap-1">
+            <span className="inline-block w-4 h-4 rounded bg-red-500/20 text-red-400 leading-4 text-center">♦</span>
+            En tu mano
+          </span>
+        )}
       </div>
 
       {(partida.turnos ?? []).length === 0 && (
