@@ -89,6 +89,22 @@ export interface GameDetailResponse extends GameResponse {
   sobre?: EnvelopeResponse; // Admin: siempre; Público: solo cuando finalizada
 }
 
+// --- Score events (GET /api/games/:id/score-events) ---
+
+export interface ScoreEventPublic {
+  id: number;
+  equipoId: string;
+  turno: number;
+  type: string;
+  points: number;
+  meta: Record<string, unknown> | null;
+  createdAt: string | null;
+}
+
+export interface ScoreEventsResponse {
+  events: ScoreEventPublic[];
+}
+
 export interface PaseResponse {
   id: string;
   equipoId: string;

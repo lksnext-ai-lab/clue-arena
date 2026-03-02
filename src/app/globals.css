@@ -11,6 +11,25 @@ body {
   font-family: Inter, system-ui, sans-serif;
 }
 
+/* Score delta float-up animation (ArenaTeamCard) */
+@keyframes score-delta-float {
+  0%   { opacity: 0;   transform: translateY(2px)  scale(0.8); }
+  20%  { opacity: 1;   transform: translateY(-2px) scale(1.15); }
+  70%  { opacity: 0.9; transform: translateY(-18px) scale(1); }
+  100% { opacity: 0;   transform: translateY(-28px) scale(0.9); }
+}
+
+.animate-score-delta {
+  animation: score-delta-float 1.6s ease-out forwards;
+  pointer-events: none;
+  position: absolute;
+  white-space: nowrap;
+  font-size: 0.75rem;
+  font-weight: 700;
+  font-family: ui-monospace, monospace;
+  line-height: 1;
+}
+
 /* Dashboard dark theme variables (forced dark mode) */
 .dark {
   --background: #0f172a; /* slate-900 */

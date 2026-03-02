@@ -55,6 +55,7 @@ export function ArenaTeamPanel({ partida }: ArenaTeamPanelProps) {
         {sorted.map((equipo) => (
           <ArenaTeamCard
             key={equipo.equipoId}
+            gameId={partida.id}
             equipo={equipo}
             isActiveTurn={equipo.equipoId === activeEquipoId}
             pendingRequest={pending.get(equipo.equipoId)}
