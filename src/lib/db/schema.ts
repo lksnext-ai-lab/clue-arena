@@ -95,6 +95,12 @@ export const turnos = sqliteTable('turnos', {
   agentDurationMs: integer('agent_duration_ms'),
   // F016: ms que tardó el primer refutador exitoso en responder (null si no hubo refutación)
   refutacionDurationMs: integer('refutacion_duration_ms'),
+  // G004: spectator comment from the active agent (optional, max 160 chars in practice)
+  agentSpectatorComment: text('agent_spectator_comment'),
+  // G004: spectator comment from the first successful refutador
+  refutadorSpectatorComment: text('refutador_spectator_comment'),
+  // Agent LLM reasoning text persisted for spectators/debug (truncated to 2000 chars)
+  agentReasoning: text('agent_reasoning'),
 });
 
 // --- sugerencias ---

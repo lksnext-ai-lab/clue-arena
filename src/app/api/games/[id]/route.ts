@@ -100,6 +100,10 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
               createdAt: turnPase.createdAt?.toISOString() ?? null,
             }
           : undefined,
+        // G004: spectator comments persisted on the turn record
+        agentSpectatorComment: t.agentSpectatorComment ?? null,
+        refutadorSpectatorComment: t.refutadorSpectatorComment ?? null,
+        agentReasoning: t.agentReasoning ?? null,
       };
     })
   );

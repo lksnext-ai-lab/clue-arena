@@ -53,6 +53,8 @@ export const ServerMessageSchema = z.discriminatedUnion('type', [
       habitacion: z.string(),
     }).optional(),
     durationMs: z.number(),
+    // G004: short natural-language comment for spectators (max 500 chars for accusations, 160 otherwise)
+    spectatorComment: z.string().max(500).optional(),
     ts: z.number(),
   }),
   // Micro-evento: el coordinador solicita refutación a uno o más agentes
@@ -77,6 +79,8 @@ export const ServerMessageSchema = z.discriminatedUnion('type', [
     resultado: z.enum(['refutada', 'no_puede_refutar']),
     cartaMostrada: z.string().optional(),
     durationMs: z.number(),
+    // G004: short natural-language comment from the refutador for spectators (max 160 chars)
+    spectatorComment: z.string().max(500).optional(),
     ts: z.number(),
   }),
   // Heartbeat para mantener la conexión

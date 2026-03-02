@@ -64,6 +64,7 @@ const loggedSaveAgentMemory = withMcpLog(
 
 /**
  * play_turn: action + optional memory the model wants to persist for next turn.
+ * G004: spectatorComment is also optional (max 500 chars; truncated to 160 or 400 for accusations by coordinator).
  */
 const PlayTurnResponseSchema = z.object({
   action: z.union([
@@ -82,14 +83,20 @@ const PlayTurnResponseSchema = z.object({
     z.object({ type: z.literal('pass') }),
   ]),
   memory: z.record(z.unknown()).optional(),
+  // G004: spectator-facing comment (max 500; coordinator truncates to 160 or 400 for accusations)
+  spectatorComment: z.string().max(500).optional(),
 });
 
 const RefuteResponseSchema = z.union([
   z.object({
     action: z.object({ type: z.literal('show_card'), card: z.string() }),
+    // G004: spectator-facing comment
+    spectatorComment: z.string().max(500).optional(),
   }),
   z.object({
     action: z.object({ type: z.literal('cannot_refute') }),
+    // G004: spectator-facing comment
+    spectatorComment: z.string().max(500).optional(),
   }),
 ]);
 
@@ -258,6 +265,8 @@ export async function invokeAgent(
     action: parsed.data.action as AgentAction,
     reasoning,
     done: true,
+    // G004: pass through the optional spectator comment from the model output
+    spectatorComment: (parsed.data as { spectatorComment?: string }).spectatorComment,
   };
 }
 

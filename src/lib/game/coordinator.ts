@@ -126,6 +126,24 @@ function calcEfficiencyBonus(turnosJugados: number): number {
   const DECAY = 25;
   return Math.max(0, BONUS_BASE - (turnosJugados - T_MIN) * DECAY);
 }
+
+// ---------------------------------------------------------------------------
+// G004 — Spectator comment sanitization
+// ---------------------------------------------------------------------------
+
+/**
+ * Sanitizes a raw spectatorComment from the agent:
+ * - Trims whitespace; returns undefined for empty strings.
+ * - Truncates to 160 characters (appends "…" if truncated).
+ * - Collapses newlines to a single space so the comment stays one line.
+ */
+function sanitizeSpectatorComment(raw: string | undefined, maxLen = 160): string | undefined {
+  if (!raw) return undefined;
+  const trimmed = raw.trim();
+  if (trimmed.length === 0) return undefined;
+  const truncated = trimmed.length > maxLen ? trimmed.slice(0, maxLen - 1) + '…' : trimmed;
+  return truncated.replace(/[\r\n]+/g, ' ');
+}
 import { v4 as uuidv4 } from 'uuid';
 import { invokeAgent } from '@/lib/api/agent';
 import { AgentResponseError } from '@/lib/api/local-agent';
@@ -245,6 +263,8 @@ export async function advanceTurn(gameId: string): Promise<AdvanceTurnResult> {
 
   // ── 4. Invoke the agent for the current team ──────────────────────────────
   let agentAction!: import('@/types/api').AgentAction;
+  let agentRawSpectatorComment: string | undefined;
+  let agentRawReasoning: string | undefined;
   let invocacionId!: string;
   let passOrigen: 'timeout' | 'invalid_format' | null = null;
   let agentDurationMs = 0;
@@ -267,6 +287,8 @@ export async function advanceTurn(gameId: string): Promise<AdvanceTurnResult> {
       { turnoId: turno.id },
     );
     agentAction = agentResponse.action;
+    agentRawSpectatorComment = agentResponse.spectatorComment;
+    agentRawReasoning = agentResponse.reasoning || undefined;
     invocacionId = invId;
   } catch (err) {
     // Determine pass origin from error type
@@ -360,6 +382,12 @@ export async function advanceTurn(gameId: string): Promise<AdvanceTurnResult> {
 
   // F016: emit turn:agent_responded for the successful agent response
   agentDurationMs = Date.now() - tsAgentInvoke;
+  const agentSpectatorComment = sanitizeSpectatorComment(
+    agentRawSpectatorComment,
+    action.type === 'accusation' ? 400 : 160,
+  );
+  // Truncate reasoning to 2000 chars to keep DB rows reasonable
+  const agentReasoning = agentRawReasoning ? agentRawReasoning.slice(0, 2000) : undefined;
   gameEventEmitter.emitTurnMicroEvent({
     type: 'turn:agent_responded',
     gameId,
@@ -375,6 +403,7 @@ export async function advanceTurn(gameId: string): Promise<AdvanceTurnResult> {
         ? { sospechoso: action.suspect, arma: action.weapon, habitacion: action.room }
         : undefined,
     durationMs: agentDurationMs,
+    spectatorComment: agentSpectatorComment,
     ts: Date.now(),
   });
   const isValidAction =
@@ -414,6 +443,8 @@ export async function advanceTurn(gameId: string): Promise<AdvanceTurnResult> {
       maxTurnos: partida.maxTurnos,
       agentDurationMs,
       teamNombres,
+      agentSpectatorComment,
+      agentReasoning,
     });
 
     gameEventEmitter.emitTurnCompleted(gameId, {
@@ -454,6 +485,8 @@ export async function advanceTurn(gameId: string): Promise<AdvanceTurnResult> {
       allTeams,
       maxTurnos: partida.maxTurnos,
       agentDurationMs,
+      agentSpectatorComment,
+      agentReasoning,
     });
 
     gameEventEmitter.emitTurnCompleted(gameId, {
@@ -494,6 +527,8 @@ export async function advanceTurn(gameId: string): Promise<AdvanceTurnResult> {
       maxTurnos: partida.maxTurnos,
       origen: 'voluntario',
       agentDurationMs,
+      agentSpectatorComment,
+      agentReasoning,
     });
 
     gameEventEmitter.emitTurnCompleted(gameId, {
@@ -542,10 +577,14 @@ interface SuggestionParams {
   maxTurnos: number | null;
   agentDurationMs: number;
   teamNombres: Map<string, string>;
+  /** G004: sanitized spectator comment from the active agent */
+  agentSpectatorComment?: string;
+  /** Agent LLM reasoning (truncated to 2000 chars) */
+  agentReasoning?: string;
 }
 
 async function handleSuggestion(p: SuggestionParams): Promise<{ maxTurnsReached: boolean; nextEquipoId: string | null }> {
-  const { gameId, teamId, turnoId, turnoNumero, suspect, weapon, room, allTeams, turnoActual, activeTeamCount, maxTurnos, agentDurationMs, teamNombres } = p;
+  const { gameId, teamId, turnoId, turnoNumero, suspect, weapon, room, allTeams, turnoActual, activeTeamCount, maxTurnos, agentDurationMs, teamNombres, agentSpectatorComment, agentReasoning } = p;
 
   // ── Validate suggestion (invalid card + redundant checks) ─────────────
   const isInvalidCard =
@@ -566,7 +605,7 @@ async function handleSuggestion(p: SuggestionParams): Promise<{ maxTurnsReached:
     });
     await db
       .update(turnos)
-      .set({ estado: 'completado', finishedAt: new Date(), agentDurationMs })
+      .set({ estado: 'completado', finishedAt: new Date(), agentDurationMs, agentSpectatorComment: agentSpectatorComment ?? null, agentReasoning: agentReasoning ?? null })
       .where(eq(turnos.id, turnoId));
     return _advanceTurnoIndex(gameId, turnoActual, activeTeamCount, allTeams, maxTurnos);
   }
@@ -654,6 +693,8 @@ async function handleSuggestion(p: SuggestionParams): Promise<{ maxTurnsReached:
 
   // ── Refutation sub-flow ────────────────────────────────────────────────
   let refutacionDurationMs: number | null = null;
+  // G004: spectator comment from the refutador (captured inside the if block)
+  let refutadorSpectatorComment: string | undefined;
   if (refutadaPor) {
     // F016: notify that refutation is being requested
     const refutadorNombre = teamNombres.get(refutadaPor) ?? refutadaPor;
@@ -673,6 +714,7 @@ async function handleSuggestion(p: SuggestionParams): Promise<{ maxTurnsReached:
       { turnoId },
     );
     refutacionDurationMs = Date.now() - tsRef;
+    refutadorSpectatorComment = sanitizeSpectatorComment(refuteResponse.spectatorComment);
 
     const refAction = refuteResponse.action;
     const isValidRefute = refAction.type === 'show_card' || refAction.type === 'cannot_refute';
@@ -716,6 +758,7 @@ async function handleSuggestion(p: SuggestionParams): Promise<{ maxTurnsReached:
       resultado: cartaMostradaValue ? 'refutada' : 'no_puede_refutar',
       cartaMostrada: cartaMostradaValue,
       durationMs: refutacionDurationMs,
+      spectatorComment: refutadorSpectatorComment,
       ts: Date.now(),
     });
   }
@@ -723,7 +766,15 @@ async function handleSuggestion(p: SuggestionParams): Promise<{ maxTurnsReached:
   // ── Mark turn as completed and advance ──────────────────────────────
   await db
     .update(turnos)
-    .set({ estado: 'completado', finishedAt: new Date(), agentDurationMs, refutacionDurationMs })
+    .set({
+      estado: 'completado',
+      finishedAt: new Date(),
+      agentDurationMs,
+      refutacionDurationMs,
+      agentSpectatorComment: agentSpectatorComment ?? null,
+      refutadorSpectatorComment: refutadaPor ? (refutadorSpectatorComment ?? null) : null,
+      agentReasoning: agentReasoning ?? null,
+    })
     .where(eq(turnos.id, turnoId));
 
   return _advanceTurnoIndex(gameId, turnoActual, activeTeamCount, allTeams, maxTurnos);
@@ -745,13 +796,17 @@ interface AccusationParams {
   allTeams: TeamRow[];
   maxTurnos: number | null;
   agentDurationMs: number;
+  /** G004: sanitized spectator comment from the active agent */
+  agentSpectatorComment?: string;
+  /** Agent LLM reasoning (truncated to 2000 chars) */
+  agentReasoning?: string;
 }
 
 /**
  * Returns gameOver flag and the next team's equipoId (null when the game ends).
  */
 async function handleAccusation(p: AccusationParams): Promise<{ gameOver: boolean; nextEquipoId: string | null }> {
-  const { gameId, teamId, turnoId, suspect, weapon, room, turnoActual, allTeams, maxTurnos, agentDurationMs } = p;
+  const { gameId, teamId, turnoId, suspect, weapon, room, turnoActual, allTeams, maxTurnos, agentDurationMs, agentSpectatorComment, agentReasoning } = p;
 
   // Load the envelope
   const sobre = await db.select().from(sobres).where(eq(sobres.partidaId, gameId)).get();
@@ -776,7 +831,7 @@ async function handleAccusation(p: AccusationParams): Promise<{ gameOver: boolea
   // Mark turn as completed
   await db
     .update(turnos)
-    .set({ estado: 'completado', finishedAt: new Date(), agentDurationMs })
+    .set({ estado: 'completado', finishedAt: new Date(), agentDurationMs, agentSpectatorComment: agentSpectatorComment ?? null, agentReasoning: agentReasoning ?? null })
     .where(eq(turnos.id, turnoId));
 
   if (correcta) {
@@ -872,6 +927,10 @@ interface PassParams {
   maxTurnos: number | null;
   origen: 'voluntario' | 'timeout' | 'invalid_format';
   agentDurationMs: number;
+  /** G004: sanitized spectator comment from the active agent (undefined for forced passes) */
+  agentSpectatorComment?: string;
+  /** Agent LLM reasoning (undefined for forced/timeout passes) */
+  agentReasoning?: string;
 }
 
 /**
@@ -880,7 +939,7 @@ interface PassParams {
  * Returns true if maxTurnos was reached (game ended).
  */
 async function handlePass(p: PassParams): Promise<{ maxTurnsReached: boolean; nextEquipoId: string | null }> {
-  const { gameId, teamId, turnoId, turnoActual, activeTeamCount, allTeams, maxTurnos, origen, agentDurationMs } = p;
+  const { gameId, teamId, turnoId, turnoActual, activeTeamCount, allTeams, maxTurnos, origen, agentDurationMs, agentSpectatorComment, agentReasoning } = p;
 
   // Persist pass in `pases` table
   await db.insert(pases).values({
@@ -903,7 +962,7 @@ async function handlePass(p: PassParams): Promise<{ maxTurnsReached: boolean; ne
   // Mark turn as completed
   await db
     .update(turnos)
-    .set({ estado: 'completado', finishedAt: new Date(), agentDurationMs })
+    .set({ estado: 'completado', finishedAt: new Date(), agentDurationMs, agentSpectatorComment: agentSpectatorComment ?? null, agentReasoning: agentReasoning ?? null })
     .where(eq(turnos.id, turnoId));
 
   return _advanceTurnoIndex(gameId, turnoActual, activeTeamCount, allTeams, maxTurnos);

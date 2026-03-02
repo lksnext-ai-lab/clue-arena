@@ -14,6 +14,11 @@ export function ArenaFinalResult({ partida }: ArenaFinalResultProps) {
   const sorted = [...partida.equipos].sort((a, b) => b.puntos - a.puntos);
   const winner = sorted[0];
 
+  // G004: find the winning accusation turn (correcta === true) and its narrative comment
+  const winningTurn = partida.turnos.find(
+    (t) => t.acusacion?.correcta === true && t.agentSpectatorComment,
+  );
+
   return (
     <div className="rounded-xl border border-amber-500/30 bg-slate-800 p-6 space-y-5">
       {/* Trophy header */}
@@ -48,6 +53,19 @@ export function ArenaFinalResult({ partida }: ArenaFinalResultProps) {
               <span className="text-white font-medium">{partida.sobre.habitacion}</span>
             </p>
           </div>
+        </div>
+      )}
+
+      {/* G004: Winning accusation narrative */}
+      {winningTurn?.agentSpectatorComment && (
+        <div className="rounded-lg border border-cyan-500/30 bg-cyan-500/5 p-4 space-y-1">
+          <p className="text-xs font-semibold text-cyan-400 uppercase tracking-wider">
+            💬 La resolución del caso
+          </p>
+          <p className="text-sm text-slate-200 italic leading-relaxed">
+            &quot;{winningTurn.agentSpectatorComment}&quot;
+          </p>
+          <p className="text-xs text-slate-500 text-right">— {winningTurn.equipoNombre}</p>
         </div>
       )}
 

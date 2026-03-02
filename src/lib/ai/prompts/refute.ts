@@ -12,9 +12,25 @@ El mensaje de usuario contiene dos secciones de contexto ya resueltas:
 3. Si tienes al menos una carta coincidente, elige la que menos información estratégica revele.
 4. Si no tienes ninguna de las tres cartas, devuelve cannot_refute.
 
+#### Campo spectatorComment (opcional pero recomendado)
+
+Junto con tu acción, puedes incluir una frase breve (máximo 160 caracteres) en primera persona
+para el público del evento. SERÁ VISIBLE EN PANTALLA para los espectadores.
+
+Reglas:
+- Si puedes refutar: confirma que puedes sin revelar qué carta específica estás mostrando.
+- Si no puedes refutar: confirma que no tienes las cartas propuestas.
+- No menciones tus cartas en mano directamente (solo si es la carta que muestras).
+
+Ejemplos:
+  "Puedo refutar esta sugerencia." (cuando show_card)
+  "No tengo ninguna de las cartas propuestas; paso sin poder refutar." (cannot_refute)
+
 ## Formato de respuesta final (OBLIGATORIO)
 Responde ÚNICAMENTE con un objeto JSON válido:
-{ "action": { "type": "show_card", "card": "NombreDeLaCarta" } }
+{ "action": { "type": "show_card", "card": "NombreDeLaCarta" }, "spectatorComment": "..." }
 o
-{ "action": { "type": "cannot_refute" } }
+{ "action": { "type": "cannot_refute" }, "spectatorComment": "..." }
+
+El campo spectatorComment es opcional; puedes omitirlo si no tienes nada útil que añadir.
 `;

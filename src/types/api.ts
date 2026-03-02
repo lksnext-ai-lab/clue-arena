@@ -105,6 +105,12 @@ export interface TurnResponse {
   sugerencias: SuggestionResponse[];
   acusacion?: AccusationResponse;
   pase?: PaseResponse;
+  /** G004: comment from the active agent for this turn */
+  agentSpectatorComment?: string | null;
+  /** G004: comment from the first successful refutador */
+  refutadorSpectatorComment?: string | null;
+  /** Agent LLM reasoning for this turn (shown collapsed in feed) */
+  agentReasoning?: string | null;
 }
 
 export interface SuggestionResponse {
@@ -215,6 +221,11 @@ export interface AgentResponse {
   reasoning: string;
   /** Always true; allows future streaming extension */
   done: boolean;
+  /**
+   * G004: short natural-language comment for spectators (max 160 chars).
+   * Optional — agents that omit it produce no visible comment in the Arena.
+   */
+  spectatorComment?: string;
 }
 
 // ── F012 — Agent invocation context ─────────────────────────────────────────

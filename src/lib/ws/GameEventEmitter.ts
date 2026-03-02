@@ -13,9 +13,9 @@ export interface SugerenciaCombo {
 
 export type TurnMicroEvent =
   | { type: 'turn:agent_invoked';        gameId: string; turnoId: string; turnoNumero: number; equipoId: string; equipoNombre: string; ts: number }
-  | { type: 'turn:agent_responded';      gameId: string; turnoId: string; turnoNumero: number; equipoId: string; equipoNombre: string; accion: 'sugerencia' | 'acusacion' | 'pasar' | 'timeout' | 'formato_invalido'; sugerencia?: SugerenciaCombo; durationMs: number; ts: number }
+  | { type: 'turn:agent_responded';      gameId: string; turnoId: string; turnoNumero: number; equipoId: string; equipoNombre: string; accion: 'sugerencia' | 'acusacion' | 'pasar' | 'timeout' | 'formato_invalido'; sugerencia?: SugerenciaCombo; durationMs: number; /** G004 */ spectatorComment?: string; ts: number }
   | { type: 'turn:refutation_requested'; gameId: string; turnoId: string; turnoNumero: number; equipoSugeridor: string; refutadoresIds: string[]; ts: number }
-  | { type: 'turn:refutation_received';  gameId: string; turnoId: string; turnoNumero: number; equipoId: string; equipoNombre: string; resultado: 'refutada' | 'no_puede_refutar'; cartaMostrada?: string; durationMs: number; ts: number };
+  | { type: 'turn:refutation_received';  gameId: string; turnoId: string; turnoNumero: number; equipoId: string; equipoNombre: string; resultado: 'refutada' | 'no_puede_refutar'; cartaMostrada?: string; durationMs: number; /** G004 */ spectatorComment?: string; ts: number };
 
 class GameEventEmitter extends EventEmitter {
   emitTurnCompleted(gameId: string, payload: GameStateEvent) {

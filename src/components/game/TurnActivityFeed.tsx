@@ -82,6 +82,12 @@ function EventRow({ ev }: { ev: TurnMicroEventUI }) {
               {ev.sugerencia.sospechoso} · {ev.sugerencia.arma} · {ev.sugerencia.habitacion}
             </span>
           )}
+          {/* G004: spectator comment */}
+          {ev.spectatorComment && (
+            <span className="mt-0.5 ml-5 block text-xs text-slate-400 italic">
+              💬 &quot;{ev.spectatorComment}&quot;
+            </span>
+          )}
         </span>
       );
     }
@@ -109,6 +115,12 @@ function EventRow({ ev }: { ev: TurnMicroEventUI }) {
           {refuted && ev.cartaMostrada && (
             <span className="ml-5 text-slate-300 text-xs">
               carta: <span className="font-semibold text-amber-300">{ev.cartaMostrada}</span>
+            </span>
+          )}
+          {/* G004: spectator comment */}
+          {ev.spectatorComment && (
+            <span className="mt-0.5 ml-5 block text-xs text-slate-400 italic">
+              💬 &quot;{ev.spectatorComment}&quot;
             </span>
           )}
         </span>

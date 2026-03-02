@@ -26,6 +26,16 @@ interface GameContextValue {
   notifySuggestionAnimationEnd: () => void;
   /** F016: live coordinator micro-events for the current turn. */
   currentTurnActivity: TurnActivityState;
+  /** G004: most recent spectator comment received; null when cleared. */
+  latestSpectatorComment: LatestSpectatorComment | null;
+}
+
+/** G004: spectator comment produced by an agent for display in ArenaHeader. */
+export interface LatestSpectatorComment {
+  equipoId: string;
+  equipoNombre: string;
+  text: string;
+  ts: number;
 }
 
 const EMPTY_TURN_ACTIVITY: TurnActivityState = { active: null, history: [] };
@@ -41,6 +51,7 @@ const GameContext = createContext<GameContextValue>({
   notifySuggestionAnimationStart: () => {},
   notifySuggestionAnimationEnd: () => {},
   currentTurnActivity: EMPTY_TURN_ACTIVITY,
+  latestSpectatorComment: null,
 });
 
 interface GameProviderProps {
@@ -55,6 +66,8 @@ export function GameProvider({ children, gameId }: GameProviderProps) {
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const [currentTurnActivity, setCurrentTurnActivity] = useState<TurnActivityState>(EMPTY_TURN_ACTIVITY);
+  // G004: most recent spectator comment from the active agent or refutador
+  const [latestSpectatorComment, setLatestSpectatorComment] = useState<LatestSpectatorComment | null>(null);
 
   // ---------- animation / pending-team bookkeeping ----------
   const animatingRef = useRef(false);
@@ -161,6 +174,8 @@ export function GameProvider({ children, gameId }: GameProviderProps) {
     if (msg.type === 'game:turn_completed') {
       // Seal the current feed entry before fetching fresh data.
       sealActiveTurn();
+      // G004: clear the spectator comment banner on turn completion
+      setLatestSpectatorComment(null);
       // coordinator tells us which team is up next; delay visible change until
       // any running suggestion animation has finished.
       if (msg.nextEquipoId !== undefined) {
@@ -193,9 +208,19 @@ export function GameProvider({ children, gameId }: GameProviderProps) {
         accion: msg.accion,
         sugerencia: msg.sugerencia,
         durationMs: msg.durationMs,
+        spectatorComment: msg.spectatorComment,
         ts: msg.ts,
       };
       appendTurnMicroEvent(ev, msg.turnoId, msg.turnoNumero);
+      // G004: update spectator comment banner if present
+      if (msg.spectatorComment) {
+        setLatestSpectatorComment({
+          equipoId: msg.equipoId,
+          equipoNombre: msg.equipoNombre,
+          text: msg.spectatorComment,
+          ts: msg.ts,
+        });
+      }
       return;
     }
     if (msg.type === 'turn:refutation_requested') {
@@ -216,9 +241,19 @@ export function GameProvider({ children, gameId }: GameProviderProps) {
         resultado: msg.resultado,
         cartaMostrada: msg.cartaMostrada,
         durationMs: msg.durationMs,
+        spectatorComment: msg.spectatorComment,
         ts: msg.ts,
       };
       appendTurnMicroEvent(ev, msg.turnoId, msg.turnoNumero);
+      // G004: update spectator comment banner with refutador's comment
+      if (msg.spectatorComment) {
+        setLatestSpectatorComment({
+          equipoId: msg.equipoId,
+          equipoNombre: msg.equipoNombre,
+          text: msg.spectatorComment,
+          ts: msg.ts,
+        });
+      }
       return;
     }
   }, [fetchGame, scheduleActiveEquipoId, appendTurnMicroEvent, sealActiveTurn]);
@@ -246,6 +281,7 @@ export function GameProvider({ children, gameId }: GameProviderProps) {
     notifySuggestionAnimationStart,
     notifySuggestionAnimationEnd,
     currentTurnActivity,
+    latestSpectatorComment,
   };
 
   return <GameContext.Provider value={value}>{children}</GameContext.Provider>;

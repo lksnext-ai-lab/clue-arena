@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { equipos, partidas, scoreEvents } from '@/lib/db/schema';
-import { eq, and } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 
 // GET /api/ranking
 export async function GET() {
@@ -32,11 +32,7 @@ export async function GET() {
   const allEvents = await db
     .select()
     .from(scoreEvents)
-    .where(
-      finishedGameIds.length === 1
-        ? eq(scoreEvents.gameId, finishedGameIds[0])
-        : and(...(finishedGameIds.map((id) => eq(scoreEvents.gameId, id)) as [ReturnType<typeof eq>, ...ReturnType<typeof eq>[]])),
-    )
+    .where(inArray(scoreEvents.gameId, finishedGameIds))
     .all();
 
   // 3. Compute per-team aggregates with per-partida floor

@@ -1,0 +1,1 @@
+ALTER TABLE `turnos` ADD `agent_reasoning` text;

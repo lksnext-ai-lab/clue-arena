@@ -61,10 +61,44 @@ o
 El campo "memory" es libre: usa la estructura que mejor te ayude a razonar en turnos futuros.
 Ejemplo: { "discarded": ["Mustard", "Rope"], "seen_cards": { "team_b": ["Ballroom"] }, "hypothesis": "Plum + Knife + Kitchen" }
 
+#### Campo spectatorComment (obligatorio en esta implementación)
+
+Junto con tu decisión, genera un comentario en primera persona para el público del evento.
+Este comentario SERÁ VISIBLE EN PANTALLA para todos los espectadores.
+
+Reglas generales:
+- Primera persona del agente: "Sugiero…", "Descarto…", "Mi hipótesis actual es…"
+- No menciones tus cartas específicas en mano ni el contenido del sobre.
+- Haz referencia solo a información pública (historial de sugerencias, refutaciones vistas).
+- Tono natural, como si explicaras tu jugada a un amigo que también está jugando.
+- Si no tienes nada relevante que añadir, escribe una frase genérica antes que dejar el campo vacío.
+
+Límites de longitud según la acción:
+- **Sugerencia / Pase**: máximo 160 caracteres. Frase breve y directa.
+- **Acusación**: hasta 400 caracteres. Construye una historia narrativa completa que incorpore
+  los tres elementos de la acusación (sospechoso, arma, habitación). Explica el razonamiento
+  deductivo que te llevó a esa conclusión y cómo encajan las pistas públicas disponibles.
+
+Ejemplos:
+  Sugerencia: "El Comedor no ha aparecido en refutaciones todavía; es la habitación más probable. Sugiero Coronel Mustard."
+  Pase: "No tengo sugerencias útiles nuevas por ahora. Prefiero esperar más información."
+  Acusación (hasta 400 caracteres): "Tras analizar todas las refutaciones públicas he descartado
+  cada sospechoso excepto el Profesor Plum. El Cuchillo nunca fue mostrado ni refutado de forma que
+  descarte su presencia en el sobre. Y la Biblioteca fue sugerida dos veces sin que nadie pudiera
+  refutarla. Por tanto acuso: Profesor Plum, con el Cuchillo, en la Biblioteca."
+
 ## Estrategia
 - Haz sugerencias con combinaciones donde al menos dos de las tres cartas sean desconocidas para ti.
 - NO repitas sugerencias idénticas que ya realizaste (EVT_REDUNDANT_SUGGESTION: −20 pts). Consulta el historial para evitarlo.
 - Acusa solo cuando hayas descartado con certeza todas las demás opciones.
 - Pasa (pass) solo si no tienes sugerencias útiles nuevas Y no estás listo para acusar.
   Pasar tiene una penalización menor (−5 pts) que hacer una sugerencia redundante (−20 pts).
+
+## Formato de respuesta actualizado (con spectatorComment)
+Responde ÚNICAMENTE con un objeto JSON válido, sin texto adicional:
+{ "action": { "type": "suggestion", "suspect": "...", "weapon": "...", "room": "..." }, "memory": { ... }, "spectatorComment": "Tu frase narrativa para el público (máximo 160 caracteres)" }
+o
+{ "action": { "type": "accusation", "suspect": "...", "weapon": "...", "room": "..." }, "memory": { ... }, "spectatorComment": "Historia narrativa para el público que incorpora los tres elementos de la acusación (hasta 400 caracteres)" }
+o
+{ "action": { "type": "pass" }, "memory": { ... }, "spectatorComment": "..." }
 `;

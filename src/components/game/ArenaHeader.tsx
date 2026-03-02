@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils/cn';
 import { apiFetch } from '@/lib/api/client';
 import { useGame } from '@/contexts/GameContext';
 import type { GameDetailResponse } from '@/types/api';
+import type { LatestSpectatorComment } from '@/contexts/GameContext';
 
 interface ArenaHeaderProps {
   partida: GameDetailResponse;
@@ -40,7 +41,23 @@ function statusBadge(estado: string) {
 export function ArenaHeader({ partida, isAdmin, isSyncing, onRefresh }: ArenaHeaderProps) {
   const [busy, setBusy] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const { activeEquipoId } = useGame();
+  const { activeEquipoId, latestSpectatorComment } = useGame();
+
+  // G004: local banner state — driven by latestSpectatorComment from GameContext
+  const [activeComment, setActiveComment] = useState<LatestSpectatorComment | null>(null);
+  useEffect(() => {
+    if (!latestSpectatorComment) {
+      // Cleared by game:turn_completed or initial state
+      setActiveComment(null);
+      return;
+    }
+    setActiveComment(latestSpectatorComment);
+    // Scale display time with text length: ~50 ms/char, min 8 s, max 20 s
+    // (short turns ≤160 chars → 8 s; accusation stories up to 400 chars → up to 20 s)
+    const displayMs = Math.max(8_000, Math.min(20_000, latestSpectatorComment.text.length * 50));
+    const timer = setTimeout(() => setActiveComment(null), displayMs);
+    return () => clearTimeout(timer);
+  }, [latestSpectatorComment]);
 
   async function callAction(action: string) {
     setBusy(action);
@@ -186,6 +203,20 @@ export function ArenaHeader({ partida, isAdmin, isSyncing, onRefresh }: ArenaHea
           <span>✖</span>
           <span className="flex-1">{actionError}</span>
           <button onClick={() => setActionError(null)} className="text-red-400/60 hover:text-red-300">✕</button>
+        </div>
+      )}
+
+      {/* G004: Spectator comment banner */}
+      {activeComment && (
+        <div className={cn(
+          'mt-2 flex items-start gap-2 rounded-md bg-slate-700/50 px-4 py-2 text-sm',
+          'border-l-2 border-cyan-400 text-slate-200 animate-in fade-in slide-in-from-top-1 duration-200',
+        )}>
+          <span className="shrink-0 text-cyan-400">💬</span>
+          <span>
+            <span className="font-semibold text-cyan-300">{activeComment.equipoNombre}: </span>
+            <span className="italic">&quot;{activeComment.text}&quot;</span>
+          </span>
         </div>
       )}
     </div>

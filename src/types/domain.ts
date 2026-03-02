@@ -126,6 +126,8 @@ export interface TurnMicroEventUI {
   cartaMostrada?: string;
   sugerencia?: SugerenciaComboUI;
   durationMs?: number;
+  /** G004: spectator-facing comment from the agent */
+  spectatorComment?: string;
   ts: number;
 }
 

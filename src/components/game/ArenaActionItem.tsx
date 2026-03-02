@@ -129,6 +129,36 @@ export function ArenaActionItem({ turno, isNew, teams }: ArenaActionItemProps) {
           )}
         </div>
       )}
+
+      {/* G004: spectator comments */}
+      {(turno.agentSpectatorComment || turno.refutadorSpectatorComment) && (
+        <div className="px-3 pb-2 pt-0 flex flex-col gap-0.5">
+          {turno.agentSpectatorComment && (
+            <p className="flex items-start gap-1.5 text-xs text-slate-400 italic">
+              <span className="shrink-0 not-italic">💬</span>
+              <span>&quot;{turno.agentSpectatorComment}&quot;</span>
+            </p>
+          )}
+          {turno.refutadorSpectatorComment && (
+            <p className="flex items-start gap-1.5 text-xs text-slate-500 italic">
+              <span className="shrink-0 not-italic">↩💬</span>
+              <span>&quot;{turno.refutadorSpectatorComment}&quot;</span>
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Reasoning: shown when expanded */}
+      {expanded && turno.agentReasoning && (
+        <div className="px-3 pb-3 pt-1 border-t border-slate-700/40">
+          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
+            🧠 Razonamiento del agente
+          </p>
+          <p className="text-xs text-slate-400 leading-relaxed whitespace-pre-wrap">
+            {turno.agentReasoning}
+          </p>
+        </div>
+      )}
     </div>
   );
 }
