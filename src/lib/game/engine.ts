@@ -359,7 +359,6 @@ function applyAccusation(state: GameState, action: AccusationAction): ApplyActio
   // Increment own turn counter for winner
   const equiposWithTurno = incrementTurnosJugados(state.equipos, action.equipoId);
 
-  let equiposActualizados: EquipoState[];
   let nuevoEstado = state.estado;
   let ganadorId = state.ganadorId;
 
@@ -414,7 +413,7 @@ function applyAccusation(state: GameState, action: AccusationAction): ApplyActio
   for (const evt of scoreEvents) {
     pointsByEquipo.set(evt.equipoId, (pointsByEquipo.get(evt.equipoId) ?? 0) + evt.points);
   }
-  equiposActualizados = equiposWithTurno.map((e) => {
+  const equiposActualizados = equiposWithTurno.map((e) => {
     const delta = pointsByEquipo.get(e.equipoId) ?? 0;
     if (!correcta && e.equipoId === action.equipoId) {
       return { ...e, eliminado: true, puntos: e.puntos + delta };

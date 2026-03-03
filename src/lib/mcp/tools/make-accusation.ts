@@ -6,7 +6,6 @@ import {
   turnos,
   acusaciones,
   sobres,
-  ranking,
 } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';

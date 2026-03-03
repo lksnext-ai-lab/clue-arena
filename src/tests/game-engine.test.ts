@@ -8,6 +8,7 @@ import {
   getGameStateView,
 } from '@/lib/game/engine';
 import type { SuggestionAction, AccusationAction } from '@/lib/game/types';
+import type { Sospechoso, Habitacion } from '@/types/domain';
 
 describe('Game Engine', () => {
   const TEAM_IDS = ['team-a', 'team-b', 'team-c'];
@@ -106,7 +107,7 @@ describe('Game Engine', () => {
     const action: AccusationAction = {
       type: 'accusation',
       equipoId: 'team-a',
-      sospechoso: wrongSospechoso as any,
+      sospechoso: wrongSospechoso as Sospechoso,
       arma: state.sobre.arma,
       habitacion: state.sobre.habitacion,
     };
@@ -131,7 +132,7 @@ describe('Game Engine', () => {
     const r1 = applyAction(state, {
       type: 'accusation',
       equipoId: 'team-x',
-      sospechoso: wrongSospechoso as any,
+      sospechoso: wrongSospechoso as Sospechoso,
       arma: state.sobre.arma,
       habitacion: state.sobre.habitacion,
     });
@@ -140,7 +141,7 @@ describe('Game Engine', () => {
     const r2 = applyAction(r1.state, {
       type: 'accusation',
       equipoId: 'team-y',
-      sospechoso: wrongSospechoso as any,
+      sospechoso: wrongSospechoso as Sospechoso,
       arma: r1.state.sobre.arma,
       habitacion: r1.state.sobre.habitacion,
     });
@@ -178,7 +179,7 @@ describe('Game Engine', () => {
     const result = applyAction(state, {
       type: 'suggestion',
       equipoId: 'team-a',
-      sospechoso: 'Profesor Fantasma' as any, // does not exist
+      sospechoso: 'Profesor Fantasma' as unknown as Sospechoso, // does not exist
       arma: 'Teclado mecánico',
       habitacion: 'La Cafetería',
     });
@@ -223,9 +224,9 @@ describe('Game Engine', () => {
       const r = applyAction(state, {
         type: 'suggestion',
         equipoId: 'team-a',
-        sospechoso: suspects[i] as any,
+        sospechoso: suspects[i] as Sospechoso,
         arma: 'Teclado mecánico',
-        habitacion: rooms[i] as any,
+        habitacion: rooms[i] as Habitacion,
       });
       const sg = r.scoreEvents.filter((e) => e.type === 'EVT_SUGGESTION');
       suggCount += sg.length;

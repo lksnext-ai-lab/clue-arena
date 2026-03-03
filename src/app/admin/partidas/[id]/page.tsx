@@ -87,7 +87,7 @@ function AdminPartidaContent({ gameId }: { gameId: string }) {
   }
 
   const { estado } = partida;
-  const modo = (partida as any).modoEjecucion as 'manual' | 'auto' | 'pausado' | undefined;
+  const modo = partida.modoEjecucion as 'manual' | 'auto' | 'pausado' | undefined;
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6" style={{ color: '#f1f5f9' }}>

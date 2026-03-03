@@ -29,10 +29,11 @@ export function DeleteTeamButton({ teamId, teamName, onDeleted }: Props) {
       await apiFetch(`/teams/${teamId}`, { method: 'DELETE' });
       setOpen(false);
       onDeleted();
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const errMessage = err instanceof Error ? err.message : '';
       let message = t('errorEliminar');
       try {
-        const body = JSON.parse(err?.message ?? '{}');
+        const body = JSON.parse(errMessage || '{}');
         if (body?.code === 'EQUIPO_EN_PARTIDA') {
           setBloqueado(true);
           message = t('equipoEnPartida');

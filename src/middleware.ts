@@ -47,7 +47,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // RBAC: /admin requires admin role
-  if (pathname.startsWith('/admin') && (session.user as any).rol !== 'admin') {
+  if (pathname.startsWith('/admin') && session.user.rol !== 'admin') {
     return NextResponse.redirect(new URL('/?error=forbidden', request.url));
   }
 

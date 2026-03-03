@@ -48,7 +48,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
       return true;
     },
-    async session({ session, token }) {
+    async session({ session, token: _token }) {
       if (!session.user?.email) return session;
 
       // Enriquecer sesión con rol y equipo desde BD

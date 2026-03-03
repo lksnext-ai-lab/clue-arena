@@ -5,7 +5,6 @@ import { cn } from '@/lib/utils/cn';
 import {
   buildDeductionBoard,
   boardKey,
-  ALL_CARDS,
   SOSPECHOSOS,
   ARMAS,
   HABITACIONES,

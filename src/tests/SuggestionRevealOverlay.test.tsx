@@ -57,13 +57,12 @@ describe('SuggestionRevealOverlay', () => {
   it('muestra la sugerencia y la oculta tras 2 segundos', () => {
     const partida = makePartidaWithSuggestion();
 
-    let rerender: (ui: React.ReactNode) => void;
     act(() => {
-      ({ rerender } = render(
+      render(
         <GameProvider gameId="test">
           <SuggestionRevealOverlay partida={partida} />
         </GameProvider>
-      ));
+      );
     });
 
     // overlay debería estar visible inmediatamente
@@ -82,7 +81,7 @@ describe('SuggestionRevealOverlay', () => {
   // verify that GameContext delays activeEquipoId updates until the suggestion
   // overlay animation ends
   it('no avanza equipo activo hasta que termine la animación', () => {
-  const results: { ctx?: ReturnType<typeof useGame> } = {} as any;
+  const results: { ctx?: ReturnType<typeof useGame> } = {};
 
   function Consumer() {
     const ctx = useGame();
@@ -109,7 +108,7 @@ describe('SuggestionRevealOverlay', () => {
   });
 
   it('delay update when schedule happens before animation start (race)', () => {
-  const results: { ctx?: ReturnType<typeof useGame> } = {} as any;
+  const results: { ctx?: ReturnType<typeof useGame> } = {};
 
   function Consumer() {
     const ctx = useGame();
@@ -144,7 +143,7 @@ describe('SuggestionRevealOverlay', () => {
   it('applies update immediately when no animation in progress', () => {
   // ensure timers are mocked (extra safety beyond the describe-level beforeEach)
   vi.useFakeTimers();
-  const results: { ctx?: ReturnType<typeof useGame> } = {} as any;
+  const results: { ctx?: ReturnType<typeof useGame> } = {};
 
   function Consumer() {
     const ctx = useGame();

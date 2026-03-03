@@ -1,5 +1,5 @@
 // src/tests/GameEventEmitter.test.ts
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { EventEmitter } from 'events';
 
 // Import the singleton (fresh each test via module re-import trick)

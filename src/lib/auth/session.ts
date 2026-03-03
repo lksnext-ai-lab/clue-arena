@@ -46,11 +46,11 @@ export async function getAuthSession(): Promise<ServerSession | null> {
 
   return {
     user: {
-      id: (session.user as any).id ?? '',
+      id: session.user.id ?? '',
       name: session.user.name ?? '',
       email: session.user.email ?? '',
-      rol: (session.user as any).rol ?? null,
-      equipo: (session.user as any).equipo ?? null,
+      rol: session.user.rol ?? null,
+      equipo: session.user.equipo ?? null,
     },
   };
 }

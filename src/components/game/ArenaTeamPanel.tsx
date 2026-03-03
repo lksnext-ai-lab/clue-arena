@@ -1,6 +1,5 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { useGame } from '@/contexts/GameContext';
 import type { GameDetailResponse } from '@/types/api';
 import { ArenaTeamCard } from './ArenaTeamCard';

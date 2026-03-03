@@ -34,11 +34,12 @@ export default function TeamRegistrationPage() {
       });
       router.refresh(); // Sincroniza SessionContext con el nuevo equipo
       router.push('/equipo');
-    } catch (err: any) {
+    } catch (err: unknown) {
       // Manejar error de nombre duplicado (400 NOMBRE_DUPLICADO)
-      let message = err?.message ?? t('registroError');
+      const errMessage = err instanceof Error ? err.message : '';
+      let message = errMessage || t('registroError');
       try {
-        const body = JSON.parse(err?.message ?? '{}');
+        const body = JSON.parse(errMessage || '{}');
         if (body?.code === 'NOMBRE_DUPLICADO') {
           message = 'Ya existe un equipo con ese nombre.';
         } else if (body?.code === 'YA_TIENE_EQUIPO') {

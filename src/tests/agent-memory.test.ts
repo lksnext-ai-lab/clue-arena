@@ -2,7 +2,7 @@
  * Unit tests for agent memory persistence helpers.
  * Uses an in-memory SQLite test DB — no mocks needed for DB ops.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createTestDb } from './db';
 
 // We need to inject our test DB into the module under test.
@@ -24,6 +24,10 @@ describe('getAgentMemory / saveAgentMemory', () => {
     const testDb = createTestDb();
     testDbContainer.db = testDb.db;
     close = testDb.close;
+  });
+
+  afterEach(() => {
+    close?.();
   });
 
   it('returns empty object when no memory exists', async () => {

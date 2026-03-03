@@ -24,7 +24,6 @@ import {
   applyAction,
   isGameOver,
   getGameStateView,
-  calcEfficiencyBonus,
 } from '@/lib/game/engine';
 import type { GameState, GameAction } from '@/lib/game/types';
 import type { AgentResponse } from '@/types/api';
@@ -92,10 +91,6 @@ export interface TrainingLoopResult {
 
 function botId(index: number): string {
   return `bot-${index + 1}`;
-}
-
-function isBotId(id: string): boolean {
-  return /^bot-\d+$/.test(id);
 }
 
 // ---------------------------------------------------------------------------

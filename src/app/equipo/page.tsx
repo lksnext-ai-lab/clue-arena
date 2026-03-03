@@ -176,7 +176,7 @@ function LoadingState({ loadingText }: { loadingText: string }) {
   );
 }
 
-function NoTeamState({ userName, label, registerLabel }: { userName?: string; label: string; registerLabel: string }) {
+function NoTeamState({ userName: _userName, label, registerLabel }: { userName?: string; label: string; registerLabel: string }) {
   return (
     <div className="p-6 flex flex-col items-center justify-center" style={{ minHeight: 300 }}>
       <div className="text-center space-y-4">

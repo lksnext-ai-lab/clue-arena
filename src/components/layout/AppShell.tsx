@@ -9,7 +9,7 @@ interface AppShellProps {
 
 export async function AppShell({ children }: AppShellProps) {
   const session = await auth();
-  const rol = (session?.user as any)?.rol;
+  const rol = session?.user?.rol;
   const tNav = await getTranslations('nav');
   const tCommon = await getTranslations('common');
 

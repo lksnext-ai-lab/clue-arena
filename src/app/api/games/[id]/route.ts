@@ -31,7 +31,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     .all();
 
   const requestingEmail = session?.user?.email;
-  const requestingUser = requestingEmail ? { email: requestingEmail, rol: (session?.user as any)?.rol } : null;
+  const requestingUser = requestingEmail ? { email: requestingEmail, rol: session?.user?.rol } : null;
 
   const allTurnos = await db
     .select()
@@ -162,7 +162,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
         numCartas: cartasArray.length,
         ...(isAdmin
           ? { cartas: cartasArray }
-          : pe.equipoId === (session?.user as any)?.equipo?.id
+          : pe.equipoId === session?.user?.equipo?.id
             ? { cartas: cartasArray }
             : {}),
       };

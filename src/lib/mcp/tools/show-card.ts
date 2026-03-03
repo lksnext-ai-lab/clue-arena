@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { db } from '@/lib/db';
-import { sugerencias, partidaEquipos } from '@/lib/db/schema';
+import { sugerencias } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 
 export const showCardTool = {

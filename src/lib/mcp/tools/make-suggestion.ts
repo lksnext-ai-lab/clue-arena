@@ -5,8 +5,6 @@ import {
   partidaEquipos,
   turnos,
   sugerencias,
-  sobres,
-  equipos,
 } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
