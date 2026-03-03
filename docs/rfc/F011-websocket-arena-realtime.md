@@ -401,7 +401,19 @@ interface UseGameSocketOptions {
   enabled: boolean; // false cuando la partida está finalizada
 }
 
-const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? 'ws://localhost:3000/api/ws';
+// La URL se resuelve en tiempo de ejecución; `NEXT_PUBLIC_WS_URL`
+// puede sobrescribirla en build, pero si no existe se construye a partir
+// de `window.location` para evitar que el bundle quede con
+// `localhost:3000` incrustado.
+function getWsUrl() {
+  if (process.env.NEXT_PUBLIC_WS_URL) return process.env.NEXT_PUBLIC_WS_URL;
+  if (typeof window !== 'undefined') {
+    const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
+    return `${proto}://${window.location.host}/api/ws`;
+  }
+  return 'ws://localhost:3000/api/ws';
+}
+
 const RECONNECT_DELAY_MS = 2_000;
 const MAX_RECONNECT_ATTEMPTS = 10;
 
@@ -700,7 +712,7 @@ useInterval(fetchGame, wsHealthy ? null : 5_000); // Desactiva si WS está sano
 
 | Variable | Descripción | Default |
 |---|---|---|
-| `NEXT_PUBLIC_WS_URL` | URL del WebSocket desde el navegador | `ws://localhost:3000/api/ws` |
+| `NEXT_PUBLIC_WS_URL` | URL del WebSocket usada en el cliente; si no se define se construye dinámicamente a partir de `window.location` (fallback `ws://localhost:3000/api/ws` en dev) | — |
 | `WS_HEARTBEAT_INTERVAL_MS` | Intervalo de ping en ms (servidor) | `30000` |
 | `WS_MAX_CONNECTIONS_PER_SESSION` | Máx. conexiones simultáneas por sesión | `5` |
 | `DISABLE_AUTH` | Desactiva validación de sesión en WS (desarrollo) | `false` |

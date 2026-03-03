@@ -11,9 +11,23 @@ interface UseGameSocketOptions {
   enabled: boolean; // false cuando la partida está finalizada
 }
 
-const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? 'ws://localhost:3000/api/ws';
+// Build the websocket URL. Prefer explicit env var (build time),
+// otherwise construct it at runtime from the current host so that the
+// bundle doesn't hard‑code `localhost` in production. Last fallback is the
+// development address used by `npm run dev`.
+export function getWsUrl() {
+  if (process.env.NEXT_PUBLIC_WS_URL) return process.env.NEXT_PUBLIC_WS_URL;
+  if (typeof window !== 'undefined') {
+    const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
+    return `${proto}://${window.location.host}/api/ws`;
+  }
+  // server-side (e.g. during build) or very early: return dev default
+  return 'ws://localhost:3000/api/ws';
+}
+
 const RECONNECT_DELAY_MS = 2_000;
 const MAX_RECONNECT_ATTEMPTS = 10;
+
 
 export function useGameSocket({ gameId, onMessage, onDisconnect, enabled }: UseGameSocketOptions) {
   const wsRef = useRef<WebSocket | null>(null);
@@ -31,7 +45,7 @@ export function useGameSocket({ gameId, onMessage, onDisconnect, enabled }: UseG
     if (!enabledRef.current) return;
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
 
-    const ws = new WebSocket(WS_URL);
+    const ws = new WebSocket(getWsUrl());
     wsRef.current = ws;
 
     ws.onopen = () => {
