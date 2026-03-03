@@ -11,6 +11,7 @@ import { gameRunner } from '@/lib/game/runner';
 import { db } from '@/lib/db';
 import { partidas } from '@/lib/db/schema';
 import { isNotNull, eq } from 'drizzle-orm';
+import { seedDevUsers } from '@/lib/db/seed';
 
 const dev = process.env.NODE_ENV !== 'production';
 const app = next({ dev });
@@ -48,6 +49,11 @@ async function recoverStaleAutoRun() {
 }
 
 app.prepare().then(async () => {
+  // En dev mode, asegurar que los usuarios ficticios existen en la BD
+  if (process.env.DISABLE_AUTH === 'true' && process.env.NODE_ENV !== 'production') {
+    await seedDevUsers();
+  }
+
   await recoverStaleAutoRun();
 
   const httpServer = createServer((req, res) => {

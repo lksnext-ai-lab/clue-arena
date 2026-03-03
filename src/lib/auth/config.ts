@@ -37,13 +37,20 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         .get();
 
       if (!existing) {
-        await db.insert(usuarios).values({
-          id: uuidv4(),
-          email: user.email,
-          nombre: user.name ?? user.email,
-          rol: 'equipo',
-          createdAt: new Date(),
-        });
+        const bootstrapEmail = process.env.BOOTSTRAP_ADMIN_EMAIL?.toLowerCase().trim();
+        const isBootstrapAdmin =
+          Boolean(bootstrapEmail) && user.email.toLowerCase() === bootstrapEmail;
+
+        await db
+          .insert(usuarios)
+          .values({
+            id: uuidv4(),
+            email: user.email,
+            nombre: user.name ?? user.email,
+            rol: isBootstrapAdmin ? 'admin' : 'espectador',
+            createdAt: new Date(),
+          })
+          .onConflictDoNothing();
       }
 
       return true;
