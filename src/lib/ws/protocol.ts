@@ -85,16 +85,84 @@ export const ServerMessageSchema = z.discriminatedUnion('type', [
   }),
   // Heartbeat para mantener la conexión
   z.object({ type: z.literal('ping'), ts: z.number() }),
-  // Confirmación de suscripción
+  // Confirmación de suscripción de partida
   z.object({ type: z.literal('subscribed'), gameId: z.string() }),
+  // Confirmación de suscripción de notificaciones
+  z.object({
+    type: z.literal('subscribed:notifications'),
+    scope: z.union([z.literal('global'), z.object({ team: z.string() })]),
+  }),
+  // ── Notificaciones globales (partidas oficiales) ──────────────────────────
+  z.object({ type: z.literal('notification:game_scheduled'), gameId: z.string(), nombre: z.string(), ts: z.number() }),
+  z.object({ type: z.literal('notification:game_started'),   gameId: z.string(), nombre: z.string(), ts: z.number() }),
+  z.object({
+    type: z.literal('notification:game_finished'),
+    gameId: z.string(),
+    nombre: z.string(),
+    ganadorId: z.string().nullable(),
+    ganadorNombre: z.string().nullable(),
+    ts: z.number(),
+  }),
+  z.object({ type: z.literal('notification:ranking_updated'), ts: z.number() }),
+  // ── Notificaciones de equipo (partidas de entrenamiento) ──────────────────
+  z.object({ type: z.literal('notification:training_started'),  trainingGameId: z.string(), equipoId: z.string(), numBots: z.number(), ts: z.number() }),
+  z.object({
+    type: z.literal('notification:training_finished'),
+    trainingGameId: z.string(),
+    equipoId: z.string(),
+    estado: z.enum(['finalizada', 'abortada']),
+    ganadorId: z.string().nullable(),
+    numTurnos: z.number(),
+    puntosSimulados: z.number(),
+    motivoAbort: z.string().optional(),
+    ts: z.number(),
+  }),
+  z.object({ type: z.literal('notification:training_error'), trainingGameId: z.string(), equipoId: z.string(), message: z.string(), ts: z.number() }),
   // Error
   z.object({ type: z.literal('error'), code: z.string(), message: z.string() }),
+  // ── G005: Tournament events ────────────────────────────────────────────────
+  z.object({
+    type:         z.literal('tournament:round_started'),
+    tournamentId: z.string(),
+    roundId:      z.string(),
+    roundNumber:  z.number(),
+    phase:        z.string(),
+    ts:           z.number(),
+  }),
+  z.object({
+    type:         z.literal('tournament:round_finished'),
+    tournamentId: z.string(),
+    roundId:      z.string(),
+    standings:    z.array(z.unknown()),
+    ts:           z.number(),
+  }),
+  z.object({
+    type:         z.literal('tournament:team_eliminated'),
+    tournamentId: z.string(),
+    teamId:       z.string(),
+    roundId:      z.string(),
+    ts:           z.number(),
+  }),
+  z.object({
+    type:           z.literal('tournament:finished'),
+    tournamentId:   z.string(),
+    winnerId:       z.string().nullable(),
+    finalStandings: z.array(z.unknown()),
+    ts:             z.number(),
+  }),
 ]);
 
 /** Mensajes client → server */
 export const ClientMessageSchema = z.discriminatedUnion('type', [
   // El cliente se suscribe a una partida
   z.object({ type: z.literal('subscribe'), gameId: z.string() }),
+  // El cliente se suscribe a notificaciones de ciclo de vida
+  z.object({
+    type: z.literal('subscribe:notifications'),
+    scope: z.union([z.literal('global'), z.object({ team: z.string() })]),
+  }),
+  // El cliente cancela su suscripción a notificaciones
+  z.object({ type: z.literal('unsubscribe:notifications') }),
   // El cliente responde al heartbeat
   z.object({ type: z.literal('pong') }),
 ]);

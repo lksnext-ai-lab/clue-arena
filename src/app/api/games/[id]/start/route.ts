@@ -18,6 +18,7 @@ import { eq } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 import { gameRunner } from '@/lib/game/runner';
 import { gameEventEmitter } from '@/lib/ws/GameEventEmitter';
+import { notificationEmitter } from '@/lib/ws/NotificationEmitter';
 
 const StartBodySchema = z.object({
   modo: z.enum(['auto', 'manual']).optional().default('manual'),
@@ -98,6 +99,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     type: 'status_changed',
     gameId: id,
     payload: { nuevoEstado: 'en_curso' },
+  });
+
+  // F018: push global notification to all users
+  notificationEmitter.emitGlobal({
+    type: 'notification:game_started',
+    gameId: id,
+    nombre: partida.nombre,
+    ts: Date.now(),
   });
 
   // Si es modo auto, delegar al GameRunner (proceso servidor, fuera del ciclo HTTP)

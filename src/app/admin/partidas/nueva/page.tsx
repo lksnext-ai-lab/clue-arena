@@ -76,25 +76,23 @@ export default function NuevaPartidaPage() {
   );
 
   return (
-    <div className="p-6 max-w-2xl mx-auto space-y-6" style={{ color: '#f1f5f9' }}>
+    <div className="p-6 max-w-2xl mx-auto space-y-6 text-slate-200">
       <div className="flex items-center gap-4">
         <button
           type="button"
-          onClick={() => router.push('/admin')}
-          className="text-sm"
-          style={{ color: '#64748b' }}
+          onClick={() => router.push('/admin/partidas')}
+          className="text-sm text-slate-500 hover:text-slate-300"
         >
-          ← Panel admin
+          ← Volver a partidas
         </button>
-        <h1 className="text-2xl font-bold" style={{ color: '#f59e0b' }}>
+        <h1 className="text-2xl font-bold text-cyan-400">
           Nueva Partida
         </h1>
       </div>
 
       {serverError && (
         <div
-          className="px-4 py-3 rounded-md text-sm"
-          style={{ background: '#7f1d1d', color: '#fca5a5' }}
+          className="px-4 py-3 rounded-md text-sm bg-red-900/40 text-red-300 border border-red-500/30"
         >
           {serverError}
         </div>
@@ -106,13 +104,12 @@ export default function NuevaPartidaPage() {
           <label className="block text-sm font-medium mb-1">Nombre de la partida</label>
           <input
             {...register('nombre')}
-            className="w-full px-3 py-2 rounded-md text-sm"
-            style={{ background: '#1a1a2e', color: '#f1f5f9', border: '1px solid #334155' }}
+            className="w-full px-3 py-2 rounded-md text-sm bg-slate-800 text-slate-200 border border-slate-700 focus:ring-2 focus:ring-cyan-500 outline-none"
             placeholder="Ej: Ronda 1"
             autoFocus
           />
           {errors.nombre && (
-            <p className="text-xs mt-1" style={{ color: '#ef4444' }}>
+            <p className="text-xs mt-1 text-red-400">
               {errors.nombre.message}
             </p>
           )}
@@ -122,7 +119,7 @@ export default function NuevaPartidaPage() {
         <div>
           <label className="block text-sm font-medium mb-1">
             Máximo de turnos{' '}
-            <span className="text-xs font-normal" style={{ color: '#64748b' }}>(opcional — deja vacío para sin límite)</span>
+            <span className="text-xs font-normal text-slate-500">(opcional — deja vacío para sin límite)</span>
           </label>
           <input
             type="number"
@@ -130,16 +127,15 @@ export default function NuevaPartidaPage() {
             {...register('maxTurnos', {
               setValueAs: (v: string) => (v === '' || v === undefined ? null : parseInt(v, 10)),
             })}
-            className="w-full px-3 py-2 rounded-md text-sm"
-            style={{ background: '#1a1a2e', color: '#f1f5f9', border: '1px solid #334155' }}
+            className="w-full px-3 py-2 rounded-md text-sm bg-slate-800 text-slate-200 border border-slate-700 focus:ring-2 focus:ring-cyan-500 outline-none"
             placeholder="Sin límite"
           />
           {errors.maxTurnos && (
-            <p className="text-xs mt-1" style={{ color: '#ef4444' }}>
+            <p className="text-xs mt-1 text-red-400">
               {errors.maxTurnos.message}
             </p>
           )}
-          <p className="text-xs mt-1" style={{ color: '#475569' }}>
+          <p className="text-xs mt-1 text-slate-600">
             Si se alcanza este número de turnos, la partida finaliza automáticamente y se penaliza a cada equipo con −3 puntos.
           </p>
         </div>
@@ -151,10 +147,7 @@ export default function NuevaPartidaPage() {
               Equipos participantes
             </label>
             <span
-              className="text-xs"
-              style={{
-                color: selectedTeams.length >= 2 ? '#22c55e' : '#64748b',
-              }}
+              className={`text-xs ${selectedTeams.length >= 2 ? 'text-emerald-400' : 'text-slate-500'}`}
             >
               {selectedTeams.length} / 6 seleccionados
             </span>
@@ -166,22 +159,19 @@ export default function NuevaPartidaPage() {
               {Array.from({ length: 4 }).map((_, i) => (
                 <div
                   key={i}
-                  className="h-10 rounded-md animate-pulse"
-                  style={{ background: '#1e293b' }}
+                  className="h-10 rounded-md animate-pulse bg-slate-800"
                 />
               ))}
             </div>
           ) : teams.length === 0 ? (
             <div
-              className="rounded-md px-4 py-6 text-center text-sm"
-              style={{ background: '#1a1a2e', color: '#64748b' }}
+              className="rounded-md px-4 py-6 text-center text-sm bg-slate-800 text-slate-500"
             >
               No hay equipos registrados.{' '}
               <button
                 type="button"
-                className="underline"
-                style={{ color: '#f59e0b' }}
-                onClick={() => router.push('/admin')}
+                className="underline text-cyan-400"
+                onClick={() => router.push('/admin/equipos')}
               >
                 Crear un equipo
               </button>
@@ -199,21 +189,19 @@ export default function NuevaPartidaPage() {
                     type="button"
                     onClick={() => toggleTeam(team.id)}
                     disabled={disabledByMax}
-                    className="px-3 py-2 rounded-md text-sm text-left transition-colors disabled:opacity-40"
-                    style={{
-                      background: selected ? '#f59e0b22' : '#1a1a2e',
-                      border: `1px solid ${
-                        selected ? '#f59e0b' : noAgent ? '#78350f55' : '#334155'
-                      }`,
-                      color: selected ? '#f59e0b' : '#f1f5f9',
-                    }}
+                    className={`px-3 py-2 rounded-md text-sm text-left transition-colors disabled:opacity-40 ${
+                      selected
+                        ? 'bg-cyan-500/20 border-cyan-500 text-cyan-300'
+                        : noAgent
+                        ? 'bg-slate-800 border-amber-800 text-slate-300'
+                        : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
+                    } border`}
                   >
                     <span className="flex items-center justify-between gap-2">
                       <span className="truncate">{team.nombre}</span>
                       {noAgent && (
                         <span
-                          className="shrink-0 text-xs px-1.5 py-0.5 rounded"
-                          style={{ background: '#78350f', color: '#fbbf24' }}
+                          className="shrink-0 text-xs px-1.5 py-0.5 rounded bg-amber-800 text-amber-300"
                         >
                           Sin agente
                         </span>
@@ -227,14 +215,14 @@ export default function NuevaPartidaPage() {
 
           {/* Advisory: teams selected without agent */}
           {teamsWithoutAgent.length > 0 && (
-            <p className="text-xs mt-2" style={{ color: '#fbbf24' }}>
+            <p className="text-xs mt-2 text-amber-400">
               ⚠️ {teamsWithoutAgent.length} equipo(s) seleccionado(s) sin agente configurado. La partida se puede crear, pero los turnos de esos equipos fallarán.
             </p>
           )}
 
           {/* Validation hint */}
           {selectedTeams.length < 2 && !loadingTeams && teams.length > 0 && (
-            <p className="text-xs mt-2" style={{ color: '#64748b' }}>
+            <p className="text-xs mt-2 text-slate-500">
               Mínimo 2 equipos necesarios para iniciar.
             </p>
           )}
@@ -245,16 +233,14 @@ export default function NuevaPartidaPage() {
           <button
             type="submit"
             disabled={!canSubmit}
-            className="px-6 py-2 rounded-md font-semibold text-sm disabled:opacity-40 transition-opacity"
-            style={{ background: '#f59e0b', color: '#0a0a0f' }}
+            className="px-6 py-2 rounded-md font-semibold text-sm disabled:opacity-40 transition-opacity bg-cyan-500 text-slate-900 hover:bg-cyan-400"
           >
             {isSubmitting ? 'Creando...' : 'Crear partida'}
           </button>
           <button
             type="button"
-            onClick={() => router.push('/admin')}
-            className="px-6 py-2 rounded-md text-sm"
-            style={{ background: '#334155', color: '#f1f5f9' }}
+            onClick={() => router.push('/admin/partidas')}
+            className="px-6 py-2 rounded-md text-sm bg-slate-700 text-slate-300 hover:bg-slate-600"
           >
             Cancelar
           </button>

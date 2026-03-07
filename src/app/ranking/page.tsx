@@ -1,11 +1,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
 import { useInterval } from '@/lib/utils/useInterval';
 import { apiFetch } from '@/lib/api/client';
 import { formatPosicion } from '@/lib/utils/formatting';
 import { useTranslations, useFormatter } from 'next-intl';
-import type { RankingResponse } from '@/types/api';
+import type { RankingResponse, RankingEntry } from '@/types/api';
+
+const MEDAL_ICONS: Record<number, string> = { 1: '🥇', 2: '🥈', 3: '🥉' };
 
 /**
  * UI-004 — Ranking del evento
@@ -30,71 +33,107 @@ export default function RankingPage() {
     }
   };
 
-  useEffect(() => { fetchRanking(); }, []);
+  useEffect(() => {
+    void fetchRanking();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   useInterval(fetchRanking, 30_000);
 
   return (
-    <div className="p-6 max-w-2xl mx-auto" style={{ color: '#f1f5f9' }}>
-      <header className="mb-8 text-center">
-        <h1 className="text-4xl font-bold" style={{ color: '#f59e0b', fontFamily: 'Georgia, serif' }}>
-          Clue Arena
-        </h1>
-          <p className="text-lg mt-1" style={{ color: '#94a3b8' }}>{t('titulo')}</p>
-      </header>
+    <div className="p-4 sm:p-6 max-w-4xl mx-auto">
+      <h1 className="text-2xl font-bold text-white mb-6">{t('titulo')}</h1>
 
       {isLoading && (
-        <p className="text-center" style={{ color: '#64748b' }}>{t('cargando')}</p>
+        <div className="flex items-center justify-center py-16">
+          <div className="w-8 h-8 rounded-full border-2 border-slate-600 border-t-cyan-400 animate-spin" />
+        </div>
       )}
 
       {error && (
-        <div className="px-4 py-3 rounded-md text-sm mb-4" style={{ background: '#7f1d1d', color: '#fca5a5' }}>
+        <div className="px-4 py-3 rounded-md text-sm mb-4 bg-red-900/40 text-red-300 border border-red-500/30">
           {error}
         </div>
       )}
 
       {ranking && (
-        <div className="rounded-xl overflow-hidden" style={{ background: '#1a1a2e' }}>
+        <div className="rounded-xl overflow-hidden border border-slate-700 bg-slate-800">
           <table className="w-full text-sm">
-            <thead>
-              <tr style={{ borderBottom: '1px solid #334155' }}>
-                <th className="px-4 py-3 text-left" style={{ color: '#64748b' }}>{t('posicion')}</th>
-                <th className="px-4 py-3 text-left" style={{ color: '#64748b' }}>{t('equipo')}</th>
-                <th className="px-4 py-3 text-right" style={{ color: '#64748b' }}>{t('puntos')}</th>
-                <th className="px-4 py-3 text-right" style={{ color: '#64748b' }}>{t('partidas')}</th>
-                <th className="px-4 py-3 text-right" style={{ color: '#64748b' }}>{t('aciertos')}</th>
+            <thead className="bg-slate-900/50">
+              <tr>
+                <th className="px-4 py-3 text-center font-medium text-slate-400 w-16">
+                  {t('posicion')}
+                </th>
+                <th className="px-4 py-3 text-left font-medium text-slate-400">
+                  {t('equipo')}
+                </th>
+                <th className="px-4 py-3 text-right font-medium text-slate-400">
+                  {t('puntos')}
+                </th>
+                <th className="px-4 py-3 text-right font-medium text-slate-400 hidden sm:table-cell">
+                  {t('partidas')}
+                </th>
+                <th className="px-4 py-3 text-right font-medium text-slate-400 hidden sm:table-cell">
+                  {t('aciertos')}
+                </th>
               </tr>
             </thead>
-            <tbody>
-              {ranking.ranking.map((entry, idx) => (
-                <tr
-                  key={entry.equipoId}
-                  style={{
-                    borderBottom: '1px solid #1e293b',
-                    background: idx === 0 ? 'rgba(245, 158, 11, 0.08)' : undefined,
-                  }}
-                >
-                  <td className="px-4 py-3 font-bold" style={{ color: idx === 0 ? '#f59e0b' : '#64748b' }}>
-                    {formatPosicion(entry.posicion)}
-                  </td>
-                  <td className="px-4 py-3 font-medium">{entry.equipoNombre}</td>
-                  <td className="px-4 py-3 text-right font-mono" style={{ color: '#f59e0b' }}>
-                    {format.number(entry.puntos, { maximumFractionDigits: 0 })}
-                  </td>
-                  <td className="px-4 py-3 text-right" style={{ color: '#94a3b8' }}>
-                    {entry.partidasJugadas}
-                  </td>
-                  <td className="px-4 py-3 text-right" style={{ color: '#94a3b8' }}>
-                    {entry.aciertos}
-                  </td>
-                </tr>
-              ))}
+            <tbody className="divide-y divide-slate-700/70">
+              {ranking.ranking.map((entry, idx) => {
+                const medal = MEDAL_ICONS[entry.posicion];
+                return (
+                  <tr
+                    key={entry.equipoId}
+                    className={
+                      idx === 0
+                        ? 'bg-cyan-500/5'
+                        : 'hover:bg-slate-700/30 transition-colors'
+                    }
+                  >
+                    <td
+                      className={`px-4 py-3 font-bold text-center ${
+                        idx === 0
+                          ? 'text-cyan-400'
+                          : idx < 3
+                            ? 'text-slate-300'
+                            : 'text-slate-500'
+                      }`}
+                    >
+                      {medal ?? formatPosicion(entry.posicion)}
+                    </td>
+                    <td className="px-4 py-3 font-medium text-slate-200 flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-md bg-slate-700 flex-shrink-0 overflow-hidden">
+                        {entry.avatarUrl && (
+                          <Image
+                            src={entry.avatarUrl}
+                            alt={`Avatar de ${entry.equipoNombre}`}
+                            width={32}
+                            height={32}
+                            className="object-cover w-full h-full"
+                            unoptimized
+                          />
+                        )}
+                      </div>
+                      <span className="truncate">{entry.equipoNombre}</span>
+                    </td>
+                    <td className="px-4 py-3 text-right font-mono font-bold text-cyan-300">
+                      {format.number(entry.puntos, { maximumFractionDigits: 0 })}
+                    </td>
+                    <td className="px-4 py-3 text-right font-mono text-slate-400 hidden sm:table-cell">
+                      {entry.partidasJugadas}
+                    </td>
+                    <td className="px-4 py-3 text-right font-mono text-slate-400 hidden sm:table-cell">
+                      {entry.aciertos}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
       )}
 
       {ranking && (
-        <p className="text-xs text-center mt-4" style={{ color: '#475569' }}>
+        <p className="text-xs text-center mt-4 text-slate-600">
           {t('actualizacion')}
         </p>
       )}

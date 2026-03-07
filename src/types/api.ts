@@ -37,6 +37,15 @@ export interface UpdateTeamRequest {
   avatarUrl?: string | null;
   estado?: TeamStatus;
   miembros?: string[];
+  usuarioId?: string;
+}
+
+// --- Users (admin) ---
+export interface UserResponse {
+  id: string;
+  nombre: string;
+  email: string;
+  rol: string;
 }
 
 // --- Games ---
@@ -308,6 +317,16 @@ export interface TrainingResultado {
   turnosJugados: number;
 }
 
+/** Outcome of the refutation sub-flow attached to a suggestion turn. */
+export interface RefutacionRecord {
+  /** ID of the team (or bot) that refuted. null = no one refuted. */
+  refutadaPor:    string | null;
+  /** Card shown during refutation. null = no card (cannot_refute or no refutador). */
+  cartaMostrada:  string | null;
+  /** Reasoning text — populated for bot refutations and real-team refutations. */
+  razonamiento?:  string;
+}
+
 export interface TrainingTurnResponse {
   id:             string;
   partidaId:      string;
@@ -319,6 +338,8 @@ export interface TrainingTurnResponse {
   agentTrace:     AgentInteractionTrace | null;  // null for bot turns
   memoriaInicial: Record<string, unknown> | null;
   memoriaFinal:   Record<string, unknown> | null;
+  /** Refutation outcome for suggestion turns; null for all other turn types. */
+  refutacion:     RefutacionRecord | null;
   durationMs:     number | null;
   createdAt:      string;
 }
@@ -326,4 +347,109 @@ export interface TrainingTurnResponse {
 export interface CreateTrainingGameBody {
   numBots: number;
   seed?:   string;
+}
+
+// ── G005: Tournament API types ────────────────────────────────────────────────
+
+import type { TournamentFormat, TournamentStatus, TournamentRoundPhase, TournamentRoundStatus } from './domain';
+import type { TournamentConfig } from '@/lib/schemas/tournament-config';
+
+export type { TournamentConfig };
+
+export interface TournamentResponse {
+  id:         string;
+  name:       string;
+  format:     TournamentFormat;
+  status:     TournamentStatus;
+  config:     TournamentConfig;
+  createdAt:  string;
+  startedAt:  string | null;
+  finishedAt: string | null;
+}
+
+export interface TournamentTeamResponse {
+  id:           string;
+  tournamentId: string;
+  teamId:       string;
+  teamName:     string;
+  avatarUrl:    string | null;
+  seed:         number | null;
+  groupIndex:   number | null;
+  eliminated:   boolean;
+}
+
+export interface TournamentRoundGameResponse {
+  id:     string;
+  gameId: string | null;  // null when isBye = true
+  isBye:  boolean;
+  teamIds: string[];       // teams assigned to this game slot
+}
+
+export interface TournamentRoundResponse {
+  id:          string;
+  tournamentId: string;
+  roundNumber: number;
+  phase:       TournamentRoundPhase;
+  status:      TournamentRoundStatus;
+  generatedAt: string | null;
+  finishedAt:  string | null;
+  games:       TournamentRoundGameResponse[];
+}
+
+export interface TournamentStandingEntry {
+  rank:               number;
+  teamId:             string;
+  teamName:           string;
+  avatarUrl:          string | null;
+  groupIndex:         number | null;
+  totalScore:         number;
+  gamesPlayed:        number;
+  wins:               number;
+  eliminations:       number;
+  isEliminated:       boolean;
+  advancedToPlayoffs: boolean;
+  roundScores:        { roundNumber: number; score: number; gameId: string | null }[];
+}
+
+export interface TournamentStandingsResponse {
+  tournamentId:   string;
+  tournamentName: string;
+  format:         TournamentFormat;
+  status:         TournamentStatus;
+  currentRound:   number | null;
+  standings:      TournamentStandingEntry[];
+}
+
+export interface TournamentDetailResponse extends TournamentResponse {
+  teams:  TournamentTeamResponse[];
+  rounds: TournamentRoundResponse[];
+}
+
+// ── Round detail (from GET /api/tournaments/:id/rounds/:roundId) ──────────────
+
+export interface TournamentRoundTeamScore {
+  teamId:    string;
+  teamName:  string;
+  avatarUrl: string | null;
+  puntos:    number;
+  eliminado: boolean;
+}
+
+export interface TournamentRoundGameDetail {
+  id:     string;
+  gameId: string | null;
+  isBye:  boolean;
+  estado: GameStatus | null;
+  teams:  TournamentRoundTeamScore[];
+}
+
+export interface TournamentRoundDetailResponse {
+  id:           string;
+  tournamentId: string;
+  roundNumber:  number;
+  phase:        TournamentRoundPhase;
+  status:       TournamentRoundStatus;
+  generatedAt:  string | null;
+  finishedAt:   string | null;
+  games:        TournamentRoundGameDetail[];
 }

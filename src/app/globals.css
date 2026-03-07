@@ -30,6 +30,29 @@ body {
   line-height: 1;
 }
 
+/* ── Scrollbar utilities ─────────────────────────────────────────────────── */
+
+/* Thin dark scrollbar for code/text blocks inside panels */
+.scrollbar-code {
+  scrollbar-width: thin;
+  scrollbar-color: #475569 #0f172a; /* slate-600 on slate-900 */
+}
+.scrollbar-code::-webkit-scrollbar { width: 6px; height: 6px; }
+.scrollbar-code::-webkit-scrollbar-track { background: #0f172a; border-radius: 9999px; }
+.scrollbar-code::-webkit-scrollbar-thumb { background: #475569; border-radius: 9999px; }
+.scrollbar-code::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+.scrollbar-code::-webkit-scrollbar-corner { background: transparent; }
+
+/* Thin indigo scrollbar for tall panel containers */
+.scrollbar-panel {
+  scrollbar-width: thin;
+  scrollbar-color: #4f46e5 #1e293b; /* indigo-600 on slate-800 */
+}
+.scrollbar-panel::-webkit-scrollbar { width: 5px; }
+.scrollbar-panel::-webkit-scrollbar-track { background: #1e293b; border-radius: 9999px; }
+.scrollbar-panel::-webkit-scrollbar-thumb { background: #4f46e5; border-radius: 9999px; }
+.scrollbar-panel::-webkit-scrollbar-thumb:hover { background: #818cf8; }
+
 /* Dashboard dark theme variables (forced dark mode) */
 .dark {
   --background: #0f172a; /* slate-900 */

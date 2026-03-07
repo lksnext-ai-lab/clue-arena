@@ -51,7 +51,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       isLoading: false,
       logout: () => {
         document.cookie = `${DEV_COOKIE}=; path=/; max-age=0`;
-        window.location.href = '/login';
+        window.location.href = '/';
       },
     };
   } else {
@@ -66,7 +66,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       rol: session?.user?.rol ?? null,
       equipo: session?.user?.equipo ?? null,
       isLoading: status === 'loading',
-      logout: () => signOut({ callbackUrl: '/login' }),
+      logout: () => signOut({ callbackUrl: '/' }),
     };
   }
 

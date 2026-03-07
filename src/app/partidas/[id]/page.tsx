@@ -1,7 +1,4 @@
 import { redirect } from 'next/navigation';
-import { isAuthDisabled, DEV_COOKIE, DEV_USERS } from '@/lib/auth/dev';
-import { cookies } from 'next/headers';
-import { auth } from '@/lib/auth/config';
 import { db } from '@/lib/db';
 import {
   partidas,
@@ -27,14 +24,9 @@ export default async function ArenaPage({
 }) {
   const { id: gameId } = await params;
 
-  if (isAuthDisabled()) {
-    const cookieStore = await cookies();
-    const devRole = cookieStore.get(DEV_COOKIE)?.value as keyof typeof DEV_USERS | undefined;
-    if (!devRole || !DEV_USERS[devRole]) redirect('/login');
-  } else {
-    const session = await auth();
-    if (!session?.user) redirect('/login');
-  }
+  // The auth check has been removed to make this page public.
+  // The underlying API endpoint /api/games/[id] handles data censoring
+  // for unauthenticated users.
 
   const initialData = await loadArenaData(gameId);
   if (!initialData) redirect('/ranking');

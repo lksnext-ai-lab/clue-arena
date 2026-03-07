@@ -1,0 +1,1 @@
+ALTER TABLE `turnos_entrenamiento` ADD `refutacion_json` text;

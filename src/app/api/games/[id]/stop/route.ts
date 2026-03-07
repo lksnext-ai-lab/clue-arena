@@ -18,6 +18,7 @@ import { partidas, turnos, sobres } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { gameRunner } from '@/lib/game/runner';
 import { gameEventEmitter } from '@/lib/ws/GameEventEmitter';
+import { notificationEmitter } from '@/lib/ws/NotificationEmitter';
 
 // POST /api/games/:id/stop
 export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -87,6 +88,17 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     gameId: id,
     payload: { nuevoEstado: 'finalizada' },
   });
+
+  // F018: notify all users that the game ended and ranking may have changed
+  notificationEmitter.emitGlobal({
+    type: 'notification:game_finished',
+    gameId: id,
+    nombre: partida.nombre,
+    ganadorId: null,        // admin-stopped games have no winner
+    ganadorNombre: null,
+    ts: Date.now(),
+  });
+  notificationEmitter.emitGlobal({ type: 'notification:ranking_updated', ts: Date.now() });
 
   const sobre = await db.select().from(sobres).where(eq(sobres.partidaId, id)).get();
 

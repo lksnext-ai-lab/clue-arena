@@ -261,7 +261,7 @@ Seguir este orden al desarrollar cualquier funcionalidad nueva:
 
 ---
 
-## Comprobaciones antes de hacer commit
+## Comprobaciones al finalizar cambios
 
 ```bash
 # 1. Sin errores de tipos

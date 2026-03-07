@@ -72,6 +72,7 @@ async function setupGame(
     teams?: string[];
     envelop?: { sospechoso: string; arma: string; habitacion: string };
     teamCards?: Record<string, string[]>;
+    maxTurnos?: number | null;
   } = {},
 ) {
   const gameId = uuidv4();
@@ -106,6 +107,7 @@ async function setupGame(
     nombre: 'Test Game',
     estado: 'en_curso',
     turnoActual: 0,
+    maxTurnos: opts.maxTurnos ?? null,
     modoEjecucion: 'manual',
     turnoDelayMs: 0,
     autoRunActivoDesde: null,
@@ -412,6 +414,9 @@ describe('get_game_state MCP tool', () => {
     const text = result.content[0].text;
     const view = JSON.parse(text);
 
+    // default maxTurnos was not set
+    expect(view.maxTurnos).toBeNull();
+
     const ownTeam = view.equipos.find((e: { equipoId: string }) => e.equipoId === 'team-a');
     const otherTeam = view.equipos.find((e: { equipoId: string }) => e.equipoId === 'team-b');
 
@@ -425,6 +430,13 @@ describe('get_game_state MCP tool', () => {
     await expect(
       getGameStateTool.handler({ game_id: gameId, team_id: 'outsider' }),
     ).rejects.toThrow();
+  });
+
+  it('propagates a non-null maxTurnos value', async () => {
+    const { gameId } = await setupGame(testDb.db, { maxTurnos: 10 });
+    const res = await getGameStateTool.handler({ game_id: gameId, team_id: 'team-a' });
+    const view = JSON.parse(res.content[0].text);
+    expect(view.maxTurnos).toBe(10);
   });
 });
 

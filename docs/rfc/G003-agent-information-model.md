@@ -611,7 +611,7 @@ También revisar que `sugerencias` incluye el campo `refutadaPor` (equipoId que 
 | Paso | Tarea | Archivo | Prioridad |
 |---|---|---|---|
 | 1 | Verificar schema: `sugerencias.refutadaPor`, `sugerencias.partidaId`, `pases.partidaId` | `src/lib/db/schema.ts` | 🔴 Bloqueante |
-| 2 | Añadir `numCartas` y `turnosJugados` a `EquipoStateView` | `src/lib/game/types.ts` | 🟡 |
+| 2 | Añadir `numCartas` y `turnosJugados` a `EquipoStateView` y `maxTurnos` al `GameStateView` | `src/lib/game/types.ts` | 🟡 |
 | 3 | Actualizar `getGameStateView()` | `src/lib/game/engine.ts` | 🟡 |
 | 4 | Añadir `cartaMostradaPorMi` a `ActionRecordView` | `src/lib/game/types.ts` | 🟢 |
 | 5 | Actualizar lógica de `cartaMostradaPorMi` en `getGameStateView()` | `src/lib/game/engine.ts` | 🟢 |
@@ -627,6 +627,7 @@ También revisar que `sugerencias` incluye el campo `refutadaPor` (equipoId que 
 - [ ] **CA-01**: El agente recibe en `historial` todos los turnos completados de la partida, incluyendo las triplas de sugerencias, quién refutó y si las acusaciones fueron correctas.
 - [ ] **CA-02**: `cartaMostrada` en una sugerencia es visible únicamente en los registros donde `equipoId === requestingTeamId`.
 - [ ] **CA-03**: Los equipos ajenos tienen `cartas: []` pero `numCartas` refleja su recuento real.
+- [ ] **CA-03b**: El `GameStateView` incluye el campo `maxTurnos` copiado del estado para que los agentes conozcan el límite de rondas.
 - [ ] **CA-04**: `turnosJugados` de cada equipo es correcto (verificable comparando con el número de registros en `turnos` completados por equipo).
 - [ ] **CA-05**: El sobre secreto nunca aparece en la `GameStateView` (campo vacío o ausente).
 - [ ] **CA-06**: Los tests unitarios de `game-engine.test.ts` cubren `getGameStateView()` con historial poblado.
@@ -672,6 +673,7 @@ Los puntos (`puntos`) son una adición de Clue Arena, no parte del Cluedo real. 
   "gameId": "game-abc123",
   "estado": "en_curso",
   "turnoActual": 2,
+  "maxTurnos": 50,
   "equipos": [
     {
       "equipoId": "equipo-X",

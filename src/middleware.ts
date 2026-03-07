@@ -1,53 +1,58 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-// Use edge-compatible auth config (no Node.js DB imports)
 import { auth } from '@/lib/auth/edge-config';
-import { DEV_COOKIE, DEV_USERS } from '@/lib/auth/dev';
+import { isAuthDisabled, DEV_COOKIE, DEV_USERS } from '@/lib/auth/dev';
 
-// Public paths that bypass authentication
-const PUBLIC_PATHS = ['/login', '/auth', '/ranking', '/api/ranking', '/partidas'];
-// Protected paths that require authentication
-// (middleware already blocks everything not in PUBLIC_PATHS, but we keep this explicit)
+const PUBLIC_PATHS = [
+  '/',
+  '/acerca-del-juego',
+  '/instrucciones',
+  '/ranking',
+  '/partidas', // covers /partidas/[id] by startsWith
+  '/login',
+  '/auth',
+  '/api/ranking',
+  '/api/games',
+];
 
-/** Dev-mode auth bypass: active only when DISABLE_AUTH=true in non-production. */
-function isAuthDisabledEdge(): boolean {
-  return (
-    process.env.DISABLE_AUTH === 'true' &&
-    process.env.NODE_ENV !== 'production'
-  );
-}
+const ADMIN_PATHS = ['/admin'];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Bypass public paths
-  if (PUBLIC_PATHS.some((p) => pathname.startsWith(p))) {
+  const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p));
+
+  // Allow public paths, and also API routes that are not explicitly protected.
+  if (isPublic || pathname.startsWith('/api/')) {
     return NextResponse.next();
   }
 
-  // --- Dev-mode bypass ---
-  if (isAuthDisabledEdge()) {
+  // --- Dev-mode bypass for protected routes ---
+  if (isAuthDisabled()) {
     const devRole = request.cookies.get(DEV_COOKIE)?.value as keyof typeof DEV_USERS | undefined;
-    // If no dev cookie yet, redirect to login to pick a role
     if (!devRole || !DEV_USERS[devRole]) {
-      return NextResponse.redirect(new URL('/login', request.url));
+      const url = new URL('/login', request.url);
+      url.searchParams.set('callbackUrl', pathname);
+      return NextResponse.redirect(url);
     }
-    // RBAC check with dev role
-    if (pathname.startsWith('/admin') && devRole !== 'admin') {
+    // RBAC check for admin in dev mode
+    if (ADMIN_PATHS.some((p) => pathname.startsWith(p)) && DEV_USERS[devRole].rol !== 'admin') {
       return NextResponse.redirect(new URL('/?error=forbidden', request.url));
     }
     return NextResponse.next();
   }
 
-  // Get session
+  // --- Production auth for protected routes ---
   const session = await auth();
 
   if (!session?.user) {
-    return NextResponse.redirect(new URL('/login', request.url));
+    const url = new URL('/login', request.url);
+    url.searchParams.set('callbackUrl', pathname);
+    return NextResponse.redirect(url);
   }
 
-  // RBAC: /admin requires admin role
-  if (pathname.startsWith('/admin') && session.user.rol !== 'admin') {
+  // RBAC for admin section
+  if (ADMIN_PATHS.some((p) => pathname.startsWith(p)) && session.user.rol !== 'admin') {
     return NextResponse.redirect(new URL('/?error=forbidden', request.url));
   }
 
@@ -55,6 +60,10 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  // Exclude static files, Next.js internals, favicon, and the MCP endpoint
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|api/mcp).*)'],
+  matcher: [
+    // Match all paths except for:
+    // - _next/static, _next/image, favicon.ico, etc.
+    // - /api/mcp (separate auth)
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.webp$).*)',
+  ],
 };

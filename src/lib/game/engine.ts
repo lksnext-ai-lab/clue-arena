@@ -88,6 +88,7 @@ export function initGame(equipoIds: string[], seed?: number): GameState {
     gameId: '',
     estado: 'pendiente',
     turnoActual: 0,
+    maxTurnos: null, // engine has no default limit
     sobre,
     equipos: equipoStates,
     historial: [],
@@ -531,6 +532,7 @@ export function getGameStateView(state: GameState, requestingTeamId: string): Ga
     gameId: state.gameId,
     estado: state.estado,
     turnoActual: state.turnoActual,
+    maxTurnos: state.maxTurnos,
     equipos: state.equipos.map((e) => ({
       equipoId: e.equipoId,
       orden: e.orden,

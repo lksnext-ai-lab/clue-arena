@@ -4,7 +4,8 @@ describe('getWsUrl', () => {
   const originalEnv = process.env;
 
   beforeEach(() => {
-    jest.resetModules();
+    // Vitest provides vi global instead of jest
+    vi.resetModules();
     process.env = { ...originalEnv };
   });
 

@@ -42,7 +42,7 @@ export async function GET(
     ? (JSON.parse(row.resultadoJson) as { ganadorId: string | null; puntosSimulados: number; turnosJugados: number })
     : null;
 
-  const sobres = (row.estado !== 'en_curso' && row.sobresJson)
+  const sobres = row.sobresJson
     ? JSON.parse(row.sobresJson) as { sospechoso: string; arma: string; habitacion: string }
     : null;
 

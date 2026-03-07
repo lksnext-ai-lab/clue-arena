@@ -121,6 +121,7 @@ export const getGameStateTool = {
       gameId: game_id,
       estado: partida.estado as GameState['estado'],
       turnoActual: partida.turnoActual,
+      maxTurnos: partida.maxTurnos,
       sobre: { sospechoso: '' as Sospechoso, arma: '' as Arma, habitacion: '' as Habitacion }, // secret — never exposed
       equipos: equipoRows.map((e) => ({
         equipoId: e.equipoId,

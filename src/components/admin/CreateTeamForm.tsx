@@ -15,6 +15,7 @@ interface CreateTeamFormProps {
 
 export function CreateTeamForm({ onCreated, onCancel }: CreateTeamFormProps) {
   const t = useTranslations('admin');
+  const tCommon = useTranslations('common');
   const [serverError, setServerError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -51,56 +52,51 @@ export function CreateTeamForm({ onCreated, onCancel }: CreateTeamFormProps) {
   };
 
   const inputClass =
-    'w-full rounded-md px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-amber-500';
-  const inputStyle = { background: '#0f172a', color: '#f1f5f9', border: '1px solid #334155' };
-  const errorStyle = { color: '#f87171' };
+    'w-full rounded-md px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-cyan-500 bg-slate-900/70 text-slate-200 border border-slate-700';
 
   return (
     <form
       onSubmit={handleSubmit(onSubmit)}
-      className="rounded-xl p-4 mb-4 space-y-4"
-      style={{ background: '#1a1a2e', border: '1px solid #334155' }}
+      className="rounded-xl p-4 mb-4 space-y-4 bg-slate-800 border border-slate-700"
     >
-      <h3 className="text-sm font-semibold" style={{ color: '#f59e0b' }}>
+      <h3 className="text-sm font-semibold text-cyan-400">
         {t('crearEquipo')}
       </h3>
 
       {serverError && (
-        <p className="text-sm px-3 py-2 rounded-md" style={{ background: '#7f1d1d', color: '#fca5a5' }}>
+        <p className="text-sm px-3 py-2 rounded-md bg-red-900/40 text-red-300 border border-red-500/30">
           {serverError}
         </p>
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
-          <label className="block text-xs mb-1" style={{ color: '#94a3b8' }}>
+          <label className="block text-xs mb-1 text-slate-400">
             {t('nombreEquipo')} *
           </label>
           <input
             {...register('nombre')}
             type="text"
             className={inputClass}
-            style={inputStyle}
             placeholder="Ej: Equipo Alpha"
           />
           {errors.nombre && (
-            <p className="text-xs mt-1" style={errorStyle}>{errors.nombre.message}</p>
+            <p className="text-xs mt-1 text-red-400">{errors.nombre.message}</p>
           )}
         </div>
 
         <div>
-          <label className="block text-xs mb-1" style={{ color: '#94a3b8' }}>
+          <label className="block text-xs mb-1 text-slate-400">
             {t('agentId')} *
           </label>
           <input
             {...register('agentId')}
             type="text"
             className={inputClass}
-            style={inputStyle}
             placeholder="Ej: agent-alpha-v2"
           />
           {errors.agentId && (
-            <p className="text-xs mt-1" style={errorStyle}>{errors.agentId.message}</p>
+            <p className="text-xs mt-1 text-red-400">{errors.agentId.message}</p>
           )}
         </div>
       </div>
@@ -110,16 +106,14 @@ export function CreateTeamForm({ onCreated, onCancel }: CreateTeamFormProps) {
           type="button"
           onClick={onCancel}
           disabled={isSubmitting}
-          className="px-4 py-1.5 rounded-md text-sm font-medium transition-colors"
-          style={{ background: '#1e293b', color: '#94a3b8', border: '1px solid #334155' }}
+          className="px-4 py-1.5 rounded-md text-sm font-medium transition-colors bg-slate-700 text-slate-300 hover:bg-slate-600"
         >
           {t('cancelarCrear')}
         </button>
         <button
           type="submit"
           disabled={isSubmitting}
-          className="px-4 py-1.5 rounded-md text-sm font-medium transition-colors"
-          style={{ background: '#f59e0b', color: '#0a0a0f', opacity: isSubmitting ? 0.6 : 1 }}
+          className="px-4 py-1.5 rounded-md text-sm font-medium transition-colors bg-cyan-500 text-slate-900 hover:bg-cyan-400 disabled:opacity-60"
         >
           {isSubmitting ? '…' : t('guardarEquipo')}
         </button>

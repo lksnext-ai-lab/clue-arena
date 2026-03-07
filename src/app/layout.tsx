@@ -1,3 +1,4 @@
+
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
@@ -5,6 +6,7 @@ import { SessionProvider as NextAuthProvider } from 'next-auth/react';
 import { SessionProvider } from '@/contexts/SessionContext';
 import { NextIntlClientProvider } from 'next-intl';
 import { getLocale, getMessages } from 'next-intl/server';
+import { RootShell } from '@/components/layout/RootShell';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -23,11 +25,11 @@ export default async function RootLayout({
 
   return (
     <html lang={locale}>
-      <body className={inter.className} style={{ background: '#0a0a0f', color: '#f1f5f9' }}>
+      <body className={inter.className}>
         <NextIntlClientProvider messages={messages}>
           <NextAuthProvider>
             <SessionProvider>
-              {children}
+              <RootShell>{children}</RootShell>
             </SessionProvider>
           </NextAuthProvider>
         </NextIntlClientProvider>

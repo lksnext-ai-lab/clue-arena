@@ -39,6 +39,7 @@ import { PLAY_TURN_SYSTEM_PROMPT } from '@/lib/ai/prompts/play-turn';
 import { REFUTE_SYSTEM_PROMPT } from '@/lib/ai/prompts/refute';
 import { z } from 'zod';
 import { getAgentMemory, saveAgentMemory } from '@/lib/ai/agent-memory';
+import { notificationEmitter } from '@/lib/ws/NotificationEmitter';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -70,11 +71,13 @@ const BotRefuteSchema = z.union([
 
 export interface TrainingLoopOptions {
   /** ID in partidas_entrenamiento */
-  gameId:   string;
+  gameId:    string;
   /** Real team's equipo ID */
-  equipoId: string;
-  numBots:  number;
-  seed?:    string;
+  equipoId:  string;
+  numBots:   number;
+  /** Maximum turns before the game is aborted (default: MAX_TRAINING_TURNS) */
+  maxTurnos?: number;
+  seed?:     string;
 }
 
 export interface TrainingLoopResult {
@@ -206,6 +209,8 @@ interface RefutationResult {
   card: string | null;
   /** Full trace when the real team was the one who refuted */
   realTeamRefuteResult?: InvokeAgentWithTraceResult;
+  /** Reasoning text from a bot refutation (populated when a bot was the refutador) */
+  botRefutacionRazonamiento?: string;
 }
 
 /**
@@ -281,10 +286,18 @@ async function resolveRefutation(
       refuteResponse.action.type === 'show_card' &&
       matchCards.includes(refuteResponse.action.card as typeof matchCards[0])
     ) {
-      return { refutadorId: candidate.equipoId, card: refuteResponse.action.card };
+      return {
+        refutadorId: candidate.equipoId,
+        card: refuteResponse.action.card,
+        botRefutacionRazonamiento: refuteResponse.reasoning,
+      };
     }
     // If invalid or cannot_refute despite having cards → use first matching card
-    return { refutadorId: candidate.equipoId, card: matchCards[0] };
+    return {
+      refutadorId: candidate.equipoId,
+      card: matchCards[0],
+      botRefutacionRazonamiento: refuteResponse.reasoning,
+    };
   }
 
   return { refutadorId: null, card: null };
@@ -298,6 +311,7 @@ export async function runTrainingGameLoop(
   options: TrainingLoopOptions,
 ): Promise<TrainingLoopResult> {
   const { gameId, equipoId, numBots } = options;
+  const turnLimit = options.maxTurnos ?? MAX_TRAINING_TURNS;
 
   // Build team ID list: real team first, then bots
   const botIds = Array.from({ length: numBots }, (_, i) => botId(i));
@@ -309,12 +323,29 @@ export async function runTrainingGameLoop(
 
   // Initialise pure in-memory state
   let state = initGame(allTeamIds, seedNum);
-  state = { ...state, gameId, estado: 'en_curso' };
+  // Expose turn limit to agents via state view
+  state = { ...state, gameId, estado: 'en_curso', maxTurnos: turnLimit };
+
+  // Persist sobresJson immediately so the UI can show it from the first poll
+  await db
+    .update(partidasEntrenamiento)
+    .set({ sobresJson: JSON.stringify(state.sobre) })
+    .where(eq(partidasEntrenamiento.id, gameId));
+
+  // F018: notify team that training has started
+  notificationEmitter.emitTeam({
+    type: 'notification:training_started',
+    trainingGameId: gameId,
+    equipoId,
+    numBots,
+    ts: Date.now(),
+  });
 
   let totalTurns = 0;
   let abortReason: string | undefined;
 
-  while (totalTurns < MAX_TRAINING_TURNS) {
+  try {
+    while (totalTurns < turnLimit) {
     if (isGameOver(state)) break;
 
     const activeEquipos = state.equipos.filter((e) => !e.eliminado);
@@ -370,8 +401,11 @@ export async function runTrainingGameLoop(
     let gameAction = toGameAction(agentResponse, currentTeamId);
     if (!gameAction) gameAction = { type: 'pass', equipoId: currentTeamId };
 
+    // refutacionJson built here so it can be attached to the suggestion turn below
+    let refutacionJsonStr: string | null = null;
+
     if (gameAction.type === 'suggestion') {
-      const { refutadorId, card, realTeamRefuteResult } = await resolveRefutation(
+      const refutRes = await resolveRefutation(
         state,
         gameId,
         currentTeamId,
@@ -380,6 +414,7 @@ export async function runTrainingGameLoop(
         gameAction.habitacion,
         equipoId,
       );
+      const { refutadorId, card, realTeamRefuteResult, botRefutacionRazonamiento } = refutRes;
 
       const applyResult = applyAction(state, gameAction);
       state = applyResult.state;
@@ -391,6 +426,18 @@ export async function runTrainingGameLoop(
           (lastRecord.result as { refutadaPor: string | null; cartaMostrada: string | null }).cartaMostrada = card;
         }
       }
+
+      // Build refutation summary attached to this suggestion turn (all cases)
+      refutacionJsonStr = JSON.stringify({
+        refutadaPor:   refutadorId,
+        cartaMostrada: card,
+        razonamiento:
+          refutadorId === null
+            ? undefined
+            : realTeamRefuteResult
+            ? realTeamRefuteResult.agentResponse.reasoning
+            : botRefutacionRazonamiento,
+      });
 
       // Persist refutation sub-turn for the real team when they were the refutador
       // (another team made the suggestion that triggered it)
@@ -429,6 +476,7 @@ export async function runTrainingGameLoop(
       agentTrace: isRealTeam ? traceJson : null,
       memoriaInicial: isRealTeam ? memoriaInicialJson : null,
       memoriaFinal: isRealTeam ? memoriaFinalJson : null,
+      refutacionJson: refutacionJsonStr,
       durationMs,
       createdAt: new Date(),
     });
@@ -437,7 +485,7 @@ export async function runTrainingGameLoop(
   }
 
   // Check abort condition
-  if (!isGameOver(state) && totalTurns >= MAX_TRAINING_TURNS) {
+  if (!isGameOver(state) && totalTurns >= turnLimit) {
     abortReason = 'MAX_TURNS_EXCEEDED';
   }
 
@@ -467,6 +515,19 @@ export async function runTrainingGameLoop(
     })
     .where(eq(partidasEntrenamiento.id, gameId));
 
+  // F018: notify team that training has finished
+  notificationEmitter.emitTeam({
+    type: 'notification:training_finished',
+    trainingGameId: gameId,
+    equipoId,
+    estado: finalEstado,
+    ganadorId,
+    numTurnos: totalTurns,
+    puntosSimulados,
+    motivoAbort: abortReason,
+    ts: Date.now(),
+  });
+
   return {
     estado: finalEstado,
     ganadorId,
@@ -474,6 +535,17 @@ export async function runTrainingGameLoop(
     puntosSimulados,
     motivoAbort: abortReason,
   };
+  } catch (err) {
+    // F018: notify team of a catastrophic loop error (unhandled exception)
+    notificationEmitter.emitTeam({
+      type: 'notification:training_error',
+      trainingGameId: gameId,
+      equipoId,
+      message: err instanceof Error ? err.message : 'Error desconocido',
+      ts: Date.now(),
+    });
+    throw err;
+  }
 }
 
 // ---------------------------------------------------------------------------

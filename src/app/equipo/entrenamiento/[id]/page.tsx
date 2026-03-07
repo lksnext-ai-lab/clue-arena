@@ -8,6 +8,7 @@ import { TrainingGameHeader } from './components/TrainingGameHeader';
 import { TrainingEnvelopeReveal } from './components/TrainingEnvelopeReveal';
 import { TrainingTurnTimeline } from './components/TrainingTurnTimeline';
 import { TrainingDeductionBoard } from './components/TrainingDeductionBoard';
+import { TrainingReplayPlayer } from './components/TrainingReplayPlayer';
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -22,6 +23,7 @@ export default function TrainingGameDetailPage({ params }: Props) {
   const [turns, setTurns] = useState<TrainingTurnResponse[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [aborting, setAborting] = useState(false);
+  const [replayMode, setReplayMode] = useState(false);
 
   useEffect(() => {
     params.then(({ id }) => setGameId(id));
@@ -94,24 +96,36 @@ export default function TrainingGameDetailPage({ params }: Props) {
 
       <TrainingEnvelopeReveal game={game} equipoId={equipoId} />
 
-      <section>
-        <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-400">
-          Tablero de deducción
-        </h2>
-        <div className="rounded-lg border border-slate-700 bg-slate-800 p-3">
-          <TrainingDeductionBoard
-            turns={turns}
-            equipoIds={allTeamIds}
-            realEquipoId={equipoId}
-          />
-        </div>
-      </section>
+      <TrainingDeductionBoard
+        turns={turns}
+        equipoIds={allTeamIds}
+        realEquipoId={equipoId}
+      />
 
       <section>
-        <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-400">
-          Historial de turnos
-        </h2>
-        <TrainingTurnTimeline turns={turns} equipoId={equipoId} />
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
+            Historial de turnos
+          </h2>
+          {turns.length > 0 && game?.estado !== 'en_curso' && (
+            <button
+              onClick={() => setReplayMode((m) => !m)}
+              className={`flex items-center gap-1.5 rounded border px-3 py-1 text-xs font-semibold transition ${
+                replayMode
+                  ? 'border-indigo-500 bg-indigo-900/40 text-indigo-200 hover:bg-indigo-900/60'
+                  : 'border-slate-600 bg-slate-800 text-slate-300 hover:border-slate-400 hover:text-white'
+              }`}
+            >
+              {replayMode ? '📋 Ver historial' : '▶ Reproducir paso a paso'}
+            </button>
+          )}
+        </div>
+
+        {replayMode ? (
+          <TrainingReplayPlayer turns={turns} equipoId={equipoId} gameId={gameId!} />
+        ) : (
+          <TrainingTurnTimeline turns={turns} equipoId={equipoId} />
+        )}
       </section>
     </div>
   );

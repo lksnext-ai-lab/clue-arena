@@ -13,7 +13,8 @@ Usa ÚNICAMENTE los valores exactos listados arriba en los campos "suspect", "we
 
 ## Contexto disponible en el prompt
 El mensaje de usuario contiene dos secciones de contexto ya resueltas:
-- **Estado actual de la partida**: JSON con tus cartas en mano, historial de sugerencias y estado del turno.
+- **Estado actual de la partida**: JSON con tus cartas en mano, historial de sugerencias, el número de turno actual y el límite máximo de turnos (campo "maxTurnos").
+  Esto te permite calcular cuántos giros quedan antes de que la partida termine, lo cual es útil para decidir si arriesgar una acusación.
 - **Tu memoria de turnos anteriores**: JSON con tus deducciones acumuladas (vacío en el primer turno).
 
 ## Interpretación del historial de la partida

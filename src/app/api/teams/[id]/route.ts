@@ -80,7 +80,22 @@ export async function PUT(request: Request, { params }: Params) {
     }
   }
 
-  const { miembros: miembrosArray, ...restData } = parsed.data;
+  const { miembros: miembrosArray, usuarioId: newUsuarioId, ...restData } = parsed.data;
+
+  // Validate new owner exists (if provided)
+  if (newUsuarioId) {
+    const ownerExists = await db
+      .select({ id: usuarios.id })
+      .from(usuarios)
+      .where(eq(usuarios.id, newUsuarioId))
+      .get();
+    if (!ownerExists) {
+      return NextResponse.json(
+        { error: 'El usuario seleccionado no existe' },
+        { status: 400 }
+      );
+    }
+  }
 
   const updated = await db
     .update(equipos)
@@ -89,6 +104,7 @@ export async function PUT(request: Request, { params }: Params) {
       ...(miembrosArray !== undefined
         ? { miembros: JSON.stringify(miembrosArray) }
         : {}),
+      ...(newUsuarioId !== undefined ? { usuarioId: newUsuarioId } : {}),
     })
     .where(eq(equipos.id, id))
     .returning()

@@ -2,6 +2,7 @@
 
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
+import { NotificationsProvider } from '@/contexts/NotificationsContext';
 
 interface DashboardShellProps {
   children: React.ReactNode;
@@ -9,12 +10,17 @@ interface DashboardShellProps {
 
 export function DashboardShell({ children }: DashboardShellProps) {
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: '#0f172a' }}>
-      <Sidebar />
-      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
-        <TopBar />
-        <main style={{ flex: 1, overflow: 'auto' }}>{children}</main>
+    <NotificationsProvider>
+      <div
+        className="dark text-white"
+        style={{ display: 'flex', minHeight: '100vh', background: '#0f172a' }}
+      >
+        <Sidebar />
+        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
+          <TopBar />
+          <main style={{ flex: 1, overflow: 'auto' }}>{children}</main>
+        </div>
       </div>
-    </div>
+    </NotificationsProvider>
   );
 }

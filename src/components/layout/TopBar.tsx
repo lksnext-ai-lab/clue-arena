@@ -1,8 +1,11 @@
 'use client';
 
-import { Bell, LogOut } from 'lucide-react';
+import { LogOut } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useAppSession } from '@/contexts/SessionContext';
+import { NotificationBell } from '@/components/layout/NotificationPanel';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 
 const S = {
   header: {
@@ -25,25 +28,50 @@ const S = {
   } as React.CSSProperties,
 };
 
+function getPageTitle(pathname: string, t: (key: any) => string): string {
+  if (pathname === '/') return t('dashboard');
+  if (pathname.startsWith('/admin/partidas/nueva')) return t('nuevaPartida');
+  if (pathname.startsWith('/admin/partidas/')) return t('adminPartidaDetalle');
+  if (pathname.startsWith('/admin/partidas')) return t('adminPartidas');
+  if (pathname.startsWith('/admin/equipos')) return t('adminEquipos');
+  if (pathname.startsWith('/admin')) return t('admin');
+  if (pathname.startsWith('/equipo/entrenamiento')) return t('entrenamiento');
+  if (pathname.startsWith('/equipo')) return t('equipo');
+  if (pathname.startsWith('/partidas')) return t('arena');
+  if (pathname.startsWith('/ranking')) return t('ranking');
+  if (pathname.startsWith('/instrucciones')) return t('instrucciones');
+  if (pathname.startsWith('/acerca-del-juego')) return t('acerca-del-juego');
+  if (pathname.startsWith('/perfil')) return t('perfil');
+
+  return t('dashboard'); // fallback
+}
+
 export function TopBar() {
   const { logout, user } = useAppSession();
-  const t = useTranslations('dashboard');
   const tCommon = useTranslations('common');
+  const tTitles = useTranslations('pageTitles');
+  const pathname = usePathname();
+
+  const title = getPageTitle(pathname, tTitles);
 
   return (
     <header style={S.header}>
-      <h1 style={S.title}>{t('topBar')}</h1>
+      <h1 style={S.title}>{title}</h1>
 
       <div style={S.actions}>
-        {user && (
-          <span style={{ fontSize: 12, color: '#64748b', marginRight: 8 }}>{user.name}</span>
+        {user ? (
+          <>
+            <span style={{ fontSize: 12, color: '#64748b', marginRight: 8 }}>{user.name}</span>
+            <NotificationBell />
+            <button aria-label={tCommon('cerrarSesion')} onClick={logout} style={S.btn}>
+              <LogOut size={16} />
+            </button>
+          </>
+        ) : (
+          <Link href="/login" className="inline-flex h-9 items-center justify-center rounded-md border border-cyan-500/50 bg-cyan-500/10 px-4 text-sm font-medium text-cyan-300 transition-colors hover:bg-cyan-500/20">
+            Acceder
+          </Link>
         )}
-        <button aria-label="Notificaciones" style={S.btn}>
-          <Bell size={16} />
-        </button>
-        <button aria-label={tCommon('cerrarSesion')} onClick={logout} style={S.btn}>
-          <LogOut size={16} />
-        </button>
       </div>
     </header>
   );

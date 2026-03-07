@@ -8,10 +8,10 @@ import {
   Users,
   Swords,
   Trophy,
+  Medal,
   User,
   Crosshair,
   BookOpen,
-  Shield,
   Bot,
   Dumbbell,
 } from 'lucide-react';
@@ -27,7 +27,7 @@ const ACCENT_BORDER = 'rgba(34,211,238,0.25)';
 const TEXT_MUTED = '#64748b';
 const TEXT_ACTIVE = '#f1f5f9';
 
-type NavKey = 'dashboard' | 'miEquipo' | 'admin' | 'arena' | 'juego' | 'ranking' | 'instrucciones' | 'entrenamiento' | 'perfil';
+type NavKey = 'dashboard' | 'miEquipo' | 'admin' | 'arena' | 'juego' | 'ranking' | 'instrucciones' | 'entrenamiento' | 'perfil' | 'equipos' | 'partidas' | 'torneos';
 
 interface NavItem {
   href: string;
@@ -36,15 +36,23 @@ interface NavItem {
   roles: Array<'admin' | 'equipo' | 'espectador'>;
 }
 
-const NAV_ITEMS: NavItem[] = [
-  { href: '/dashboard',       Icon: LayoutDashboard, labelKey: 'dashboard', roles: ['admin', 'equipo', 'espectador'] },
+const ALL_NAV_ITEMS: NavItem[] = [
+  // Public items
+  { href: '/', Icon: LayoutDashboard, labelKey: 'dashboard', roles: ['admin', 'equipo', 'espectador'] },
+  { href: '/acerca-del-juego', Icon: BookOpen,        labelKey: 'juego',         roles: ['admin', 'equipo', 'espectador'] },
+  { href: '/instrucciones',   Icon: Bot,             labelKey: 'instrucciones', roles: ['admin', 'equipo', 'espectador'] },
+  { href: '/arena',           Icon: Swords,          labelKey: 'arena',         roles: ['admin', 'equipo', 'espectador'] },
+  { href: '/ranking',         Icon: Trophy,          labelKey: 'ranking',       roles: ['admin', 'equipo', 'espectador'] },
+  
+  // Team-specific items
   { href: '/equipo',          Icon: Users,           labelKey: 'miEquipo',  roles: ['equipo'] },
-  { href: '/admin',           Icon: Shield,          labelKey: 'admin',     roles: ['admin'] },
-  { href: '/arena',           Icon: Swords,          labelKey: 'arena',     roles: ['admin', 'equipo', 'espectador'] },
-  { href: '/dashboard/juego', Icon: BookOpen,        labelKey: 'juego',         roles: ['admin', 'equipo', 'espectador'] },
-  { href: '/ranking',         Icon: Trophy,          labelKey: 'ranking',           roles: ['admin', 'equipo', 'espectador'] },
   { href: '/equipo/entrenamiento', Icon: Dumbbell, labelKey: 'entrenamiento',     roles: ['equipo'] },
-  { href: '/instrucciones',   Icon: Bot,             labelKey: 'instrucciones',     roles: ['admin', 'equipo', 'espectador'] },
+
+  // Admin-specific items
+  { href: '/admin',           Icon: LayoutDashboard, labelKey: 'admin',     roles: ['admin'] },
+  { href: '/admin/equipos',   Icon: Users,           labelKey: 'equipos',   roles: ['admin'] },
+  { href: '/admin/partidas',  Icon: Swords,          labelKey: 'partidas',  roles: ['admin'] },
+  { href: '/admin/torneos',   Icon: Medal,           labelKey: 'torneos',   roles: ['admin'] },
 ];
 
 const BTM_ITEMS: NavItem[] = [
@@ -83,10 +91,17 @@ export function Sidebar() {
   const { rol } = useAppSession();
   const t = useTranslations('nav');
 
-  const isActive = (href: string) =>
-    pathname === href || (href !== '/dashboard' && pathname.startsWith(href));
-  const filterRole = (items: NavItem[]) =>
-    items.filter((i) => !rol || i.roles.includes(rol));
+  const isActive = (href: string) => {
+    if (href === '/admin' && pathname.startsWith('/admin')) return true;
+    if (href === '/' && pathname !== '/') return false;
+    if (href !== '/' && pathname.startsWith(href)) return true;
+    return pathname === href;
+  }
+  
+  const effectiveRole = rol ?? 'espectador';
+
+  const mainNav = ALL_NAV_ITEMS.filter(i => i.roles.includes(effectiveRole));
+  const bottomNav = BTM_ITEMS.filter(i => i.roles.includes(effectiveRole));
 
   return (
     <nav
@@ -100,24 +115,24 @@ export function Sidebar() {
       }}
     >
       {/* Logo */}
-      <div style={{
+      <Link href="/" style={{
         width: 36, height: 36, borderRadius: 8, marginBottom: 20, flexShrink: 0,
         background: ACCENT_BG, border: `1px solid ${ACCENT_BORDER}`,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
         <Crosshair size={17} color={ACCENT} strokeWidth={2} />
-      </div>
+      </Link>
 
       {/* Main nav */}
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, flex: 1 }}>
-        {filterRole(NAV_ITEMS).map((item) => (
+        {mainNav.map((item) => (
           <SidebarLink key={item.href} {...item} label={t(item.labelKey)} active={isActive(item.href)} />
         ))}
       </div>
 
       {/* Bottom */}
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
-        {filterRole(BTM_ITEMS).map((item) => (
+        {bottomNav.map((item) => (
           <SidebarLink key={item.href} {...item} label={t(item.labelKey)} active={isActive(item.href)} />
         ))}
         <LocaleSwitcher />
@@ -125,4 +140,3 @@ export function Sidebar() {
     </nav>
   );
 }
-

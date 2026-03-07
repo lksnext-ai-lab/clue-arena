@@ -3,7 +3,6 @@ import { auth } from '@/lib/auth/config';
 import { isAuthDisabled } from '@/lib/auth/dev';
 import { cookies } from 'next/headers';
 import { DEV_COOKIE, DEV_USERS } from '@/lib/auth/dev';
-import { DashboardShell } from '@/components/layout/DashboardShell';
 
 export default async function AdminLayout({
   children,
@@ -23,9 +22,7 @@ export default async function AdminLayout({
     }
   }
 
-  return (
-    <div className="dark min-h-screen bg-slate-900 text-white">
-      <DashboardShell>{children}</DashboardShell>
-    </div>
-  );
+  // The DashboardShell is provided by a higher-level layout (RootShell)
+  // This layout only needs to enforce the admin role check.
+  return <>{children}</>;
 }

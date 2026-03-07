@@ -6,6 +6,8 @@ import type { IncomingMessage } from 'http';
 import type { Server } from 'http';
 import { parse } from 'url';
 import { gameEventEmitter } from './GameEventEmitter';
+import { notificationEmitter } from './NotificationEmitter';
+import type { GlobalNotificationEvent, TeamNotificationEvent } from './NotificationEmitter';
 import { ClientMessageSchema, type ServerMessage, type GameStateEvent } from './protocol';
 import type { TurnMicroEvent } from './GameEventEmitter';
 import { validateWsSession } from './auth';
@@ -18,6 +20,49 @@ const gameListeners = new Map<string, () => void>();
 const microListeners = new Map<string, () => void>();
 // Map userId → número de conexiones activas (rate limiting por sesión)
 const connectionsByUser = new Map<string, number>();
+
+// ── F018: Notification subscriptions ─────────────────────────────────────────
+// Map WebSocket → { global, equipoId }
+const notifSubscriptions = new Map<WebSocket, { global: boolean; equipoId: string | null }>();
+// Shared global notification listener (one for all global subscribers)
+let globalNotifListener: (() => void) | null = null;
+// Per-equipo notification listeners
+const teamNotifListeners = new Map<string, () => void>();
+
+function ensureGlobalNotifListener() {
+  if (globalNotifListener) return;
+  globalNotifListener = notificationEmitter.onGlobal((event: GlobalNotificationEvent) => {
+    for (const [ws, scope] of notifSubscriptions) {
+      if (scope.global && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify(event));
+      }
+    }
+  });
+}
+
+function ensureTeamNotifListener(equipoId: string) {
+  if (teamNotifListeners.has(equipoId)) return;
+  const unsub = notificationEmitter.onTeam(equipoId, (event: TeamNotificationEvent) => {
+    for (const [ws, scope] of notifSubscriptions) {
+      if (scope.equipoId === equipoId && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify(event));
+      }
+    }
+  });
+  teamNotifListeners.set(equipoId, unsub);
+}
+
+function cleanupTeamNotifListener(equipoId: string) {
+  // Remove the listener only when no active subscriber needs it anymore
+  for (const scope of notifSubscriptions.values()) {
+    if (scope.equipoId === equipoId) return; // still in use
+  }
+  const unsub = teamNotifListeners.get(equipoId);
+  if (unsub) {
+    unsub();
+    teamNotifListeners.delete(equipoId);
+  }
+}
 
 const MAX_CONNECTIONS_PER_SESSION = Number(process.env.WS_MAX_CONNECTIONS_PER_SESSION ?? 5);
 const HEARTBEAT_INTERVAL_MS = Number(process.env.WS_HEARTBEAT_INTERVAL_MS ?? 30_000);
@@ -196,6 +241,41 @@ export function attachWebSocketServer(httpServer: Server) {
           ensureGameListener(msg.gameId);
 
           send(ws, { type: 'subscribed', gameId: msg.gameId });
+          return;
+        }
+
+        if (msg.type === 'subscribe:notifications') {
+          clearTimeout(subscribeTimeout);
+          const { scope } = msg;
+          const equipoId = typeof scope === 'object' && 'team' in scope ? scope.team : null;
+
+          // RBAC: si scope.team, verificar que la sesión pertenece al mismo equipo o es admin
+          if (equipoId && session.user.rol !== 'admin' && session.user.equipo?.id !== equipoId) {
+            send(ws, { type: 'error', code: 'FORBIDDEN', message: 'No autorizado para este equipo' });
+            return;
+          }
+
+          // Reemplazar suscripción anterior si ya existía
+          const prevScope = notifSubscriptions.get(ws);
+          notifSubscriptions.set(ws, { global: true, equipoId });
+
+          ensureGlobalNotifListener();
+          if (equipoId) ensureTeamNotifListener(equipoId);
+
+          // Limpiar listener del equipo anterior si ya no tiene suscriptores
+          if (prevScope?.equipoId && prevScope.equipoId !== equipoId) {
+            cleanupTeamNotifListener(prevScope.equipoId);
+          }
+
+          send(ws, { type: 'subscribed:notifications', scope });
+          return;
+        }
+
+        if (msg.type === 'unsubscribe:notifications') {
+          const prevScope = notifSubscriptions.get(ws);
+          notifSubscriptions.delete(ws);
+          if (prevScope?.equipoId) cleanupTeamNotifListener(prevScope.equipoId);
+          return;
         }
       } catch {
         send(ws, { type: 'error', code: 'INVALID_MESSAGE', message: 'Mensaje inválido' });
@@ -216,6 +296,11 @@ export function attachWebSocketServer(httpServer: Server) {
         subscriptions.get(subscribedGameId)?.delete(ws);
         cleanupGameListener(subscribedGameId);
       }
+
+      // Limpiar suscripción de notificaciones
+      const prevNotifScope = notifSubscriptions.get(ws);
+      notifSubscriptions.delete(ws);
+      if (prevNotifScope?.equipoId) cleanupTeamNotifListener(prevNotifScope.equipoId);
     });
   });
 }

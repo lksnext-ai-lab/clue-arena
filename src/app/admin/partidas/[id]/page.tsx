@@ -15,6 +15,9 @@ import {
   type Habitacion,
 } from '@/types/domain';
 import { AgentLogPanel } from '@/components/admin/AgentLogPanel';
+import { GameStatusBadge } from '@/components/game/GameStatusBadge';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils/cn';
 
 /**
  * UI-008 — Detalle de partida (Admin)
@@ -35,22 +38,6 @@ export default function AdminPartidaPage({ params }: { params: Promise<{ id: str
     </GameProvider>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Status / mode badges
-// ---------------------------------------------------------------------------
-
-const STATUS_COLORS: Record<string, string> = {
-  pendiente: '#64748b',
-  en_curso: '#22c55e',
-  finalizada: '#f59e0b',
-};
-
-const MODE_COLORS: Record<string, { bg: string; text: string }> = {
-  manual: { bg: '#33415522', text: '#94a3b8' },
-  auto:   { bg: '#22c55e22', text: '#22c55e' },
-  pausado: { bg: '#f59e0b22', text: '#f59e0b' },
-};
 
 // ---------------------------------------------------------------------------
 // Main content (Client Component)
@@ -80,7 +67,7 @@ function AdminPartidaContent({ gameId }: { gameId: string }) {
 
   if (!partida) {
     return (
-      <main className="p-6 flex items-center justify-center" style={{ color: '#64748b' }}>
+      <main className="p-6 flex items-center justify-center text-slate-500">
         <p>Cargando partida...</p>
       </main>
     );
@@ -89,40 +76,26 @@ function AdminPartidaContent({ gameId }: { gameId: string }) {
   const { estado } = partida;
   const modo = partida.modoEjecucion as 'manual' | 'auto' | 'pausado' | undefined;
 
+  const currentTurnoNumero =
+    partida.turnos.find((t) => t.estado === 'en_curso')?.numero
+    ?? partida.turnos.length;
+
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6" style={{ color: '#f1f5f9' }}>
+    <div className="p-6 max-w-5xl mx-auto space-y-6 text-slate-200">
       {/* ── Header ── */}
       <header className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold">{partida.nombre}</h1>
-          <p className="text-sm mt-1" style={{ color: '#64748b' }}>
-            Turno {partida.turnoActual}
+          <p className="text-sm mt-1 text-slate-500">
+            Turno {currentTurnoNumero}{partida.maxTurnos ? ` / ${partida.maxTurnos}` : ''}
             {isConnected && ' · en tiempo real'}
             {lastUpdated && ` · ${formatFecha(lastUpdated)}`}
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          {/* Estado badge */}
-          <span
-            className="px-3 py-1 rounded-full text-xs font-semibold"
-            style={{
-              background: STATUS_COLORS[estado] + '22',
-              color: STATUS_COLORS[estado],
-            }}
-          >
-            {estado}
-          </span>
-          {/* modoEjecucion badge (solo cuando en curso) */}
+          <GameStatusBadge estado={estado} />
           {estado === 'en_curso' && modo && (
-            <span
-              className="px-3 py-1 rounded-full text-xs font-semibold"
-              style={{
-                background: MODE_COLORS[modo]?.bg ?? '#33415522',
-                color: MODE_COLORS[modo]?.text ?? '#94a3b8',
-              }}
-            >
-              {modo}
-            </span>
+            <Badge variant="secondary">{modo}</Badge>
           )}
         </div>
       </header>
@@ -130,8 +103,7 @@ function AdminPartidaContent({ gameId }: { gameId: string }) {
       {/* ── Error banner ── */}
       {actionError && (
         <div
-          className="px-4 py-3 rounded-md text-sm"
-          style={{ background: '#7f1d1d', color: '#fca5a5' }}
+          className="px-4 py-3 rounded-md text-sm bg-red-900/40 text-red-300 border border-red-500/30"
         >
           {actionError}
         </div>
@@ -147,22 +119,20 @@ function AdminPartidaContent({ gameId }: { gameId: string }) {
 
       {/* ── Teams grid ── */}
       <section>
-        <h2 className="text-lg font-semibold mb-3" style={{ color: '#f59e0b' }}>
+        <h2 className="text-lg font-semibold mb-3 text-cyan-400">
           Equipos
         </h2>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
           {partida.equipos.map((equipo) => (
             <div
               key={equipo.equipoId}
-              className="rounded-xl p-4"
-              style={{
-                background: '#1a1a2e',
-                opacity: equipo.eliminado ? 0.5 : 1,
-                border: `1px solid ${equipo.eliminado ? '#334155' : '#f59e0b33'}`,
-              }}
+              className={cn(
+                'rounded-xl p-4 bg-slate-800 border',
+                equipo.eliminado ? 'opacity-50 grayscale border-slate-700' : 'border-cyan-500/20'
+              )}
             >
               <p className="font-medium text-sm">{equipo.equipoNombre}</p>
-              <p className="text-xs mt-1" style={{ color: '#64748b' }}>
+              <p className="text-xs mt-1 text-slate-500">
                 Orden: {equipo.orden + 1} · {equipo.puntos} pts
               </p>
               {/* Admin sees cards */}
@@ -171,8 +141,7 @@ function AdminPartidaContent({ gameId }: { gameId: string }) {
                   {(equipo.cartas as string[]).map((carta) => (
                     <span
                       key={carta}
-                      className="text-xs px-1.5 py-0.5 rounded"
-                      style={{ background: '#334155', color: '#94a3b8' }}
+                      className="text-xs px-1.5 py-0.5 rounded bg-slate-700 text-slate-300"
                     >
                       {carta}
                     </span>
@@ -180,7 +149,7 @@ function AdminPartidaContent({ gameId }: { gameId: string }) {
                 </div>
               )}
               {equipo.eliminado && (
-                <p className="text-xs mt-2" style={{ color: '#ef4444' }}>
+                <p className="text-xs mt-2 text-red-400">
                   ❌ Eliminado
                 </p>
               )}
@@ -192,7 +161,7 @@ function AdminPartidaContent({ gameId }: { gameId: string }) {
       {/* ── Turn history ── */}
       {partida.turnos && partida.turnos.length > 0 && (
         <section>
-          <h2 className="text-lg font-semibold mb-3" style={{ color: '#f59e0b' }}>
+          <h2 className="text-lg font-semibold mb-3 text-cyan-400">
             Historial de turnos
           </h2>
           <div className="space-y-3">
@@ -237,13 +206,13 @@ function ControlBar({ estado, modo, loading, onAction }: ControlBarProps) {
         <>
           <ActionButton
             label="Iniciar (manual)"
-            color="#22c55e"
+            variant="secondary"
             loading={loading}
             onClick={() => onAction('start', { modo: 'manual' })}
           />
           <ActionButton
             label="Iniciar (auto)"
-            color="#3b82f6"
+            variant="primary"
             loading={loading}
             onClick={() => onAction('start', { modo: 'auto', turnoDelayMs: 3000 })}
           />
@@ -255,19 +224,19 @@ function ControlBar({ estado, modo, loading, onAction }: ControlBarProps) {
         <>
           <ActionButton
             label="Avanzar turno"
-            color="#6366f1"
+            variant="default"
             loading={loading}
             onClick={() => onAction('advance-turn')}
           />
           <ActionButton
             label="Activar auto-run"
-            color="#3b82f6"
+            variant="primary"
             loading={loading}
             onClick={() => onAction('run', { turnoDelayMs: 3000 })}
           />
           <ActionButton
             label="Finalizar"
-            color="#ef4444"
+            variant="destructive"
             loading={loading}
             onClick={() => onAction('stop')}
           />
@@ -279,13 +248,13 @@ function ControlBar({ estado, modo, loading, onAction }: ControlBarProps) {
         <>
           <ActionButton
             label="Pausar"
-            color="#f59e0b"
+            variant="warning"
             loading={loading}
             onClick={() => onAction('pause')}
           />
           <ActionButton
             label="Finalizar"
-            color="#ef4444"
+            variant="destructive"
             loading={loading}
             onClick={() => onAction('stop')}
           />
@@ -297,19 +266,19 @@ function ControlBar({ estado, modo, loading, onAction }: ControlBarProps) {
         <>
           <ActionButton
             label="Reanudar"
-            color="#3b82f6"
+            variant="primary"
             loading={loading}
             onClick={() => onAction('resume', { turnoDelayMs: 3000 })}
           />
           <ActionButton
             label="Avanzar turno"
-            color="#6366f1"
+            variant="default"
             loading={loading}
             onClick={() => onAction('advance-turn')}
           />
           <ActionButton
             label="Finalizar"
-            color="#ef4444"
+            variant="destructive"
             loading={loading}
             onClick={() => onAction('stop')}
           />
@@ -321,20 +290,30 @@ function ControlBar({ estado, modo, loading, onAction }: ControlBarProps) {
 
 interface ActionButtonProps {
   label: string;
-  color: string;
+  variant?: 'primary' | 'secondary' | 'destructive' | 'warning' | 'default';
   loading: boolean;
   onClick: () => void;
 }
 
-function ActionButton({ label, color, loading, onClick }: ActionButtonProps) {
+const actionButtonVariants = {
+  primary: 'bg-cyan-500 text-slate-900 hover:bg-cyan-400',
+  secondary: 'bg-emerald-500 text-slate-900 hover:bg-emerald-400',
+  destructive: 'bg-red-500 text-white hover:bg-red-400',
+  warning: 'bg-amber-500 text-slate-900 hover:bg-amber-400',
+  default: 'bg-slate-700 text-slate-200 hover:bg-slate-600',
+}
+
+function ActionButton({ label, variant = 'default', loading, onClick }: ActionButtonProps) {
   return (
     <button
       onClick={onClick}
       disabled={loading}
-      className="px-4 py-2 rounded-md text-sm font-semibold disabled:opacity-50 transition-opacity"
-      style={{ background: color, color: color === '#f59e0b' ? '#0a0a0f' : '#fff' }}
+      className={cn(
+        "px-4 py-2 rounded-md text-sm font-semibold disabled:opacity-50 transition-opacity",
+        actionButtonVariants[variant]
+      )}
     >
-      {label}
+      {loading ? '...' : label}
     </button>
   );
 }
@@ -353,8 +332,7 @@ function TurnoCard({ turno }: { turno: NonNullable<ReturnType<typeof useGame>['p
 
   return (
     <div
-      className="rounded-xl p-4 text-sm"
-      style={{ background: '#1a1a2e' }}
+      className="rounded-xl p-4 text-sm bg-slate-800 border border-slate-700"
     >
       <div className="flex items-center justify-between mb-2">
         <p className="font-medium">
@@ -371,18 +349,20 @@ function TurnoCard({ turno }: { turno: NonNullable<ReturnType<typeof useGame>['p
         </span>
       </div>
       {turno.sugerencias.map((s) => (
-        <p key={s.id} className="text-xs mt-1" style={{ color: '#94a3b8' }}>
+        <p key={s.id} className="text-xs mt-1 text-slate-400">
           💬 {s.sospechoso} · {s.arma} · {s.habitacion}
           {s.refutadaPor && ` → Refutada`}
           {s.cartaMostrada && (
-            <span style={{ color: '#f59e0b' }}> (carta: {s.cartaMostrada})</span>
+            <span className="text-amber-400"> (carta: {s.cartaMostrada})</span>
           )}
         </p>
       ))}
       {turno.acusacion && (
         <p
-          className="text-xs mt-2"
-          style={{ color: turno.acusacion.correcta ? '#22c55e' : '#ef4444' }}
+          className={cn(
+            "text-xs mt-2",
+            turno.acusacion.correcta ? 'text-emerald-400' : 'text-red-400'
+          )}
         >
           {turno.acusacion.correcta ? '✅' : '❌'} Acusación:{' '}
           {turno.acusacion.sospechoso} · {turno.acusacion.arma} · {turno.acusacion.habitacion}
@@ -408,12 +388,11 @@ function SobreReveal({ sobre, finalizada }: SobreRevealProps) {
 
   return (
     <section>
-      <h2 className="text-lg font-semibold mb-4" style={{ color: '#f59e0b' }}>
+      <h2 className="text-lg font-semibold mb-4 text-cyan-400">
         🔍 Sobre secreto{!finalizada && <span className="text-xs ml-2 opacity-60">(solo admin)</span>}
       </h2>
       <div
-        className="rounded-xl p-6 grid grid-cols-3 gap-6"
-        style={{ background: '#1a1a2e', border: '1px solid #f59e0b55' }}
+        className="rounded-xl p-6 grid grid-cols-3 gap-6 bg-slate-800 border border-cyan-500/20"
       >
         <SobreCard
           label="Sospechoso"
@@ -434,7 +413,7 @@ function SobreReveal({ sobre, finalizada }: SobreRevealProps) {
           value={sobre.habitacion}
           imagen={habitacionMeta?.imagen}
           sublabel={habitacionMeta?.emoji}
-          accent="#f59e0b"
+          accent="#3b82f6"
         />
       </div>
     </section>
@@ -452,11 +431,11 @@ interface SobreCardProps {
 function SobreCard({ label, value, imagen, sublabel, accent }: SobreCardProps) {
   return (
     <div
-      className="rounded-xl overflow-hidden flex flex-col"
-      style={{ border: `2px solid ${accent}66`, background: '#0d0d1a', boxShadow: `0 4px 24px ${accent}22` }}
+      className="rounded-xl overflow-hidden flex flex-col bg-slate-900/50"
+      style={{ border: `2px solid ${accent}66`, boxShadow: `0 4px 24px ${accent}22` }}
     >
       {/* Imagen de la carta — aspect ratio de carta de juego (3:4) */}
-      <div className="relative w-full" style={{ aspectRatio: '3/4', background: '#070712' }}>
+      <div className="relative w-full" style={{ aspectRatio: '3/4', background: '#0a0a0f' }}>
         {imagen ? (
           <Image
             src={imagen}
@@ -477,7 +456,7 @@ function SobreCard({ label, value, imagen, sublabel, accent }: SobreCardProps) {
         className="px-4 py-3 flex flex-col gap-0.5"
         style={{ borderTop: `1px solid ${accent}33` }}
       >
-        <p className="text-[10px] uppercase tracking-widest font-medium" style={{ color: '#64748b' }}>
+        <p className="text-[10px] uppercase tracking-widest font-medium text-slate-500">
           {label}
         </p>
         {sublabel && (
@@ -492,4 +471,3 @@ function SobreCard({ label, value, imagen, sublabel, accent }: SobreCardProps) {
     </div>
   );
 }
-

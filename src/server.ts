@@ -3,6 +3,7 @@ import { createServer } from 'http';
 import { parse } from 'url';
 import next from 'next';
 import { attachWebSocketServer } from '@/lib/ws/server';
+import { execSync } from 'child_process';
 // Importar gameRunner como efecto lateral: crea el singleton en globalThis antes
 // de que los bundles webpack de los Route Handlers arranquen. Así el loop de
 // auto-ejecución vive en el proceso de servidor, no en el contexto de petición.
@@ -49,9 +50,20 @@ async function recoverStaleAutoRun() {
 }
 
 app.prepare().then(async () => {
-  // En dev mode, asegurar que los usuarios ficticios existen en la BD
-  if (process.env.DISABLE_AUTH === 'true' && process.env.NODE_ENV !== 'production') {
-    await seedDevUsers();
+  // En dev mode, aplicar migraciones y seed
+  if (process.env.NODE_ENV !== 'production') {
+    try {
+      console.log('> [db] Applying migrations...');
+      execSync('npm run db:migrate', { stdio: 'inherit' });
+      console.log('> [db] Migrations applied.');
+
+      if (process.env.DISABLE_AUTH === 'true') {
+        await seedDevUsers();
+      }
+    } catch (err) {
+      console.error('> [db] Error during DB initialization:', err);
+      process.exit(1);
+    }
   }
 
   await recoverStaleAutoRun();

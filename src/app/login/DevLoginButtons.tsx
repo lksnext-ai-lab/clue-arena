@@ -16,29 +16,26 @@ export default function DevLoginButtons() {
   }
 
   return (
-    <div className="mt-6 border-t pt-6 space-y-3" style={{ borderColor: '#1e293b' }}>
-      <p className="text-xs font-mono" style={{ color: '#f59e0b' }}>
+    <div className="mt-6 border-t border-slate-800 pt-6 space-y-3">
+      <p className="text-xs font-mono text-amber-500">
         {t('devMode')}
       </p>
       <div className="flex gap-3 justify-center">
         <button
           onClick={() => loginAs('admin')}
-          className="px-5 py-2 rounded-lg text-sm font-semibold border transition-opacity hover:opacity-80"
-          style={{ borderColor: '#f59e0b', color: '#f59e0b', background: 'transparent' }}
+          className="px-5 py-2 rounded-lg text-sm font-semibold border transition-opacity hover:opacity-80 border-cyan-500 text-cyan-400 bg-transparent hover:bg-cyan-500/10"
         >
           {t('entrarAdmin')}
         </button>
         <button
           onClick={() => loginAs('equipo')}
-          className="px-5 py-2 rounded-lg text-sm font-semibold border transition-opacity hover:opacity-80"
-          style={{ borderColor: '#94a3b8', color: '#94a3b8', background: 'transparent' }}
+          className="px-5 py-2 rounded-lg text-sm font-semibold border transition-opacity hover:opacity-80 border-slate-500 text-slate-400 bg-transparent hover:bg-slate-700"
         >
           {t('entrarEquipo')}
         </button>
         <button
           onClick={() => loginAs('sinEquipo')}
-          className="px-5 py-2 rounded-lg text-sm font-semibold border transition-opacity hover:opacity-80"
-          style={{ borderColor: '#64748b', color: '#64748b', background: 'transparent' }}
+          className="px-5 py-2 rounded-lg text-sm font-semibold border transition-opacity hover:opacity-80 border-slate-600 text-slate-500 bg-transparent hover:bg-slate-700"
         >
           {t('entrarSinEquipo')}
         </button>

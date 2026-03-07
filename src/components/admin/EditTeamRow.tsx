@@ -6,7 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { UpdateTeamSchema, type UpdateTeamInput } from '@/lib/schemas/team';
 import { apiFetch } from '@/lib/api/client';
 import { useTranslations } from 'next-intl';
-import type { TeamResponse } from '@/types/api';
+import type { TeamResponse, UserResponse } from '@/types/api';
 import { DeleteTeamButton } from './DeleteTeamButton';
 import Image from 'next/image';
 import { MembersEditor } from '@/components/team/MembersEditor';
@@ -29,6 +29,9 @@ export function EditTeamRow({ team, statusColors, onUpdated, onDeleted }: Props)
   const [editing, setEditing] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
   const [members, setMembers] = useState<string[]>(team.miembros ?? []);
+  const [ownerUserId, setOwnerUserId] = useState<string>(team.usuarioId);
+  const [users, setUsers] = useState<UserResponse[]>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
 
   const [avatarUrl, setAvatarUrl] = useState<string | null>(team.avatarUrl ?? null);
   const [avatarLoading, setAvatarLoading] = useState(false);
@@ -49,6 +52,21 @@ export function EditTeamRow({ team, statusColors, onUpdated, onDeleted }: Props)
     },
   });
 
+  const openEdit = async () => {
+    setEditing(true);
+    if (users.length === 0) {
+      setUsersLoading(true);
+      try {
+        const data = await apiFetch<{ users: UserResponse[] }>('/admin/users');
+        setUsers(data.users);
+      } catch {
+        // show empty select; not blocking
+      } finally {
+        setUsersLoading(false);
+      }
+    }
+  };
+
   const onSubmit = async (data: UpdateTeamInput) => {
     setServerError(null);
     try {
@@ -58,9 +76,10 @@ export function EditTeamRow({ team, statusColors, onUpdated, onDeleted }: Props)
           ...data,
           descripcion: data.descripcion || null,
           avatarUrl,
+          usuarioId: ownerUserId,
         }),
       });
-      onUpdated({ ...updated, avatarUrl });
+      onUpdated({ ...updated, avatarUrl, usuarioId: ownerUserId });
       setEditing(false);
     } catch (err: unknown) {
       let message = t('errorEditar');
@@ -81,6 +100,7 @@ export function EditTeamRow({ team, statusColors, onUpdated, onDeleted }: Props)
     setServerError(null);
     setMembers(team.miembros ?? []);
     setAvatarUrl(team.avatarUrl ?? null);
+    setOwnerUserId(team.usuarioId);
     reset({ nombre: team.nombre, descripcion: team.descripcion ?? '', agentId: team.agentId });
   };
 
@@ -125,38 +145,36 @@ export function EditTeamRow({ team, statusColors, onUpdated, onDeleted }: Props)
   // ── Edit mode (full-width panel via colSpan) ──────────────────────────────
   if (editing) {
     return (
-      <tr style={{ borderBottom: '1px solid #1e293b' }}>
+      <tr className="border-b border-slate-700">
         <td colSpan={5} className="px-4 py-4">
           <div className="space-y-4">
 
             {/* nombre + agentId */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs mb-1" style={{ color: '#94a3b8' }}>
+                <label className="block text-xs mb-1 text-slate-400">
                   {t('nombreEquipo')}
                 </label>
                 <input
                   {...register('nombre')}
-                  className="w-full px-2 py-1.5 rounded text-sm"
-                  style={{ background: '#0a0a0f', color: '#f1f5f9', border: '1px solid #64748b' }}
+                  className="w-full px-2 py-1.5 rounded text-sm bg-slate-900/70 text-slate-200 border border-slate-700 focus:ring-2 focus:ring-cyan-500 outline-none"
                 />
                 {errors.nombre && (
-                  <p className="text-xs mt-0.5" style={{ color: '#ef4444' }}>
+                  <p className="text-xs mt-0.5 text-red-400">
                     {errors.nombre.message}
                   </p>
                 )}
               </div>
               <div>
-                <label className="block text-xs mb-1" style={{ color: '#94a3b8' }}>
+                <label className="block text-xs mb-1 text-slate-400">
                   Agent ID
                 </label>
                 <input
                   {...register('agentId')}
-                  className="w-full px-2 py-1.5 rounded text-sm font-mono"
-                  style={{ background: '#0a0a0f', color: '#f1f5f9', border: '1px solid #64748b' }}
+                  className="w-full px-2 py-1.5 rounded text-sm font-mono bg-slate-900/70 text-slate-200 border border-slate-700 focus:ring-2 focus:ring-cyan-500 outline-none"
                 />
                 {errors.agentId && (
-                  <p className="text-xs mt-0.5" style={{ color: '#ef4444' }}>
+                  <p className="text-xs mt-0.5 text-red-400">
                     {errors.agentId.message}
                   </p>
                 )}
@@ -165,18 +183,17 @@ export function EditTeamRow({ team, statusColors, onUpdated, onDeleted }: Props)
 
             {/* descripcion */}
             <div>
-              <label className="block text-xs mb-1" style={{ color: '#94a3b8' }}>
+              <label className="block text-xs mb-1 text-slate-400">
                 {t('descripcionEquipo')}
               </label>
               <textarea
                 {...register('descripcion')}
                 rows={2}
-                className="w-full px-2 py-1.5 rounded text-sm resize-none"
-                style={{ background: '#0a0a0f', color: '#f1f5f9', border: '1px solid #64748b' }}
+                className="w-full px-2 py-1.5 rounded text-sm resize-none bg-slate-900/70 text-slate-200 border border-slate-700 focus:ring-2 focus:ring-cyan-500 outline-none"
                 placeholder={t('descripcionPlaceholder')}
               />
               {errors.descripcion && (
-                <p className="text-xs mt-0.5" style={{ color: '#ef4444' }}>
+                <p className="text-xs mt-0.5 text-red-400">
                   {errors.descripcion.message}
                 </p>
               )}
@@ -184,13 +201,11 @@ export function EditTeamRow({ team, statusColors, onUpdated, onDeleted }: Props)
 
             {/* Avatar section */}
             <div
-              className="rounded-lg p-3 flex items-start gap-4"
-              style={{ background: '#0f172a', border: '1px solid #334155' }}
+              className="rounded-lg p-3 flex items-start gap-4 bg-slate-900/50 border border-slate-700"
             >
               {/* Thumbnail */}
               <div
-                className="flex-shrink-0 w-16 h-16 rounded-md overflow-hidden flex items-center justify-center"
-                style={{ background: '#1e293b' }}
+                className="flex-shrink-0 w-16 h-16 rounded-md overflow-hidden flex items-center justify-center bg-slate-800"
               >
                 {avatarUrl ? (
                   <Image
@@ -208,7 +223,7 @@ export function EditTeamRow({ team, statusColors, onUpdated, onDeleted }: Props)
 
               {/* Controls */}
               <div className="flex-1 space-y-2">
-                <p className="text-xs font-medium" style={{ color: '#94a3b8' }}>
+                <p className="text-xs font-medium text-slate-400">
                   {t('avatar')}
                 </p>
                 <div className="flex gap-2 flex-wrap">
@@ -216,8 +231,7 @@ export function EditTeamRow({ team, statusColors, onUpdated, onDeleted }: Props)
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
                     disabled={avatarLoading}
-                    className="text-xs px-3 py-1.5 rounded font-medium disabled:opacity-50"
-                    style={{ background: '#334155', color: '#e2e8f0' }}
+                    className="text-xs px-3 py-1.5 rounded font-medium disabled:opacity-50 bg-slate-700 text-slate-300 hover:bg-slate-600"
                   >
                     {t('subirAvatar')}
                   </button>
@@ -236,25 +250,49 @@ export function EditTeamRow({ team, statusColors, onUpdated, onDeleted }: Props)
                     type="button"
                     onClick={handleGenerate}
                     disabled={avatarLoading}
-                    className="text-xs px-3 py-1.5 rounded font-medium disabled:opacity-50"
-                    style={{ background: '#7c3aed22', color: '#a78bfa', border: '1px solid #7c3aed55' }}
+                    className="text-xs px-3 py-1.5 rounded font-medium disabled:opacity-50 bg-indigo-600/20 text-indigo-300 border border-indigo-600/40 hover:bg-indigo-600/30"
                   >
                     {avatarLoading ? `⏳ ${t('generandoAvatar')}` : `✨ ${t('generarConIA')}`}
                   </button>
                 </div>
                 {avatarError && (
-                  <p className="text-xs" style={{ color: '#ef4444' }}>{avatarError}</p>
+                  <p className="text-xs text-red-400">{avatarError}</p>
                 )}
                 {avatarLoading && !avatarError && (
-                  <p className="text-xs" style={{ color: '#64748b' }}>{t('generandoAvatarDesc')}</p>
+                  <p className="text-xs text-slate-500">{t('generandoAvatarDesc')}</p>
                 )}
               </div>
             </div>
 
+            {/* Owner selector */}
+            <div>
+              <label className="block text-xs mb-1 text-slate-400">
+                {t('ownerEquipo')}
+              </label>
+              <select
+                value={ownerUserId}
+                onChange={(e) => setOwnerUserId(e.target.value)}
+                disabled={usersLoading}
+                className="w-full px-2 py-1.5 rounded text-sm bg-slate-900/70 text-slate-200 border border-slate-700 focus:ring-2 focus:ring-cyan-500 outline-none disabled:opacity-60"
+              >
+                {usersLoading && (
+                  <option value="">{t('cargandoUsuarios')}</option>
+                )}
+                {users.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.nombre} ({u.email})
+                  </option>
+                ))}
+                {/* Fallback: if users not yet loaded, show the current id */}
+                {!usersLoading && users.length === 0 && (
+                  <option value={ownerUserId}>{ownerUserId}</option>
+                )}
+              </select>
+            </div>
+
             {/* Members section */}
             <div
-              className="rounded-lg p-3"
-              style={{ background: '#0f172a', border: '1px solid #334155' }}
+              className="rounded-lg p-3 bg-slate-900/50 border border-slate-700"
             >
               <MembersEditor
                 teamId={team.id}
@@ -266,21 +304,19 @@ export function EditTeamRow({ team, statusColors, onUpdated, onDeleted }: Props)
 
             {/* Submit / cancel */}
             {serverError && (
-              <p className="text-xs" style={{ color: '#ef4444' }}>{serverError}</p>
+              <p className="text-xs text-red-400">{serverError}</p>
             )}
             <div className="flex gap-2">
               <button
                 onClick={handleSubmit(onSubmit)}
                 disabled={isSubmitting || avatarLoading}
-                className="text-xs px-3 py-1.5 rounded font-semibold disabled:opacity-50"
-                style={{ background: '#22c55e22', color: '#22c55e' }}
+                className="text-xs px-3 py-1.5 rounded font-semibold disabled:opacity-50 bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30"
               >
                 {isSubmitting ? '...' : tCommon('guardar')}
               </button>
               <button
                 onClick={handleCancel}
-                className="text-xs px-2 py-1.5 rounded"
-                style={{ background: '#334155', color: '#94a3b8' }}
+                className="text-xs px-2 py-1.5 rounded bg-slate-700 text-slate-300 hover:bg-slate-600"
               >
                 {tCommon('cancelar')}
               </button>
@@ -293,12 +329,11 @@ export function EditTeamRow({ team, statusColors, onUpdated, onDeleted }: Props)
 
   // ── View mode ─────────────────────────────────────────────────────────────
   return (
-    <tr style={{ borderBottom: '1px solid #1e293b' }}>
+    <tr className="border-b border-slate-700/50">
       {/* Avatar */}
       <td className="px-4 py-3">
         <div
-          className="w-10 h-10 rounded-md overflow-hidden flex items-center justify-center"
-          style={{ background: '#1e293b' }}
+          className="w-10 h-10 rounded-md overflow-hidden flex items-center justify-center bg-slate-700"
         >
           {avatarUrl ? (
             <Image
@@ -319,14 +354,14 @@ export function EditTeamRow({ team, statusColors, onUpdated, onDeleted }: Props)
       <td className="px-4 py-3">
         <span className="font-medium">{team.nombre}</span>
         {team.descripcion && (
-          <p className="text-xs mt-0.5 truncate max-w-[200px]" style={{ color: '#64748b' }}>
+          <p className="text-xs mt-0.5 truncate max-w-[200px] text-slate-500">
             {team.descripcion}
           </p>
         )}
       </td>
 
       {/* Agent ID */}
-      <td className="px-4 py-3 font-mono text-xs" style={{ color: '#64748b' }}>
+      <td className="px-4 py-3 font-mono text-xs text-slate-500">
         {team.agentId}
       </td>
 
@@ -344,9 +379,8 @@ export function EditTeamRow({ team, statusColors, onUpdated, onDeleted }: Props)
       <td className="px-4 py-3">
         <div className="flex gap-2">
           <button
-            onClick={() => setEditing(true)}
-            className="text-xs px-2 py-1 rounded"
-            style={{ color: '#f59e0b', background: '#f59e0b22' }}
+            onClick={openEdit}
+            className="text-xs px-2 py-1 rounded bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20"
             title={t('editarEquipo')}
           >
             ✎
@@ -361,4 +395,3 @@ export function EditTeamRow({ team, statusColors, onUpdated, onDeleted }: Props)
     </tr>
   );
 }
-

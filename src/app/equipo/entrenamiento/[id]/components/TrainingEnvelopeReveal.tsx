@@ -8,25 +8,22 @@ interface TrainingEnvelopeRevealProps {
 }
 
 export function TrainingEnvelopeReveal({ game, equipoId }: TrainingEnvelopeRevealProps) {
-  if (game.estado === 'en_curso') {
+  if (!game.sobres) {
     return (
       <div className="rounded-lg border border-slate-700 bg-slate-800 p-4 text-center text-slate-400">
-        🔒 El sobre secreto se revelará al finalizar la partida
+        🔒 Cargando sobre secreto…
       </div>
     );
   }
 
-  if (!game.sobres) {
-    return null;
-  }
-
-  const won = game.resultado?.ganadorId === equipoId;
-  const lost = game.resultado?.ganadorId && game.resultado.ganadorId !== equipoId;
+  const isLive = game.estado === 'en_curso';
+  const won = !isLive && game.resultado?.ganadorId === equipoId;
+  const lost = !isLive && game.resultado?.ganadorId && game.resultado.ganadorId !== equipoId;
 
   return (
     <div className={`rounded-lg border p-4 ${won ? 'border-green-600 bg-green-900/20' : 'border-slate-600 bg-slate-800'}`}>
       <p className="mb-3 text-lg font-bold text-white flex items-center gap-2">
-        🔓 Sobre secreto revelado
+        {isLive ? '🔍 Sobre secreto (modo entrenamiento)' : '🔓 Sobre secreto revelado'}
         {won && <span className="text-green-400 text-base">(¡Tu agente ganó!)</span>}
         {lost && <span className="text-red-400 text-base">(Ganó otro equipo)</span>}
         {game.estado === 'abortada' && <span className="text-yellow-400 text-base">(Partida abortada{game.motivoAbort ? `: ${game.motivoAbort}` : ''})</span>}

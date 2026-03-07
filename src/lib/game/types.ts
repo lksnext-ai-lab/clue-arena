@@ -8,6 +8,8 @@ export interface GameState {
   gameId: string;
   estado: 'pendiente' | 'en_curso' | 'finalizada';
   turnoActual: number;
+  /** Número máximo de turnos configurado para la partida. null = sin límite */
+  maxTurnos: number | null;
   sobre: { sospechoso: Sospechoso; arma: Arma; habitacion: Habitacion };
   equipos: EquipoState[];
   historial: ActionRecord[];
@@ -105,6 +107,8 @@ export interface GameStateView {
   gameId: string;
   estado: string;
   turnoActual: number;
+  /** copia del campo maxTurnos del estado para que los agentes conozcan cuántos giros quedan */
+  maxTurnos: number | null;
   equipos: EquipoStateView[];
   historial: ActionRecordView[];
   esElTurnoDeEquipo: boolean;

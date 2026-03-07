@@ -19,9 +19,17 @@ describe('Game Engine', () => {
     expect(state.equipos).toHaveLength(3);
     expect(state.estado).toBe('pendiente');
     expect(state.turnoActual).toBe(0);
+    expect(state.maxTurnos).toBeNull(); // default no limit
     expect(state.sobre.sospechoso).toBeTruthy();
     expect(state.sobre.arma).toBeTruthy();
     expect(state.sobre.habitacion).toBeTruthy();
+  });
+
+  it('view includes maxTurnos when provided', () => {
+    const state = initGame(TEAM_IDS, 42);
+    state.maxTurnos = 25;
+    const view = getGameStateView(state, 'team-a');
+    expect(view.maxTurnos).toBe(25);
   });
 
   it('deals all cards (minus envelope) to teams', () => {
@@ -147,6 +155,13 @@ describe('Game Engine', () => {
     });
 
     expect(isGameOver(r2.state)).toBe(true);
+  });
+
+  it('view includes maxTurnos when provided', () => {
+    const state = initGame(TEAM_IDS, 42);
+    state.maxTurnos = 25;
+    const view = getGameStateView(state, 'team-a');
+    expect(view.maxTurnos).toBe(25);
   });
 
   // --------------- Scoring tests (G001) ---------------

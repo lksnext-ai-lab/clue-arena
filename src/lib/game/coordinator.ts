@@ -29,6 +29,7 @@ import { eq, and, count, sql, inArray } from 'drizzle-orm';
 import type { ScoreEventType } from '@/lib/game/types';
 import type { InferSelectModel } from 'drizzle-orm';
 import { gameEventEmitter } from '@/lib/ws/GameEventEmitter';
+import { notificationEmitter } from '@/lib/ws/NotificationEmitter';
 
 /** Row type for partidaEquipos table */
 type TeamRow = InferSelectModel<typeof partidaEquipos>;
@@ -368,6 +369,8 @@ export async function advanceTurn(gameId: string): Promise<AdvanceTurnResult> {
         gameId,
         payload: { nuevoEstado: 'finalizada' },
       });
+      notificationEmitter.emitGlobal({ type: 'notification:game_finished', gameId, nombre: partida.nombre, ganadorId: null, ganadorNombre: null, ts: Date.now() });
+      notificationEmitter.emitGlobal({ type: 'notification:ranking_updated', ts: Date.now() });
     }
 
     return {
@@ -464,6 +467,8 @@ export async function advanceTurn(gameId: string): Promise<AdvanceTurnResult> {
         gameId,
         payload: { nuevoEstado: 'finalizada' },
       });
+      notificationEmitter.emitGlobal({ type: 'notification:game_finished', gameId, nombre: partida.nombre, ganadorId: null, ganadorNombre: null, ts: Date.now() });
+      notificationEmitter.emitGlobal({ type: 'notification:ranking_updated', ts: Date.now() });
     }
 
     return {
@@ -506,6 +511,9 @@ export async function advanceTurn(gameId: string): Promise<AdvanceTurnResult> {
         gameId,
         payload: { nuevoEstado: 'finalizada' },
       });
+      // F018: winner is the team that made the correct accusation
+      notificationEmitter.emitGlobal({ type: 'notification:game_finished', gameId, nombre: partida.nombre, ganadorId: currentTeam.equipoId, ganadorNombre: teamNombres.get(currentTeam.equipoId) ?? null, ts: Date.now() });
+      notificationEmitter.emitGlobal({ type: 'notification:ranking_updated', ts: Date.now() });
     }
 
     return {
@@ -548,6 +556,8 @@ export async function advanceTurn(gameId: string): Promise<AdvanceTurnResult> {
         gameId,
         payload: { nuevoEstado: 'finalizada' },
       });
+      notificationEmitter.emitGlobal({ type: 'notification:game_finished', gameId, nombre: partida.nombre, ganadorId: null, ganadorNombre: null, ts: Date.now() });
+      notificationEmitter.emitGlobal({ type: 'notification:ranking_updated', ts: Date.now() });
     }
 
     return {

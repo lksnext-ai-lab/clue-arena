@@ -57,10 +57,10 @@ export function AdminTeamsSection() {
   if (isLoading) {
     return (
       <section>
-        <h2 className="text-xl font-semibold mb-4" style={{ color: '#f59e0b' }}>
+        <h2 className="text-xl font-semibold mb-4 text-cyan-400">
           {t('equipos', { n: '…' })}
         </h2>
-        <p className="text-sm" style={{ color: '#64748b' }}>{t('cargandoEquipos')}</p>
+        <p className="text-sm text-slate-500">{t('cargandoEquipos')}</p>
       </section>
     );
   }
@@ -68,14 +68,13 @@ export function AdminTeamsSection() {
   return (
     <section>
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-semibold" style={{ color: '#f59e0b' }}>
+        <h2 className="text-xl font-semibold text-cyan-400">
           {t('equipos', { n: teams.length })}
         </h2>
         {!showCreateForm && (
           <button
             onClick={() => setShowCreateForm(true)}
-            className="px-3 py-1.5 rounded-md text-sm font-medium transition-colors"
-            style={{ background: '#f59e0b', color: '#0a0a0f' }}
+            className="px-3 py-1.5 rounded-md text-sm font-medium transition-colors bg-cyan-500 text-slate-900 hover:bg-cyan-400"
           >
             {t('crearEquipo')}
           </button>
@@ -91,35 +90,34 @@ export function AdminTeamsSection() {
 
       {fetchError && (
         <div
-          className="px-4 py-3 rounded-md text-sm mb-4"
-          style={{ background: '#7f1d1d', color: '#fca5a5' }}
+          className="px-4 py-3 rounded-md text-sm mb-4 bg-red-900/40 text-red-300 border border-red-500/30"
         >
           {fetchError}
         </div>
       )}
 
       {teams.length === 0 ? (
-        <p className="text-sm" style={{ color: '#64748b' }}>
+        <p className="text-sm text-slate-500">
           {t('equiposSinRegistrar')}
         </p>
       ) : (
-        <div className="rounded-xl overflow-hidden" style={{ background: '#1a1a2e' }}>
+        <div className="rounded-xl overflow-hidden bg-slate-800 border border-slate-700">
           <table className="w-full text-sm">
-            <thead>
-              <tr style={{ borderBottom: '1px solid #334155' }}>
-                <th className="px-4 py-3 text-left w-12" style={{ color: '#64748b' }}>
+            <thead className="bg-slate-900/50">
+              <tr className="border-b border-slate-700">
+                <th className="px-4 py-3 text-left w-12 text-slate-500">
                   {t('avatar')}
                 </th>
-                <th className="px-4 py-3 text-left" style={{ color: '#64748b' }}>
+                <th className="px-4 py-3 text-left text-slate-500">
                   {t('nombre')}
                 </th>
-                <th className="px-4 py-3 text-left" style={{ color: '#64748b' }}>
+                <th className="px-4 py-3 text-left text-slate-500">
                   {t('agentId')}
                 </th>
-                <th className="px-4 py-3 text-left" style={{ color: '#64748b' }}>
+                <th className="px-4 py-3 text-left text-slate-500">
                   {t('estado')}
                 </th>
-                <th className="px-4 py-3 text-left" style={{ color: '#64748b' }}>
+                <th className="px-4 py-3 text-left text-slate-500">
                   {t('acciones')}
                 </th>
               </tr>

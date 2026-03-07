@@ -8,7 +8,7 @@ import type { GameStatus } from '@/types/domain';
 /**
  * /arena — Gateway hacia las vistas de espectador.
  * Lista las partidas en curso y las últimas finalizadas.
- * Cualquier usuario autenticado puede acceder (el layout protege la ruta).
+ * Página pública accesible sin autenticación.
  */
 export default async function ArenaGatewayPage() {
   const allGames = await db

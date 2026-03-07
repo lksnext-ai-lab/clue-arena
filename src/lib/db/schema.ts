@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, real, primaryKey } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, real, primaryKey, unique } from 'drizzle-orm/sqlite-core';
 import { relations } from 'drizzle-orm';
 
 // --- usuarios ---
@@ -248,6 +248,7 @@ export const partidasEntrenamiento = sqliteTable('partidas_entrenamiento', {
                 enum: ['en_curso', 'finalizada', 'abortada'],
               }).notNull().default('en_curso'),
   numBots:    integer('num_bots').notNull().default(2),     // 1–5 bot opponents
+  maxTurnos:  integer('max_turnos').notNull().default(50),  // Turn cap (5–200)
   seed:       text('seed'),                                 // Reproducible seed (optional)
   sobresJson: text('sobres_json'),                          // JSON envelope (visible when finished)
   resultadoJson: text('resultado_json'),                    // Simulated score result JSON
@@ -270,6 +271,7 @@ export const turnosEntrenamiento = sqliteTable('turnos_entrenamiento', {
   agentTrace:     text('agent_trace_json'),                 // AgentInteractionTrace JSON (real team only)
   memoriaInicial: text('memoria_inicial_json'),             // Memory state before turn
   memoriaFinal:   text('memoria_final_json'),               // Memory state after turn
+  refutacionJson: text('refutacion_json'),                  // RefutacionRecord JSON — populated for suggestion turns
   durationMs:     integer('duration_ms'),
   createdAt:      integer('created_at', { mode: 'timestamp' }).notNull(),
 });
@@ -297,4 +299,84 @@ export const pasesRelations = relations(pases, ({ one }) => ({
   turno: one(turnos, { fields: [pases.turnoId], references: [turnos.id] }),
   partida: one(partidas, { fields: [pases.partidaId], references: [partidas.id] }),
   equipo: one(equipos, { fields: [pases.equipoId], references: [equipos.id] }),
+}));
+
+// ─── G005: Tournament system ──────────────────────────────────────────────────
+
+// --- tournaments ---
+export const tournaments = sqliteTable('tournaments', {
+  id:         text('id').primaryKey(),
+  name:       text('name').notNull(),
+  format:     text('format', {
+                enum: ['round_robin', 'single_bracket', 'group_stage', 'custom'] as const,
+              }).notNull(),
+  status:     text('status', {
+                enum: ['draft', 'active', 'finished'] as const,
+              }).notNull().default('draft'),
+  config:     text('config').notNull(), // JSON blob — see TournamentConfig schemas
+  createdAt:  integer('created_at', { mode: 'timestamp' }).notNull(),
+  startedAt:  integer('started_at', { mode: 'timestamp' }),
+  finishedAt: integer('finished_at', { mode: 'timestamp' }),
+});
+
+// --- tournament_teams ---
+export const tournamentTeams = sqliteTable('tournament_teams', {
+  id:           text('id').primaryKey(),
+  tournamentId: text('tournament_id').notNull()
+                  .references(() => tournaments.id, { onDelete: 'cascade' }),
+  teamId:       text('team_id').notNull()
+                  .references(() => equipos.id, { onDelete: 'cascade' }),
+  seed:         integer('seed'),         // initial seeding (null = no seed)
+  groupIndex:   integer('group_index'),  // only for format = 'group_stage'
+  eliminated:   integer('eliminated', { mode: 'boolean' }).notNull().default(false),
+}, (t) => ({
+  uniq: unique().on(t.tournamentId, t.teamId),
+}));
+
+// --- tournament_rounds ---
+export const tournamentRounds = sqliteTable('tournament_rounds', {
+  id:           text('id').primaryKey(),
+  tournamentId: text('tournament_id').notNull()
+                  .references(() => tournaments.id, { onDelete: 'cascade' }),
+  roundNumber:  integer('round_number').notNull(),
+  phase:        text('phase', {
+                  enum: ['group_stage', 'round_of_16', 'quarterfinal',
+                         'semifinal', 'final', 'round'] as const,
+                }).notNull().default('round'),
+  status:       text('status', {
+                  enum: ['pending', 'active', 'finished'] as const,
+                }).notNull().default('pending'),
+  generatedAt:  integer('generated_at', { mode: 'timestamp' }),
+  finishedAt:   integer('finished_at', { mode: 'timestamp' }),
+});
+
+// --- tournament_round_games ---
+export const tournamentRoundGames = sqliteTable('tournament_round_games', {
+  id:      text('id').primaryKey(),
+  roundId: text('round_id').notNull()
+             .references(() => tournamentRounds.id, { onDelete: 'cascade' }),
+  gameId:  text('game_id')
+             .references(() => partidas.id, { onDelete: 'cascade' }),
+  isBye:   integer('is_bye', { mode: 'boolean' }).notNull().default(false),
+});
+
+// --- Tournament Relations ---
+export const tournamentsRelations = relations(tournaments, ({ many }) => ({
+  teams:  many(tournamentTeams),
+  rounds: many(tournamentRounds),
+}));
+
+export const tournamentTeamsRelations = relations(tournamentTeams, ({ one }) => ({
+  tournament: one(tournaments, { fields: [tournamentTeams.tournamentId], references: [tournaments.id] }),
+  team:       one(equipos,     { fields: [tournamentTeams.teamId],       references: [equipos.id] }),
+}));
+
+export const tournamentRoundsRelations = relations(tournamentRounds, ({ one, many }) => ({
+  tournament: one(tournaments,        { fields: [tournamentRounds.tournamentId], references: [tournaments.id] }),
+  games:      many(tournamentRoundGames),
+}));
+
+export const tournamentRoundGamesRelations = relations(tournamentRoundGames, ({ one }) => ({
+  round: one(tournamentRounds, { fields: [tournamentRoundGames.roundId], references: [tournamentRounds.id] }),
+  game:  one(partidas,         { fields: [tournamentRoundGames.gameId],  references: [partidas.id] }),
 }));

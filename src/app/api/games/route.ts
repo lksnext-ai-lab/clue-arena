@@ -6,6 +6,7 @@ import { eq } from 'drizzle-orm';
 import { CreateGameSchema } from '@/lib/schemas/game';
 import { initGame } from '@/lib/game/engine';
 import { v4 as uuidv4 } from 'uuid';
+import { notificationEmitter } from '@/lib/ws/NotificationEmitter';
 
 // GET /api/games  (Admin: all games; Equipo: only their games)
 export async function GET(request: Request) {
@@ -156,6 +157,14 @@ export async function POST(request: Request) {
     .innerJoin(equipos, eq(partidaEquipos.equipoId, equipos.id))
     .where(eq(partidaEquipos.partidaId, gameId))
     .all();
+
+  // F018: notify all connected clients that a new official game has been scheduled
+  notificationEmitter.emitGlobal({
+    type: 'notification:game_scheduled',
+    gameId,
+    nombre,
+    ts: Date.now(),
+  });
 
   return NextResponse.json(
     {

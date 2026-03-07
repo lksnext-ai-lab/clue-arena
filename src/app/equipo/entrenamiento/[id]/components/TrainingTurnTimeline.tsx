@@ -1,6 +1,6 @@
 'use client';
 
-import type { AgentAction, TrainingTurnResponse } from '@/types/api';
+import type { AgentAction, TrainingTurnResponse, RefutacionRecord } from '@/types/api';
 import { TrainingGameStateDebug } from './TrainingGameStateDebug';
 import { TrainingAgentInteractionLog } from './TrainingAgentInteractionLog';
 
@@ -28,6 +28,44 @@ function getActionLabel(turn: TrainingTurnResponse): string {
   if (action.type === 'show_card') return 'Mostrar carta';
   if (action.type === 'cannot_refute') return 'Sin refutación';
   return (action as { type: string }).type;
+}
+
+/** Inline refutation block shown below suggestion/accusation turn cards. */
+function RefutacionInline({
+  refutacion,
+  allEquipoId,
+}: {
+  refutacion: RefutacionRecord;
+  allEquipoId: string;
+}) {
+  if (refutacion.refutadaPor === null) {
+    return (
+      <div className="mt-2 rounded border border-slate-600/50 bg-slate-700/30 px-2 py-1.5 text-xs text-slate-400">
+        🔓 <span className="font-medium text-slate-300">Nadie pudo refutar</span> — ningún equipo tenía las cartas
+      </div>
+    );
+  }
+  const refutorLabel =
+    refutacion.refutadaPor === allEquipoId
+      ? 'Tu equipo'
+      : refutacion.refutadaPor.startsWith('bot-')
+      ? `Bot ${refutacion.refutadaPor.replace('bot-', '')}`
+      : refutacion.refutadaPor;
+  return (
+    <div className="mt-2 rounded border border-amber-700/40 bg-amber-900/10 px-2 py-1.5 text-xs">
+      <span className="text-amber-400 font-semibold">🃏 Refutó:</span>{' '}
+      <span className="text-slate-200">{refutorLabel}</span>
+      {refutacion.cartaMostrada && (
+        <>
+          {' '}
+          <span className="text-slate-400">con</span>{' '}
+          <span className="rounded bg-amber-900/40 px-1.5 py-0.5 font-medium text-amber-200">
+            {refutacion.cartaMostrada}
+          </span>
+        </>
+      )}
+    </div>
+  );
 }
 
 function TurnCard({ turn, equipoId }: { turn: TrainingTurnResponse; equipoId: string }) {
@@ -80,6 +118,14 @@ function TurnCard({ turn, equipoId }: { turn: TrainingTurnResponse; equipoId: st
             <span className="text-white">{(action as { room: string }).room}</span>
           </div>
         </div>
+      )}
+
+      {/* Refutation outcome — shown inline under suggestion turns */}
+      {action && action.type === 'suggestion' && turn.refutacion !== undefined && (
+        <RefutacionInline
+          refutacion={turn.refutacion ?? { refutadaPor: null, cartaMostrada: null }}
+          allEquipoId={equipoId}
+        />
       )}
 
       {/* Action details — refutation (show_card) */}

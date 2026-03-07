@@ -237,3 +237,10 @@ export const ESCENARIO_META: Record<Habitacion, EscenarioMeta> = {
   'Recursos Humanos':       { imagen: '/game/escenarios/escenario-recursos-humanos.webp',  emoji: '👥' },
   'El Almacén de IT':       { imagen: '/game/escenarios/escenario-almacen-it.webp',        emoji: '📦' },
 };
+
+// ── G005: Tournament types ────────────────────────────────────────────────────
+
+export type TournamentFormat = 'round_robin' | 'single_bracket' | 'group_stage' | 'custom';
+export type TournamentStatus = 'draft' | 'active' | 'finished';
+export type TournamentRoundPhase = 'group_stage' | 'round_of_16' | 'quarterfinal' | 'semifinal' | 'final' | 'round';
+export type TournamentRoundStatus = 'pending' | 'active' | 'finished';

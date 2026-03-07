@@ -1,0 +1,1 @@
+ALTER TABLE `partidas_entrenamiento` ADD `max_turnos` integer DEFAULT 50 NOT NULL;

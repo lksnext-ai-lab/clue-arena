@@ -19,10 +19,11 @@ export default function NuevaEntrenamientoPage() {
     formState: { errors, isSubmitting },
   } = useForm<CreateTrainingGameInput>({
     resolver: zodResolver(CreateTrainingGameSchema),
-    defaultValues: { numBots: 2 },
+    defaultValues: { numBots: 2, maxTurnos: 50 },
   });
 
   const numBots = watch('numBots') ?? 2;
+  const maxTurnos = watch('maxTurnos') ?? 50;
 
   const onSubmit = async (data: CreateTrainingGameInput) => {
     setSubmitError(null);
@@ -65,6 +66,32 @@ export default function NuevaEntrenamientoPage() {
           </div>
           {errors.numBots && (
             <p className="text-xs text-red-400 mt-1">{errors.numBots.message}</p>
+          )}
+        </div>
+
+        {/* MaxTurnos */}
+        <div>
+          <label className="block text-sm font-medium text-slate-300 mb-2">
+            Turnos máximos
+          </label>
+          <div className="flex gap-2">
+            {[20, 50, 100, 150, 200].map((n) => (
+              <button
+                key={n}
+                type="button"
+                onClick={() => setValue('maxTurnos', n, { shouldValidate: true })}
+                className={`flex-1 h-10 rounded border text-sm font-semibold transition
+                  ${maxTurnos === n
+                    ? 'border-indigo-500 bg-indigo-600 text-white'
+                    : 'border-slate-600 bg-slate-700 text-slate-300 hover:border-slate-400'
+                  }`}
+              >
+                {n}
+              </button>
+            ))}
+          </div>
+          {errors.maxTurnos && (
+            <p className="text-xs text-red-400 mt-1">{errors.maxTurnos.message}</p>
           )}
         </div>
 

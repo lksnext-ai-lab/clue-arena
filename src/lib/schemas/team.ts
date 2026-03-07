@@ -25,6 +25,7 @@ export const UpdateTeamSchema = z.object({
   avatarUrl: z.string().nullable().optional(),
   estado: z.enum(['registrado', 'activo', 'finalizado']).optional(),
   miembros: emailList,
+  usuarioId: z.string().min(1).optional(),
 });
 
 export type UpdateTeamInput = z.infer<typeof UpdateTeamSchema>;

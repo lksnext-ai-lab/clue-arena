@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({ errors: parsed.error.flatten().fieldErrors }, { status: 422 });
   }
-  const { numBots, seed } = parsed.data;
+  const { numBots, maxTurnos, seed } = parsed.data;
 
   // Rate limiting: enforce 60 s between game creations
   const recentGames = await db
@@ -172,6 +172,7 @@ export async function POST(request: NextRequest) {
     equipoId,
     estado: 'en_curso',
     numBots,
+    maxTurnos,
     seed: resolvedSeed,
     createdAt: new Date(),
   });
@@ -180,7 +181,7 @@ export async function POST(request: NextRequest) {
   // The client navigates to the detail page immediately and polls for updates.
   after(async () => {
     try {
-      await runTrainingGameLoop({ gameId, equipoId, numBots, seed: resolvedSeed });
+      await runTrainingGameLoop({ gameId, equipoId, numBots, maxTurnos, seed: resolvedSeed });
     } catch (err) {
       await db
         .update(partidasEntrenamiento)

@@ -52,6 +52,7 @@ export async function GET(
       esBot: t.esBot,
       numero: t.numero,
       accion: t.accion ? JSON.parse(t.accion) : null,
+      refutacion: t.refutacionJson ? JSON.parse(t.refutacionJson) : null,
       durationMs: t.durationMs,
       createdAt: t.createdAt?.toISOString() ?? '',
     };

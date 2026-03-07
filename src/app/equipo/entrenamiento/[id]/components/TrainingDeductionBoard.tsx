@@ -1,113 +1,294 @@
 'use client';
 
-import { useMemo } from 'react';
-import { buildDeductionBoard, ALL_CARDS } from '@/lib/utils/deduction-board';
-import type { TurnResponse, TrainingTurnResponse } from '@/types/api';
+import React, { useMemo, useState } from 'react';
+import { cn } from '@/lib/utils/cn';
+import {
+  buildDeductionBoard,
+  boardKey,
+  SOSPECHOSOS,
+  ARMAS,
+  HABITACIONES,
+  type CardCategory,
+} from '@/lib/utils/deduction-board';
+import type { TrainingTurnResponse, TurnResponse } from '@/types/api';
+import type { GameStateView, ActionRecordView } from '@/lib/game/types';
 
 interface TrainingDeductionBoardProps {
   turns: TrainingTurnResponse[];
+  /** [realEquipoId, 'bot-1', 'bot-2', …] */
   equipoIds: string[];
   realEquipoId: string;
 }
 
+interface EquipoCol {
+  id: string;
+  label: string;
+  cards: Set<string>;
+}
+
+const CATEGORY_LABELS: Record<CardCategory, string> = {
+  sospechoso: 'SOSPECHOSOS',
+  arma: 'ARMAS',
+  habitacion: 'HABITACIONES',
+};
+
+const SECTIONS: { category: CardCategory; cards: readonly string[] }[] = [
+  { category: 'sospechoso', cards: SOSPECHOSOS },
+  { category: 'arma', cards: ARMAS },
+  { category: 'habitacion', cards: HABITACIONES },
+];
+
+// ---------------------------------------------------------------------------
+// Tooltip (identical to ArenaDeductionBoard)
+// ---------------------------------------------------------------------------
+
+interface TooltipProps { text: string; children: React.ReactNode }
+function Tooltip({ text, children }: TooltipProps) {
+  const [visible, setVisible] = useState(false);
+  return (
+    <span
+      className="relative"
+      onMouseEnter={() => setVisible(true)}
+      onMouseLeave={() => setVisible(false)}
+    >
+      {children}
+      {visible && (
+        <span className="absolute z-10 bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2 py-1 rounded bg-slate-900 border border-slate-600 text-xs text-slate-200 whitespace-nowrap pointer-events-none shadow-lg">
+          {text}
+        </span>
+      )}
+    </span>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function teamLabel(id: string, realEquipoId: string): string {
+  return id === realEquipoId ? 'Tu equipo' : `Bot ${id.replace('bot-', '')}`;
+}
+
 /**
- * Adapts TrainingTurnResponse to the TurnResponse shape expected by buildDeductionBoard.
- * Only includes suggestion turns from the real team perspective.
+ * Converts TrainingTurnResponse[] → TurnResponse[] for buildDeductionBoard.
+ *
+ * Strategy:
+ * 1. The most accurate refutation data lives in the latest real-team
+ *    gameStateView historial. Use that for all suggestions it covers.
+ * 2. Supplement with raw accion data for turns that come after the latest
+ *    real-team snapshot (no refutadaPor yet, but cards are tracked).
  */
-function adaptTurns(turns: TrainingTurnResponse[]): TurnResponse[] {
-  return turns
+function adaptTurns(turns: TrainingTurnResponse[], realEquipoId: string): TurnResponse[] {
+  const latestViewTurn = [...turns].reverse().find((t) => t.gameStateView != null);
+  const historial: ActionRecordView[] = latestViewTurn?.gameStateView
+    ? (latestViewTurn.gameStateView as GameStateView).historial
+    : [];
+
+  // Part 1: from historial — has refutadaPor + cartaMostrada
+  const fromHistorial: TurnResponse[] = historial
+    .filter(
+      (h): h is ActionRecordView & { sospechoso: string; arma: string; habitacion: string } =>
+        h.tipo === 'suggestion' && !!h.sospechoso && !!h.arma && !!h.habitacion,
+    )
+    .map((h) => ({
+      id: `hist-${h.equipoId}-${h.turno}`,
+      equipoId: h.equipoId,
+      equipoNombre: teamLabel(h.equipoId, realEquipoId),
+      numero: h.turno,
+      estado: 'completado',
+      sugerencias: [
+        {
+          id: `hist-${h.equipoId}-${h.turno}`,
+          equipoId: h.equipoId,
+          sospechoso: h.sospechoso,
+          arma: h.arma,
+          habitacion: h.habitacion,
+          refutadaPor: h.refutadaPor ?? null,
+          cartaMostrada: h.cartaMostrada ?? null,
+          createdAt: new Date(h.timestamp).toISOString(),
+        },
+      ],
+    }));
+
+  // Part 2: turns after the snapshot (not yet in any historial)
+  const latestRealNumero = latestViewTurn?.numero ?? 0;
+  const recentTurns: TurnResponse[] = turns
     .filter((t) => {
-      const action = t.accion?.action;
-      return action?.type === 'suggestion' || action?.type === 'accusation' || action?.type === 'pass';
+      if (t.numero < latestRealNumero) return false;
+      return t.accion?.action?.type === 'suggestion';
     })
     .map((t) => {
-      const action = t.accion?.action;
-      const isSuggestion = action?.type === 'suggestion';
+      const action = t.accion!.action as {
+        type: 'suggestion'; suspect: string; weapon: string; room: string;
+      };
       return {
         id: t.id,
         equipoId: t.equipoId,
-        equipoNombre: t.esBot ? `Bot ${t.equipoId.replace('bot-', '')}` : 'Tu equipo',
+        equipoNombre: teamLabel(t.equipoId, realEquipoId),
         numero: t.numero,
         estado: 'completado',
-        sugerencias: isSuggestion
-          ? [
-              {
-                id: t.id,
-                equipoId: t.equipoId,
-                sospechoso: (action as { suspect: string }).suspect,
-                arma: (action as { weapon: string }).weapon,
-                habitacion: (action as { room: string }).room,
-                refutadaPor: null,
-                cartaMostrada: null,
-                createdAt: t.createdAt,
-              },
-            ]
-          : [],
-        acusacion: undefined,
-        pase: action?.type === 'pass' ? { id: t.id, equipoId: t.equipoId, origen: 'voluntario' as const, createdAt: t.createdAt } : undefined,
+        sugerencias: [
+          {
+            id: t.id,
+            equipoId: t.equipoId,
+            sospechoso: action.suspect,
+            arma: action.weapon,
+            habitacion: action.room,
+            refutadaPor: null,
+            cartaMostrada: null,
+            createdAt: t.createdAt,
+          },
+        ],
       };
     });
+
+  return [...fromHistorial, ...recentTurns];
 }
 
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
 export function TrainingDeductionBoard({ turns, equipoIds, realEquipoId }: TrainingDeductionBoardProps) {
-  const board = useMemo(() => {
-    const adapted = adaptTurns(turns);
-    return buildDeductionBoard(adapted, equipoIds);
-  }, [turns, equipoIds]);
+  // Real team's hand cards from the latest gameStateView
+  const equipoCols = useMemo<EquipoCol[]>(() => {
+    const latestViewTurn = [...turns]
+      .reverse()
+      .find((t) => t.gameStateView != null && t.equipoId === realEquipoId);
+    const view = latestViewTurn?.gameStateView as GameStateView | null;
+    const ownCards = new Set<string>(view?.equipos.find((e) => e.esPropio)?.cartas ?? []);
 
-  const teamCols = [realEquipoId, ...equipoIds.filter((id) => id !== realEquipoId)];
+    return equipoIds.map((id) => ({
+      id,
+      label: teamLabel(id, realEquipoId),
+      cards: id === realEquipoId ? ownCards : new Set(),
+    }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [equipoIds, realEquipoId, JSON.stringify(turns.map((t) => t.id))]);
 
-  if (turns.length === 0) {
-    return (
-      <div className="text-center text-slate-500 text-sm py-4">
-        El tablero se actualiza con cada sugerencia jugada.
-      </div>
-    );
-  }
+  const board = useMemo(
+    () => buildDeductionBoard(adaptTurns(turns, realEquipoId), equipoIds),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [
+      JSON.stringify(
+        turns.flatMap((t) =>
+          t.accion?.action?.type === 'suggestion'
+            ? [`${t.id}:${t.gameStateView ? 'v' : 'n'}`]
+            : [],
+        ),
+      ),
+      JSON.stringify(equipoIds),
+    ],
+  );
+
+  const hasAnyHandCards = equipoCols.some((e) => e.cards.size > 0);
 
   return (
-    <div className="overflow-auto">
+    <div className="rounded-xl border border-slate-700 bg-slate-800 p-4 overflow-x-auto">
+      <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">
+        Tablero de deducción
+      </h2>
+
       <table className="min-w-full text-xs border-collapse">
         <thead>
-          <tr className="bg-slate-700">
-            <th className="px-2 py-1 text-left text-slate-300 border border-slate-600">Carta</th>
-            {teamCols.map((tid) => (
-              <th key={tid} className="px-2 py-1 text-center text-slate-300 border border-slate-600">
-                {tid === realEquipoId ? 'Tu equipo' : `Bot ${tid.replace('bot-', '')}`}
+          <tr>
+            <th className="text-left text-slate-500 font-medium pb-2 pr-4 w-36">Carta</th>
+            {equipoCols.map((e) => (
+              <th key={e.id} className="pb-2 px-2 text-center min-w-[5rem]">
+                <span className="block font-medium text-center break-words leading-tight text-slate-300">
+                  {e.label}
+                </span>
               </th>
             ))}
           </tr>
         </thead>
         <tbody>
-          {ALL_CARDS.map(({ card, category }) => (
-            <tr key={card} className="odd:bg-slate-800 even:bg-slate-800/50">
-              <td className="px-2 py-1 border border-slate-700">
-                <span className="text-slate-400 mr-1 text-xs">[{category.charAt(0).toUpperCase()}]</span>
-                <span className="text-white">{card}</span>
-              </td>
-              {teamCols.map((tid) => {
-                const cell = board.get(`${tid}::${card}`);
-                const mentioned = cell?.turnos.length ?? 0;
-                const refuted = cell?.turnosRefutados.length ?? 0;
-                return (
-                  <td key={tid} className="px-2 py-1 text-center border border-slate-700">
-                    {mentioned > 0 ? (
-                      <span className={refuted > 0 ? 'text-yellow-400' : 'text-green-400'}>
-                        {mentioned} {refuted > 0 ? `(↯${refuted})` : ''}
-                      </span>
-                    ) : (
-                      <span className="text-slate-600">—</span>
-                    )}
-                  </td>
-                );
-              })}
-            </tr>
+          {SECTIONS.map(({ category, cards }) => (
+            <React.Fragment key={category}>
+              <tr>
+                <td
+                  colSpan={equipoCols.length + 1}
+                  className="pt-3 pb-1 text-xs font-semibold text-slate-500 uppercase tracking-widest"
+                >
+                  {CATEGORY_LABELS[category]}
+                </td>
+              </tr>
+              {cards.map((card) => (
+                <tr key={card} className="border-t border-slate-700/40">
+                  <td className="py-1 pr-4 text-slate-400 whitespace-nowrap">{card}</td>
+                  {equipoCols.map((e) => {
+                    const inHand = e.cards.has(card);
+                    const cell = board.get(boardKey(e.id, card));
+                    const seen = cell && cell.turnos.length > 0;
+                    const refuted = seen && cell!.turnosRefutados.length > 0;
+                    const tooltipText = inHand
+                      ? 'En tu mano'
+                      : seen
+                      ? cell!.turnos
+                          .map((t) => (cell!.turnosRefutados.includes(t) ? `T${t}↩` : `T${t}`))
+                          .join(', ')
+                      : '';
+                    return (
+                      <td key={e.id} className="py-1 px-1 text-center">
+                        {inHand ? (
+                          <Tooltip text={tooltipText}>
+                            <span className="inline-block w-5 h-5 rounded leading-5 cursor-default select-none bg-red-500/20 text-red-400">
+                              ♦
+                            </span>
+                          </Tooltip>
+                        ) : seen ? (
+                          <Tooltip text={tooltipText}>
+                            <span
+                              className={cn(
+                                'inline-block w-5 h-5 rounded leading-5 cursor-default select-none',
+                                refuted
+                                  ? 'bg-orange-500/20 text-orange-300'
+                                  : 'bg-cyan-500/20 text-cyan-300',
+                              )}
+                            >
+                              ✦
+                            </span>
+                          </Tooltip>
+                        ) : (
+                          <span className="inline-block w-5 h-5 rounded bg-slate-700/50 text-slate-600 leading-5 select-none text-center">
+                            ·
+                          </span>
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </React.Fragment>
           ))}
         </tbody>
       </table>
-      <p className="mt-1 text-xs text-slate-500">
-        Número de sugerencias que incluyen esa carta. ↯ = refutada por esa tripla.
-      </p>
+
+      {/* Legend */}
+      <div className="flex flex-wrap gap-3 mt-3 pt-2 border-t border-slate-700/40 text-xs text-slate-500">
+        <span className="flex items-center gap-1">
+          <span className="inline-block w-4 h-4 rounded bg-slate-700/50 text-slate-600 leading-4 text-center">·</span>
+          No propuesta
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="inline-block w-4 h-4 rounded bg-cyan-500/20 text-cyan-300 leading-4 text-center">✦</span>
+          Sugerida (sin refutar)
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="inline-block w-4 h-4 rounded bg-orange-500/20 text-orange-300 leading-4 text-center">✦</span>
+          Refutada
+        </span>
+        {hasAnyHandCards && (
+          <span className="flex items-center gap-1">
+            <span className="inline-block w-4 h-4 rounded bg-red-500/20 text-red-400 leading-4 text-center">♦</span>
+            En tu mano
+          </span>
+        )}
+      </div>
+
+      {turns.length === 0 && (
+        <p className="text-slate-600 text-xs mt-3">La partida no ha comenzado todavía.</p>
+      )}
     </div>
   );
 }

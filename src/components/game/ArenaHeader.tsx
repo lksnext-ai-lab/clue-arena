@@ -125,7 +125,7 @@ export function ArenaHeader({ partida, isAdmin, isSyncing, onRefresh }: ArenaHea
       {/* Admin controls */}
       {isAdmin && partida.estado !== 'finalizada' && (
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          {!isAuto && (
+          {!isAuto && !isPaused && (
             <button
               onClick={() => callAction('run')}
               disabled={busy === 'run'}
