@@ -1,11 +1,11 @@
 import { redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
-import { auth } from '@/lib/auth/config';
-import { User, Shield, Briefcase, Users, Link as LinkIcon } from 'lucide-react';
+import { getAuthSession } from '@/lib/auth/session';
+import { User, Shield, Users, Link as LinkIcon } from 'lucide-react';
 import Link from 'next/link';
 
 export default async function PerfilPage() {
-  const session = await auth();
+  const session = await getAuthSession();
   const t = await getTranslations('perfil');
 
   // The middleware is responsible for route protection.

@@ -20,7 +20,7 @@ const ADMIN_PATHS = ['/admin'];
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p));
+  const isPublic = PUBLIC_PATHS.some((p) => (p === '/' ? pathname === '/' : pathname.startsWith(p)));
 
   // Allow public paths, and also API routes that are not explicitly protected.
   if (isPublic || pathname.startsWith('/api/')) {
