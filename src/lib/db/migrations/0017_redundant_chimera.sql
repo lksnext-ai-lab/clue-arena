@@ -1,0 +1,1 @@
+ALTER TABLE `equipos` ADD `agent_backend` text DEFAULT 'mattin' NOT NULL;

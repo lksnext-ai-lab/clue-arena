@@ -43,16 +43,17 @@ export async function GET(
 
   const gamesData = await Promise.all(
     roundGames.map(async (rg) => {
-      if (rg.isBye) {
+      if (rg.isBye || !rg.gameId) {
         return { id: rg.id, gameId: null, isBye: true, teams: [], estado: null };
       }
 
-      const game = await db.select().from(partidas).where(eq(partidas.id, rg.gameId)).get();
+      const gameId = rg.gameId!;
+      const game = await db.select().from(partidas).where(eq(partidas.id, gameId)).get();
       const teamScores = await db
         .select({ pe: partidaEquipos, e: equipos })
         .from(partidaEquipos)
         .innerJoin(equipos, eq(partidaEquipos.equipoId, equipos.id))
-        .where(eq(partidaEquipos.partidaId, rg.gameId))
+        .where(eq(partidaEquipos.partidaId, gameId))
         .all();
 
       return {

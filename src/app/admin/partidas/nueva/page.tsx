@@ -1,21 +1,37 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import type { ReactNode } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import {
+  AlertTriangle,
+  ArrowLeft,
+  Check,
+  Crosshair,
+  Search,
+  ShieldAlert,
+  Sparkles,
+  Swords,
+  Users,
+} from 'lucide-react';
 import { CreateGameSchema, type CreateGameInput } from '@/lib/schemas/game';
 import { apiFetch } from '@/lib/api/client';
+import { cn } from '@/lib/utils/cn';
 import type { TeamResponse, GameResponse } from '@/types/api';
+
+type TeamFilter = 'all' | 'ready' | 'missing-agent';
+
+const TURN_PRESETS = [24, 40, 60];
 
 /**
  * UI-007 — Crear partida (Admin)
  *
- * Flujo:
- *  1. Carga equipos via GET /api/teams.
- *  2. Admin escribe nombre + selecciona 2–6 equipos.
- *  3. Equipos sin agent_id muestran badge "Sin agente".
- *  4. Submit → POST /api/games → redirige a UI-008.
+ * Rediseñada para priorizar:
+ *  1. Lectura rápida del estado de la convocatoria.
+ *  2. Selección de equipos con feedback inmediato.
+ *  3. Prevención visual de errores antes de crear la partida.
  */
 export default function NuevaPartidaPage() {
   const router = useRouter();
@@ -23,11 +39,14 @@ export default function NuevaPartidaPage() {
   const [loadingTeams, setLoadingTeams] = useState(true);
   const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
   const [serverError, setServerError] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
+  const [teamFilter, setTeamFilter] = useState<TeamFilter>('all');
 
   const {
     register,
     handleSubmit,
     setValue,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm<CreateGameInput>({
     resolver: zodResolver(CreateGameSchema),
@@ -42,12 +61,19 @@ export default function NuevaPartidaPage() {
   }, []);
 
   const toggleTeam = (id: string) => {
+    setServerError(null);
     setSelectedTeams((prev) => {
       let next: string[];
-      if (prev.includes(id)) next = prev.filter((t) => t !== id);
-      else if (prev.length >= 6) next = prev; // max 6
-      else next = [...prev, id];
-      setValue('equipoIds', next, { shouldValidate: true });
+
+      if (prev.includes(id)) {
+        next = prev.filter((teamId) => teamId !== id);
+      } else if (prev.length >= 6) {
+        next = prev;
+      } else {
+        next = [...prev, id];
+      }
+
+      setValue('equipoIds', next, { shouldValidate: true, shouldDirty: true });
       return next;
     });
   };
@@ -57,195 +83,567 @@ export default function NuevaPartidaPage() {
       setServerError('Selecciona al menos 2 equipos para la partida.');
       return;
     }
+
     setServerError(null);
+    const normalizedMaxTurnos =
+      typeof data.maxTurnos === 'number' && Number.isFinite(data.maxTurnos) ? data.maxTurnos : null;
+
     try {
       const game = await apiFetch<GameResponse>('/games', {
         method: 'POST',
-        body: JSON.stringify({ ...data, equipoIds: selectedTeams }),
+        body: JSON.stringify({ ...data, equipoIds: selectedTeams, maxTurnos: normalizedMaxTurnos }),
       });
+
       router.push(`/admin/partidas/${game.id}`);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Error al crear la partida';
-      setServerError(msg);
+      const message = err instanceof Error ? err.message : 'Error al crear la partida';
+      setServerError(message);
     }
   };
 
+  const nombre = watch('nombre');
+  const maxTurnos = watch('maxTurnos');
+  const readyTeams = teams.filter((team) => Boolean(team.agentId?.trim()));
+  const filteredTeams = teams.filter((team) => {
+    const matchesQuery =
+      query.trim().length === 0 ||
+      team.nombre.toLowerCase().includes(query.toLowerCase()) ||
+      team.id.toLowerCase().includes(query.toLowerCase()) ||
+      team.agentId.toLowerCase().includes(query.toLowerCase());
+
+    if (!matchesQuery) return false;
+    if (teamFilter === 'ready') return Boolean(team.agentId?.trim());
+    if (teamFilter === 'missing-agent') return !team.agentId?.trim();
+    return true;
+  });
+
+  const selectedTeamDetails = selectedTeams
+    .map((id) => teams.find((team) => team.id === id))
+    .filter((team): team is TeamResponse => Boolean(team));
+
+  const teamsWithoutAgent = selectedTeamDetails.filter((team) => !team.agentId?.trim());
+  const missingToMinimum = Math.max(0, 2 - selectedTeams.length);
+  const remainingSlots = Math.max(0, 6 - selectedTeams.length);
   const canSubmit = !isSubmitting && selectedTeams.length >= 2;
-  const teamsWithoutAgent = selectedTeams.filter(
-    (id) => !teams.find((t) => t.id === id)?.agentId
-  );
+
+  const selectionMessage =
+    selectedTeams.length === 0
+      ? 'Elige entre 2 y 6 equipos para preparar la mesa.'
+      : missingToMinimum > 0
+        ? `Falta ${missingToMinimum} equipo más para alcanzar el mínimo.`
+        : remainingSlots === 0
+          ? 'Has completado el máximo de 6 equipos.'
+          : `Configuración válida. Aún puedes añadir ${remainingSlots} equipo(s).`;
 
   return (
-    <div className="p-6 max-w-2xl mx-auto space-y-6 text-slate-200">
-      <div className="flex items-center gap-4">
-        <button
-          type="button"
-          onClick={() => router.push('/admin/partidas')}
-          className="text-sm text-slate-500 hover:text-slate-300"
+    <div
+      className="min-h-screen px-4 py-8 text-slate-100 sm:px-6 lg:px-8"
+      style={{ background: 'radial-gradient(circle at top, #17324c 0%, #08111d 46%, #05080d 100%)' }}
+    >
+      <div className="mx-auto max-w-7xl space-y-8">
+        <section
+          className="relative overflow-hidden rounded-[2rem] border px-6 py-7 shadow-[0_30px_90px_rgba(2,6,23,0.48)] sm:px-8"
+          style={{
+            borderColor: 'rgba(148, 163, 184, 0.16)',
+            background:
+              'linear-gradient(145deg, rgba(8,17,29,0.96), rgba(15,23,42,0.92) 52%, rgba(30,41,59,0.88) 100%)',
+          }}
         >
-          ← Volver a partidas
-        </button>
-        <h1 className="text-2xl font-bold text-cyan-400">
-          Nueva Partida
-        </h1>
-      </div>
-
-      {serverError && (
-        <div
-          className="px-4 py-3 rounded-md text-sm bg-red-900/40 text-red-300 border border-red-500/30"
-        >
-          {serverError}
-        </div>
-      )}
-
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-        {/* Nombre */}
-        <div>
-          <label className="block text-sm font-medium mb-1">Nombre de la partida</label>
-          <input
-            {...register('nombre')}
-            className="w-full px-3 py-2 rounded-md text-sm bg-slate-800 text-slate-200 border border-slate-700 focus:ring-2 focus:ring-cyan-500 outline-none"
-            placeholder="Ej: Ronda 1"
-            autoFocus
+          <div
+            className="absolute -right-10 top-0 h-52 w-52 rounded-full blur-3xl"
+            style={{ background: 'rgba(34, 211, 238, 0.14)' }}
           />
-          {errors.nombre && (
-            <p className="text-xs mt-1 text-red-400">
-              {errors.nombre.message}
-            </p>
-          )}
-        </div>
-
-        {/* Máximo de turnos */}
-        <div>
-          <label className="block text-sm font-medium mb-1">
-            Máximo de turnos{' '}
-            <span className="text-xs font-normal text-slate-500">(opcional — deja vacío para sin límite)</span>
-          </label>
-          <input
-            type="number"
-            min={1}
-            {...register('maxTurnos', {
-              setValueAs: (v: string) => (v === '' || v === undefined ? null : parseInt(v, 10)),
-            })}
-            className="w-full px-3 py-2 rounded-md text-sm bg-slate-800 text-slate-200 border border-slate-700 focus:ring-2 focus:ring-cyan-500 outline-none"
-            placeholder="Sin límite"
+          <div
+            className="absolute bottom-0 left-10 h-40 w-40 rounded-full blur-3xl"
+            style={{ background: 'rgba(250, 204, 21, 0.1)' }}
           />
-          {errors.maxTurnos && (
-            <p className="text-xs mt-1 text-red-400">
-              {errors.maxTurnos.message}
-            </p>
-          )}
-          <p className="text-xs mt-1 text-slate-600">
-            Si se alcanza este número de turnos, la partida finaliza automáticamente y se penaliza a cada equipo con −3 puntos.
-          </p>
-        </div>
 
-        {/* Equipos */}
-        <div>
-          <div className="flex items-baseline justify-between mb-3">
-            <label className="text-sm font-medium">
-              Equipos participantes
-            </label>
-            <span
-              className={`text-xs ${selectedTeams.length >= 2 ? 'text-emerald-400' : 'text-slate-500'}`}
-            >
-              {selectedTeams.length} / 6 seleccionados
-            </span>
-          </div>
-
-          {loadingTeams ? (
-            // Skeleton
-            <div className="grid grid-cols-2 gap-2">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="h-10 rounded-md animate-pulse bg-slate-800"
-                />
-              ))}
-            </div>
-          ) : teams.length === 0 ? (
-            <div
-              className="rounded-md px-4 py-6 text-center text-sm bg-slate-800 text-slate-500"
-            >
-              No hay equipos registrados.{' '}
+          <div className="relative flex flex-col gap-8 xl:flex-row xl:items-end xl:justify-between">
+            <div className="max-w-3xl">
               <button
                 type="button"
-                className="underline text-cyan-400"
-                onClick={() => router.push('/admin/equipos')}
+                onClick={() => router.push('/admin/partidas')}
+                className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.22em] text-slate-300 transition-colors hover:bg-white/[0.08]"
               >
-                Crear un equipo
+                <ArrowLeft className="h-3.5 w-3.5" />
+                Volver a partidas
               </button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-2">
-              {teams.map((team) => {
-                const selected = selectedTeams.includes(team.id);
-                const noAgent = !team.agentId;
-                const disabledByMax = !selected && selectedTeams.length >= 6;
 
-                return (
+              <div className="mt-5 space-y-3">
+                <div className="inline-flex items-center gap-2 rounded-full bg-cyan-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-cyan-300">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Configurador de mesa
+                </div>
+                <h1 className="text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+                  Diseña una nueva partida con contexto, no a ciegas
+                </h1>
+                <p className="max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">
+                  Nombra la sesión, define el ritmo de turnos y compón una mesa equilibrada. El panel te enseña
+                  al momento si la partida está lista o si hay agentes pendientes que pueden romper el arranque.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-3 xl:w-[34rem]">
+              <MetricCard
+                icon={<Users className="h-4 w-4" />}
+                label="Equipos registrados"
+                value={teams.length}
+                hint="Base disponible para convocar"
+              />
+              <MetricCard
+                icon={<Check className="h-4 w-4" />}
+                label="Listos para jugar"
+                value={readyTeams.length}
+                hint="Con agent_id operativo"
+                accent="cyan"
+              />
+              <MetricCard
+                icon={<ShieldAlert className="h-4 w-4" />}
+                label="En observación"
+                value={teams.length - readyTeams.length}
+                hint="Sin agente configurado"
+                accent="amber"
+              />
+            </div>
+          </div>
+        </section>
+
+        {serverError && (
+          <div className="rounded-[1.5rem] border border-red-400/25 bg-red-500/10 px-5 py-4 text-sm text-red-100 shadow-[0_18px_50px_rgba(127,29,29,0.2)]">
+            {serverError}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit(onSubmit)} className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_24rem]">
+          <section
+            className="rounded-[2rem] border p-6 shadow-[0_24px_70px_rgba(2,6,23,0.38)] sm:p-7"
+            style={{
+              borderColor: 'rgba(148, 163, 184, 0.14)',
+              background: 'linear-gradient(145deg, rgba(8,17,29,0.94), rgba(15,23,42,0.9))',
+            }}
+          >
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-slate-100">Nombre de la partida</label>
+                <input
+                  {...register('nombre')}
+                  className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-slate-100 outline-none transition focus:border-cyan-400/50 focus:ring-2 focus:ring-cyan-400/20"
+                  placeholder="Ej: Ronda 1 · Semifinal técnica"
+                  autoFocus
+                />
+                {errors.nombre && <p className="text-xs text-red-300">{errors.nombre.message}</p>}
+                <p className="text-xs text-slate-400">
+                  Usa un nombre reconocible para localizar esta mesa rápido desde el panel de administración.
+                </p>
+              </div>
+
+              <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.03] p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">Vista previa</p>
+                <p className="mt-3 text-xl font-semibold text-white">{nombre?.trim() || 'Partida sin título todavía'}</p>
+                <p className="mt-2 text-sm text-slate-400">
+                  {selectedTeams.length > 0
+                    ? `${selectedTeams.length} equipo(s) seleccionados`
+                    : 'Selecciona participantes para completar la mesa.'}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6 rounded-[1.75rem] border border-white/10 bg-white/[0.03] p-5">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <label className="text-sm font-semibold text-slate-100">Límite de turnos</label>
+                  <p className="mt-1 text-sm leading-6 text-slate-400">
+                    Déjalo vacío para una partida abierta o fija un tope para cerrar la mesa automáticamente.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
                   <button
-                    key={team.id}
                     type="button"
-                    onClick={() => toggleTeam(team.id)}
-                    disabled={disabledByMax}
-                    className={`px-3 py-2 rounded-md text-sm text-left transition-colors disabled:opacity-40 ${
-                      selected
-                        ? 'bg-cyan-500/20 border-cyan-500 text-cyan-300'
-                        : noAgent
-                        ? 'bg-slate-800 border-amber-800 text-slate-300'
-                        : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
-                    } border`}
+                    onClick={() => setValue('maxTurnos', null, { shouldDirty: true, shouldValidate: true })}
+                    className={cn(
+                      'rounded-full border px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] transition-colors',
+                      maxTurnos == null
+                        ? 'border-cyan-300/40 bg-cyan-400/12 text-cyan-200'
+                        : 'border-white/10 bg-white/[0.03] text-slate-400 hover:bg-white/[0.06]'
+                    )}
                   >
-                    <span className="flex items-center justify-between gap-2">
-                      <span className="truncate">{team.nombre}</span>
-                      {noAgent && (
-                        <span
-                          className="shrink-0 text-xs px-1.5 py-0.5 rounded bg-amber-800 text-amber-300"
-                        >
-                          Sin agente
-                        </span>
-                      )}
-                    </span>
+                    Sin l&iacute;mite
                   </button>
-                );
-              })}
+                  {TURN_PRESETS.map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => setValue('maxTurnos', preset, { shouldDirty: true, shouldValidate: true })}
+                      className={cn(
+                        'rounded-full border px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] transition-colors',
+                        maxTurnos === preset
+                          ? 'border-cyan-300/40 bg-cyan-400/12 text-cyan-200'
+                          : 'border-white/10 bg-white/[0.03] text-slate-400 hover:bg-white/[0.06]'
+                      )}
+                    >
+                      {preset} turnos
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-4 max-w-sm">
+                <input
+                  type="number"
+                  min={1}
+                  value={maxTurnos ?? ''}
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    setValue('maxTurnos', value === '' ? null : parseInt(value, 10), {
+                      shouldDirty: true,
+                      shouldValidate: true,
+                    });
+                  }}
+                  className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-slate-100 outline-none transition focus:border-cyan-400/50 focus:ring-2 focus:ring-cyan-400/20"
+                  placeholder="Sin límite"
+                />
+                {errors.maxTurnos && <p className="mt-2 text-xs text-red-300">{errors.maxTurnos.message}</p>}
+                <p className="mt-2 text-xs leading-5 text-slate-400">
+                  Si se alcanza este número, la partida se cierra y cada equipo recibe una penalización de -3 puntos.
+                </p>
+              </div>
             </div>
-          )}
 
-          {/* Advisory: teams selected without agent */}
-          {teamsWithoutAgent.length > 0 && (
-            <p className="text-xs mt-2 text-amber-400">
-              ⚠️ {teamsWithoutAgent.length} equipo(s) seleccionado(s) sin agente configurado. La partida se puede crear, pero los turnos de esos equipos fallarán.
-            </p>
-          )}
+            <div className="mt-6 space-y-4">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                <div>
+                  <h2 className="text-xl font-semibold text-white">Selecciona equipos</h2>
+                  <p className="mt-1 text-sm text-slate-400">
+                    Construye una mesa de 2 a 6 participantes. La selección respeta el orden en que haces clic.
+                  </p>
+                </div>
 
-          {/* Validation hint */}
-          {selectedTeams.length < 2 && !loadingTeams && teams.length > 0 && (
-            <p className="text-xs mt-2 text-slate-500">
-              Mínimo 2 equipos necesarios para iniciar.
-            </p>
-          )}
-        </div>
+                <div className="rounded-full border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-slate-300">
+                  {selectedTeams.length} / 6 convocados
+                </div>
+              </div>
 
-        {/* Actions */}
-        <div className="flex gap-3 items-center pt-2">
-          <button
-            type="submit"
-            disabled={!canSubmit}
-            className="px-6 py-2 rounded-md font-semibold text-sm disabled:opacity-40 transition-opacity bg-cyan-500 text-slate-900 hover:bg-cyan-400"
-          >
-            {isSubmitting ? 'Creando...' : 'Crear partida'}
-          </button>
-          <button
-            type="button"
-            onClick={() => router.push('/admin/partidas')}
-            className="px-6 py-2 rounded-md text-sm bg-slate-700 text-slate-300 hover:bg-slate-600"
-          >
-            Cancelar
-          </button>
-        </div>
-      </form>
+              <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto]">
+                <label className="relative block">
+                  <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                  <input
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                    className="w-full rounded-2xl border border-white/10 bg-slate-950/60 py-3 pl-11 pr-4 text-sm text-slate-100 outline-none transition focus:border-cyan-400/50 focus:ring-2 focus:ring-cyan-400/20"
+                    placeholder="Busca por nombre, id o agent_id"
+                  />
+                </label>
+
+                <div className="flex flex-wrap gap-2">
+                  <FilterChip
+                    active={teamFilter === 'all'}
+                    onClick={() => setTeamFilter('all')}
+                    label={`Todos (${teams.length})`}
+                  />
+                  <FilterChip
+                    active={teamFilter === 'ready'}
+                    onClick={() => setTeamFilter('ready')}
+                    label={`Listos (${readyTeams.length})`}
+                  />
+                  <FilterChip
+                    active={teamFilter === 'missing-agent'}
+                    onClick={() => setTeamFilter('missing-agent')}
+                    label={`Sin agente (${teams.length - readyTeams.length})`}
+                  />
+                </div>
+              </div>
+
+              {errors.equipoIds && <p className="text-xs text-red-300">{errors.equipoIds.message}</p>}
+
+              {loadingTeams ? (
+                <div className="grid gap-3 md:grid-cols-2">
+                  {Array.from({ length: 6 }).map((_, index) => (
+                    <div key={index} className="h-32 animate-pulse rounded-[1.5rem] bg-white/[0.05]" />
+                  ))}
+                </div>
+              ) : teams.length === 0 ? (
+                <div className="rounded-[1.75rem] border border-dashed border-white/10 bg-white/[0.02] px-5 py-10 text-center">
+                  <p className="text-lg font-semibold text-white">Aún no hay equipos registrados</p>
+                  <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-400">
+                    Crea primero la base de participantes y vuelve aquí para montar la primera mesa.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => router.push('/admin/equipos')}
+                    className="mt-5 rounded-2xl bg-cyan-400 px-5 py-3 text-sm font-semibold text-slate-950 transition-colors hover:bg-cyan-300"
+                  >
+                    Ir a equipos
+                  </button>
+                </div>
+              ) : filteredTeams.length === 0 ? (
+                <div className="rounded-[1.75rem] border border-dashed border-white/10 bg-white/[0.02] px-5 py-10 text-center text-sm text-slate-400">
+                  No hay resultados para ese criterio. Prueba con otra búsqueda o cambia el filtro.
+                </div>
+              ) : (
+                <div className="grid gap-3 md:grid-cols-2">
+                  {filteredTeams.map((team) => {
+                    const selected = selectedTeams.includes(team.id);
+                    const disabledByMax = !selected && selectedTeams.length >= 6;
+                    const noAgent = !team.agentId?.trim();
+                    const selectionOrder = selectedTeams.indexOf(team.id);
+
+                    return (
+                      <button
+                        key={team.id}
+                        type="button"
+                        onClick={() => toggleTeam(team.id)}
+                        disabled={disabledByMax}
+                        className={cn(
+                          'group rounded-[1.5rem] border p-4 text-left transition-all duration-200',
+                          'disabled:cursor-not-allowed disabled:opacity-45',
+                          selected
+                            ? 'border-cyan-300/35 bg-cyan-400/10 shadow-[0_20px_50px_rgba(8,145,178,0.15)]'
+                            : noAgent
+                              ? 'border-amber-400/20 bg-amber-400/5 hover:bg-amber-400/10'
+                              : 'border-white/10 bg-white/[0.03] hover:border-cyan-300/20 hover:bg-white/[0.05]'
+                        )}
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex items-center gap-3">
+                            <div
+                              className={cn(
+                                'flex h-11 w-11 items-center justify-center rounded-2xl border text-sm font-semibold',
+                                selected
+                                  ? 'border-cyan-300/30 bg-cyan-400/14 text-cyan-100'
+                                  : 'border-white/10 bg-slate-950/60 text-slate-200'
+                              )}
+                            >
+                              {team.nombre.slice(0, 2).toUpperCase()}
+                            </div>
+                            <div>
+                              <p className="text-base font-semibold text-white">{team.nombre}</p>
+                              <p className="text-xs uppercase tracking-[0.18em] text-slate-500">{team.id}</p>
+                            </div>
+                          </div>
+
+                          {selected ? (
+                            <span className="inline-flex h-8 min-w-8 items-center justify-center rounded-full border border-cyan-300/35 bg-cyan-400/14 px-2 text-xs font-semibold text-cyan-100">
+                              {selectionOrder + 1}
+                            </span>
+                          ) : (
+                            <span className="rounded-full border border-white/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+                              {noAgent ? 'Revisar' : 'Disponible'}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="mt-4 space-y-3">
+                          <div className="rounded-2xl border border-white/8 bg-slate-950/45 px-3 py-2">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">agent_id</p>
+                            <p className={cn('mt-1 text-sm', noAgent ? 'text-amber-200' : 'text-slate-200')}>
+                              {team.agentId?.trim() || 'No configurado'}
+                            </p>
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-2 text-xs">
+                            <StatusPill
+                              icon={noAgent ? <AlertTriangle className="h-3.5 w-3.5" /> : <Check className="h-3.5 w-3.5" />}
+                              label={noAgent ? 'Sin agente' : 'Listo para jugar'}
+                              tone={noAgent ? 'amber' : 'emerald'}
+                            />
+                            <StatusPill
+                              icon={<Swords className="h-3.5 w-3.5" />}
+                              label={selected ? 'En la mesa' : 'Fuera de la mesa'}
+                              tone={selected ? 'cyan' : 'slate'}
+                            />
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </section>
+
+          <aside className="space-y-6 xl:sticky xl:top-6 xl:self-start">
+            <section
+              className="rounded-[2rem] border p-6 shadow-[0_24px_70px_rgba(2,6,23,0.38)]"
+              style={{
+                borderColor: 'rgba(148, 163, 184, 0.14)',
+                background: 'linear-gradient(145deg, rgba(8,17,29,0.94), rgba(15,23,42,0.9))',
+              }}
+            >
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-300">Chequeo de salida</p>
+              <h2 className="mt-3 text-2xl font-semibold text-white">Resumen de la partida</h2>
+              <p className="mt-2 text-sm leading-6 text-slate-400">{selectionMessage}</p>
+
+              <div className="mt-5 grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
+                <SummaryStat label="Participantes" value={`${selectedTeams.length}/6`} />
+                <SummaryStat label="Límite" value={maxTurnos ? `${maxTurnos} turnos` : 'Sin límite'} />
+                <SummaryStat label="Riesgo" value={teamsWithoutAgent.length > 0 ? 'Revisar agentes' : 'Listo'} />
+              </div>
+
+              {teamsWithoutAgent.length > 0 && (
+                <div className="mt-5 rounded-[1.5rem] border border-amber-300/20 bg-amber-400/8 p-4 text-sm text-amber-100">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                    <p>
+                      Hay {teamsWithoutAgent.length} equipo(s) seleccionado(s) sin `agent_id`. La partida puede
+                      crearse, pero esos turnos fallarán hasta que se configure el agente.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              <div className="mt-6">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-semibold text-slate-100">Orden de selección</p>
+                  <span className="text-xs uppercase tracking-[0.18em] text-slate-500">clic = prioridad visual</span>
+                </div>
+
+                {selectedTeamDetails.length === 0 ? (
+                  <div className="mt-3 rounded-[1.5rem] border border-dashed border-white/10 bg-white/[0.02] px-4 py-6 text-sm text-slate-500">
+                    Todavía no has añadido equipos a la mesa.
+                  </div>
+                ) : (
+                  <div className="mt-3 space-y-3">
+                    {selectedTeamDetails.map((team, index) => (
+                      <div key={team.id} className="flex items-center gap-3 rounded-[1.4rem] border border-white/10 bg-white/[0.03] px-4 py-3">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-cyan-400/12 text-sm font-semibold text-cyan-100">
+                          {index + 1}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-semibold text-white">{team.nombre}</p>
+                          <p className="truncate text-xs text-slate-500">{team.agentId?.trim() || 'Sin agent_id'}</p>
+                        </div>
+                        <StatusPill
+                          label={team.agentId?.trim() ? 'OK' : 'Pendiente'}
+                          tone={team.agentId?.trim() ? 'emerald' : 'amber'}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-6 flex flex-col gap-3">
+                <button
+                  type="submit"
+                  disabled={!canSubmit}
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl bg-cyan-400 px-5 py-3 text-sm font-semibold text-slate-950 transition-all hover:-translate-y-0.5 hover:bg-cyan-300 disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-45"
+                >
+                  <Crosshair className="h-4 w-4" />
+                  {isSubmitting ? 'Creando partida...' : 'Crear partida'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => router.push('/admin/partidas')}
+                  className="rounded-2xl border border-white/10 bg-white/[0.03] px-5 py-3 text-sm font-semibold text-slate-200 transition-colors hover:bg-white/[0.07]"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </section>
+          </aside>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function MetricCard({
+  icon,
+  label,
+  value,
+  hint,
+  accent = 'slate',
+}: {
+  icon: ReactNode;
+  label: string;
+  value: number;
+  hint: string;
+  accent?: 'slate' | 'cyan' | 'amber';
+}) {
+  return (
+    <article
+      className={cn(
+        'rounded-[1.5rem] border p-4 backdrop-blur-sm',
+        accent === 'cyan' && 'border-cyan-300/20 bg-cyan-300/[0.08]',
+        accent === 'amber' && 'border-amber-300/20 bg-amber-300/[0.08]',
+        accent === 'slate' && 'border-white/10 bg-white/[0.05]'
+      )}
+    >
+      <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-300">
+        <span className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-black/15 text-cyan-200">
+          {icon}
+        </span>
+        {label}
+      </div>
+      <p className="mt-4 text-3xl font-semibold text-white">{value}</p>
+      <p className="mt-1 text-sm text-slate-400">{hint}</p>
+    </article>
+  );
+}
+
+function FilterChip({
+  active,
+  onClick,
+  label,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'rounded-full border px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] transition-colors',
+        active
+          ? 'border-cyan-300/35 bg-cyan-400/12 text-cyan-200'
+          : 'border-white/10 bg-white/[0.03] text-slate-400 hover:bg-white/[0.06]'
+      )}
+    >
+      {label}
+    </button>
+  );
+}
+
+function StatusPill({
+  label,
+  tone,
+  icon,
+}: {
+  label: string;
+  tone: 'emerald' | 'amber' | 'cyan' | 'slate';
+  icon?: ReactNode;
+}) {
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em]',
+        tone === 'emerald' && 'border-emerald-300/20 bg-emerald-400/10 text-emerald-100',
+        tone === 'amber' && 'border-amber-300/20 bg-amber-400/10 text-amber-100',
+        tone === 'cyan' && 'border-cyan-300/20 bg-cyan-400/10 text-cyan-100',
+        tone === 'slate' && 'border-white/10 bg-white/[0.04] text-slate-400'
+      )}
+    >
+      {icon}
+      {label}
+    </span>
+  );
+}
+
+function SummaryStat({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-[1.35rem] border border-white/10 bg-white/[0.03] px-4 py-3">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{label}</p>
+      <p className="mt-2 text-lg font-semibold text-white">{value}</p>
     </div>
   );
 }

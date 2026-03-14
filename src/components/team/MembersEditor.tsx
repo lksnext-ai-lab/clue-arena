@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useRef, useState } from 'react';
+import { MailPlus, Trash2, Users } from 'lucide-react';
 import { apiFetch } from '@/lib/api/client';
 import { useTranslations } from 'next-intl';
 import type { TeamResponse } from '@/types/api';
@@ -59,7 +60,7 @@ export function MembersEditor({
   };
 
   const removeMember = (email: string) => {
-    setMembers((prev) => prev.filter((m) => m !== email));
+    setMembers((prev) => prev.filter((member) => member !== email));
     setSaveSuccess(false);
   };
 
@@ -89,55 +90,103 @@ export function MembersEditor({
   };
 
   return (
-    <div className="space-y-3">
-      {/* Title + description */}
-      <div>
-        <p className="text-xs font-medium" style={{ color: '#94a3b8' }}>
-          {t('miembros')}
-        </p>
-        {!readOnly && (
-          <p className="text-xs mt-0.5" style={{ color: '#64748b' }}>
-            {t('miembrosDesc')}
+    <div className="space-y-5">
+      <div className="flex items-start gap-3">
+        <div
+          className="flex h-11 w-11 items-center justify-center rounded-2xl"
+          style={{ background: 'rgba(56,189,248,0.12)', color: '#38bdf8' }}
+        >
+          <Users size={20} />
+        </div>
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.24em]" style={{ color: '#94a3b8' }}>
+            {t('miembros')}
           </p>
+          <h3 className="mt-2 text-xl font-semibold" style={{ color: '#f8fafc' }}>
+            {t('panelMembersTitle')}
+          </h3>
+          <p className="mt-2 text-sm leading-6" style={{ color: '#94a3b8' }}>
+            {readOnly ? t('miembros') : t('miembrosDesc')}
+          </p>
+        </div>
+      </div>
+
+      <div
+        className="rounded-[24px] border p-4"
+        style={{ borderColor: 'rgba(148, 163, 184, 0.14)', background: 'rgba(8, 17, 29, 0.55)' }}
+      >
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-sm font-semibold" style={{ color: '#f8fafc' }}>
+            {t('panelMembersCount', { count: members.length })}
+          </p>
+          <div
+            className="rounded-full px-3 py-1 text-xs font-semibold"
+            style={{ background: 'rgba(56,189,248,0.12)', color: '#7dd3fc' }}
+          >
+            {members.length}/20
+          </div>
+        </div>
+
+        {members.length === 0 ? (
+          <div
+            className="mt-4 rounded-2xl border px-4 py-8 text-center"
+            style={{ borderColor: 'rgba(148, 163, 184, 0.12)', background: 'rgba(15, 23, 42, 0.7)' }}
+          >
+            <p className="text-sm font-medium italic" style={{ color: '#94a3b8' }}>
+              {t('miembrosVacio')}
+            </p>
+          </div>
+        ) : (
+          <ul className="mt-4 grid gap-3">
+            {members.map((email) => (
+              <li
+                key={email}
+                className="flex items-center justify-between gap-3 rounded-2xl border px-4 py-3"
+                style={{ borderColor: 'rgba(148, 163, 184, 0.12)', background: 'rgba(15, 23, 42, 0.7)' }}
+              >
+                <span className="min-w-0 truncate font-mono text-sm" style={{ color: '#e2e8f0' }}>
+                  {email}
+                </span>
+                {!readOnly && (
+                  <button
+                    type="button"
+                    onClick={() => removeMember(email)}
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-xl transition"
+                    style={{ background: 'rgba(248,113,113,0.1)', color: '#fca5a5' }}
+                    aria-label={`${t('miembrosEliminar')} ${email}`}
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
         )}
       </div>
 
-      {/* Members list */}
-      {members.length === 0 ? (
-        <p className="text-xs italic" style={{ color: '#475569' }}>
-          {t('miembrosVacio')}
-        </p>
-      ) : (
-        <ul className="space-y-1">
-          {members.map((email) => (
-            <li
-              key={email}
-              className="flex items-center justify-between px-2 py-1 rounded text-xs"
-              style={{ background: '#0f172a', border: '1px solid #1e293b' }}
-            >
-              <span style={{ color: '#cbd5e1' }} className="font-mono truncate">
-                {email}
-              </span>
-              {!readOnly && (
-                <button
-                  type="button"
-                  onClick={() => removeMember(email)}
-                  className="ml-2 text-xs flex-shrink-0 rounded px-1.5 py-0.5 transition-colors hover:bg-red-900"
-                  style={{ color: '#f87171' }}
-                  aria-label={`${t('miembrosEliminar')} ${email}`}
-                >
-                  ✕
-                </button>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {/* Add input */}
       {!readOnly && (
-        <>
-          <div className="flex gap-2">
+        <div
+          className="rounded-[24px] border p-4"
+          style={{ borderColor: 'rgba(148, 163, 184, 0.14)', background: 'rgba(8, 17, 29, 0.55)' }}
+        >
+          <div className="flex items-start gap-3">
+            <div
+              className="flex h-10 w-10 items-center justify-center rounded-2xl"
+              style={{ background: 'rgba(245,158,11,0.12)', color: '#fbbf24' }}
+            >
+              <MailPlus size={18} />
+            </div>
+            <div>
+              <p className="text-sm font-semibold" style={{ color: '#f8fafc' }}>
+                {t('panelMembersAddTitle')}
+              </p>
+              <p className="mt-1 text-sm leading-6" style={{ color: '#94a3b8' }}>
+                {t('panelMembersAddDesc')}
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-4 flex flex-col gap-3 sm:flex-row">
             <input
               ref={inputRef}
               type="email"
@@ -148,51 +197,50 @@ export function MembersEditor({
               }}
               onKeyDown={handleKeyDown}
               placeholder={t('miembrosPlaceholder')}
-              className="flex-1 px-2 py-1.5 rounded text-xs"
+              className="flex-1 rounded-2xl px-4 py-3 text-sm outline-none transition focus:ring-2 focus:ring-cyan-400/30"
               style={{
-                background: '#0a0a0f',
-                color: '#f1f5f9',
-                border: `1px solid ${inputError ? '#ef4444' : '#64748b'}`,
+                background: 'rgba(15, 23, 42, 0.78)',
+                color: '#f8fafc',
+                border: `1px solid ${inputError ? 'rgba(248,113,113,0.6)' : 'rgba(148, 163, 184, 0.22)'}`,
               }}
             />
             <button
               type="button"
               onClick={addMember}
-              className="px-3 py-1.5 rounded text-xs font-medium flex-shrink-0 transition-colors"
-              style={{ background: '#334155', color: '#f1f5f9' }}
+              className="inline-flex items-center justify-center rounded-2xl px-4 py-3 text-sm font-semibold transition"
+              style={{ background: 'rgba(56,189,248,0.14)', color: '#7dd3fc' }}
             >
               {t('miembrosAgregar')}
             </button>
           </div>
+
           {inputError && (
-            <p className="text-xs" style={{ color: '#ef4444' }}>
+            <p className="mt-3 text-xs" style={{ color: '#fca5a5' }}>
               {inputError}
             </p>
           )}
 
-          {/* Save */}
-          <div className="flex items-center gap-3">
+          <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="text-xs">
+              {saveSuccess ? (
+                <span style={{ color: '#86efac' }}>{t('miembrosGuardado')}</span>
+              ) : null}
+              {saveError ? (
+                <span style={{ color: '#fca5a5' }}>{saveError}</span>
+              ) : null}
+            </div>
+
             <button
               type="button"
               onClick={handleSave}
               disabled={isSaving}
-              className="px-3 py-1.5 rounded text-xs font-medium transition-colors disabled:opacity-50"
-              style={{ background: '#f59e0b', color: '#0a0a0f' }}
+              className="inline-flex items-center justify-center rounded-2xl px-4 py-3 text-sm font-semibold transition disabled:opacity-50"
+              style={{ background: '#f59e0b', color: '#111827', boxShadow: '0 14px 30px rgba(245,158,11,0.18)' }}
             >
               {isSaving ? t('miembrosGuardando') : t('miembrosGuardar')}
             </button>
-            {saveSuccess && (
-              <span className="text-xs" style={{ color: '#4ade80' }}>
-                ✓ {t('miembrosGuardado')}
-              </span>
-            )}
-            {saveError && (
-              <span className="text-xs" style={{ color: '#f87171' }}>
-                {saveError}
-              </span>
-            )}
           </div>
-        </>
+        </div>
       )}
     </div>
   );

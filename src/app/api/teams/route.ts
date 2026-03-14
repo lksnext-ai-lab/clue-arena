@@ -4,7 +4,26 @@ import { db } from '@/lib/db';
 import { equipos, usuarios } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { TeamRegistrationSchema } from '@/lib/schemas/team';
-import { v4 as uuidv4 } from 'uuid';
+import type { TeamResponse } from '@/types/api';
+import { resolveTeamId } from '@/lib/utils/team-id';
+
+/** Builds a safe TeamResponse, never exposing mattinApiKey. */
+function toTeamResponse(t: typeof equipos.$inferSelect): TeamResponse {
+  return {
+    id: t.id,
+    nombre: t.nombre,
+    descripcion: t.descripcion ?? null,
+    agentId: t.agentId,
+    agentBackend: (t.agentBackend ?? 'mattin') as 'mattin' | 'local',
+    appId: t.appId ?? null,
+    hasMattinApiKey: !!t.mattinApiKey,
+    avatarUrl: t.avatarUrl ?? null,
+    usuarioId: t.usuarioId,
+    estado: t.estado as TeamResponse['estado'],
+    miembros: JSON.parse(t.miembros ?? '[]') as string[],
+    createdAt: t.createdAt instanceof Date ? t.createdAt.toISOString() : String(t.createdAt),
+  };
+}
 
 // GET /api/teams
 // Admin: devuelve todos los equipos. Equipo: devuelve solo el propio.
@@ -18,12 +37,7 @@ export async function GET() {
 
   if (userRol === 'admin') {
     const allTeams = await db.select().from(equipos).all();
-    return NextResponse.json({
-      teams: allTeams.map((t) => ({
-        ...t,
-        miembros: JSON.parse(t.miembros ?? '[]') as string[],
-      })),
-    });
+    return NextResponse.json({ teams: allTeams.map(toTeamResponse) });
   }
 
   // Rol equipo/espectador: devolver solo el equipo del usuario
@@ -43,12 +57,7 @@ export async function GET() {
     .where(eq(equipos.usuarioId, user.id))
     .all();
 
-  return NextResponse.json({
-    teams: userTeams.map((t) => ({
-      ...t,
-      miembros: JSON.parse(t.miembros ?? '[]') as string[],
-    })),
-  });
+  return NextResponse.json({ teams: userTeams.map(toTeamResponse) });
 }
 
 // POST /api/teams
@@ -111,10 +120,28 @@ export async function POST(request: Request) {
     );
   }
 
+  const resolvedTeamId = resolveTeamId(parsed.data.id, parsed.data.nombre);
+
+  const idConflict = await db
+    .select()
+    .from(equipos)
+    .where(eq(equipos.id, resolvedTeamId))
+    .get();
+
+  if (idConflict) {
+    return NextResponse.json(
+      { code: 'ID_DUPLICADO', error: 'Ya existe un equipo con ese team_id' },
+      { status: 400 }
+    );
+  }
+
   const newTeam = {
-    id: uuidv4(),
+    id: resolvedTeamId,
     nombre: parsed.data.nombre,
     agentId: parsed.data.agentId,
+    agentBackend: parsed.data.agentBackend ?? 'mattin',
+    appId: parsed.data.appId ?? null,
+    mattinApiKey: parsed.data.mattinApiKey ?? null,
     miembros: JSON.stringify(parsed.data.miembros ?? []),
     usuarioId: user.id,
     estado: 'registrado' as const,
@@ -124,7 +151,7 @@ export async function POST(request: Request) {
   await db.insert(equipos).values(newTeam);
 
   return NextResponse.json(
-    { equipo: { ...newTeam, miembros: parsed.data.miembros ?? [] } },
+    { equipo: toTeamResponse({ ...newTeam, descripcion: null, avatarUrl: null }) },
     { status: 201 }
   );
 }

@@ -1,4 +1,4 @@
-// GET /api/tournaments — list all tournaments (espectador+)
+// GET /api/tournaments — list all tournaments (public)
 // POST /api/tournaments — create a tournament (admin only)
 
 import { NextResponse } from 'next/server';
@@ -10,11 +10,6 @@ import { v4 as uuidv4 } from 'uuid';
 import { CreateTournamentSchema } from '@/lib/schemas/tournament-config';
 
 export async function GET() {
-  const session = await getAuthSession();
-  if (!session?.user) {
-    return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
-  }
-
   const list = await db
     .select()
     .from(tournaments)
@@ -23,13 +18,13 @@ export async function GET() {
 
   return NextResponse.json({
     tournaments: list.map((t) => ({
-      id:         t.id,
-      name:       t.name,
-      format:     t.format,
-      status:     t.status,
-      config:     JSON.parse(t.config),
-      createdAt:  t.createdAt?.toISOString() ?? null,
-      startedAt:  t.startedAt?.toISOString() ?? null,
+      id: t.id,
+      name: t.name,
+      format: t.format,
+      status: t.status,
+      config: JSON.parse(t.config),
+      createdAt: t.createdAt?.toISOString() ?? null,
+      startedAt: t.startedAt?.toISOString() ?? null,
       finishedAt: t.finishedAt?.toISOString() ?? null,
     })),
   });
@@ -54,9 +49,9 @@ export async function POST(request: Request) {
   await db.insert(tournaments).values({
     id,
     name,
-    format:    config.format,
-    status:    'draft',
-    config:    JSON.stringify(config),
+    format: config.format,
+    status: 'draft',
+    config: JSON.stringify(config),
     createdAt: now,
   });
 
@@ -64,11 +59,11 @@ export async function POST(request: Request) {
     {
       id,
       name,
-      format:     config.format,
-      status:     'draft',
+      format: config.format,
+      status: 'draft',
       config,
-      createdAt:  now.toISOString(),
-      startedAt:  null,
+      createdAt: now.toISOString(),
+      startedAt: null,
       finishedAt: null,
     },
     { status: 201 },

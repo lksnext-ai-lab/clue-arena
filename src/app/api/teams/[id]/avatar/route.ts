@@ -16,7 +16,7 @@ import path from 'path';
 import fs from 'fs/promises';
 import { getAuthSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
-import { equipos } from '@/lib/db/schema';
+import { equipos, usuarios } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { generateTeamAvatar } from '@/lib/ai/flows/generate-avatar';
 
@@ -32,13 +32,26 @@ export async function POST(request: Request, { params }: Params) {
   if (!session?.user) {
     return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
   }
-  if (session.user.rol !== 'admin') {
-    return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 });
-  }
 
   const team = await db.select().from(equipos).where(eq(equipos.id, id)).get();
   if (!team) {
     return NextResponse.json({ error: 'Equipo no encontrado' }, { status: 404 });
+  }
+
+  if (session.user.rol !== 'admin') {
+    if (session.user.rol !== 'equipo' || !session.user.email) {
+      return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 });
+    }
+
+    const user = await db
+      .select()
+      .from(usuarios)
+      .where(eq(usuarios.email, session.user.email))
+      .get();
+
+    if (!user || team.usuarioId !== user.id) {
+      return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 });
+    }
   }
 
   const contentType = request.headers.get('content-type') ?? '';

@@ -8,8 +8,11 @@
  * Accepts a pre-built GameStateView JSON string (from engine.getGameStateView)
  * so that training games do not need to be persisted in the official partidas table.
  *
- * Uses the local Genkit backend regardless of AGENT_BACKEND env — training runs
- * do not require MattinAI connectivity.
+ * Supports both backends:
+ *   - 'local' (default): Genkit/local — full prompt/response/tool-call trace captured here.
+ *   - 'mattin': Remote MattinAI — calls the real production agent; only input/output
+ *     are observable. Internal tool calls are visible via F012 MCP logs (invocacionId).
+ *     Per-turn timeout of MATTIN_TURN_TIMEOUT_MS applies to avoid runaway training games.
  */
 
 import { z } from 'zod';
@@ -18,6 +21,8 @@ import { ai, DEFAULT_MODEL } from '@/lib/ai/genkit';
 import { PLAY_TURN_SYSTEM_PROMPT } from '@/lib/ai/prompts/play-turn';
 import { REFUTE_SYSTEM_PROMPT } from '@/lib/ai/prompts/refute';
 import { getAgentMemory, saveAgentMemory } from '@/lib/ai/agent-memory';
+
+const MATTIN_TURN_TIMEOUT_MS = 90_000; // 90 s per-turn cap for Mattin training turns
 
 // ---------------------------------------------------------------------------
 // Zod schemas (mirrored from local-agent.ts)
@@ -67,6 +72,15 @@ export interface TrainingAgentRequest {
   agentRequest:   AgentRequest;
   /** Pre-built GameStateView JSON string from engine.getGameStateView() */
   gameStateJson:  string;
+  /** Agent backend to use. Defaults to 'local'. */
+  agentBackend?:  'mattin' | 'local';
+  /** Required when agentBackend === 'mattin' */
+  mattinAgentId?: string;
+  mattinAppId?:   string;
+  mattinApiKey?:  string;
+  /** Correlation IDs for F012 logs (training loop provides these) */
+  invocacionId?:  string;
+  turnoId?:       string;
 }
 
 // ---------------------------------------------------------------------------
@@ -74,13 +88,29 @@ export interface TrainingAgentRequest {
 // ---------------------------------------------------------------------------
 
 /**
- * Invokes the local Genkit agent for a training turn and captures the full
- * interaction trace (prompts, LLM response, tool calls, memory diff).
+ * Invokes the agent for a training turn and captures the full interaction
+ * trace (prompts, LLM response, tool calls, memory diff).
  *
- * NOTE: This always uses the local Genkit backend, independent of AGENT_BACKEND env.
- * Training runs do not require MattinAI / production agent connectivity.
+ * When agentBackend === 'local' (default): full Genkit trace is captured here.
+ * When agentBackend === 'mattin': the real production agent is invoked; only
+ *   input/output are observable—internal tool calls appear in F012 MCP logs.
  */
 export async function invokeAgentWithTrace(
+  req: TrainingAgentRequest,
+): Promise<InvokeAgentWithTraceResult> {
+  const backend = req.agentBackend ?? 'local';
+
+  if (backend === 'mattin') {
+    return invokeAgentWithTraceMatttin(req);
+  }
+  return invokeAgentWithTraceLocal(req);
+}
+
+// ---------------------------------------------------------------------------
+// Local / Genkit backend
+// ---------------------------------------------------------------------------
+
+async function invokeAgentWithTraceLocal(
   req: TrainingAgentRequest,
 ): Promise<InvokeAgentWithTraceResult> {
   const { agentRequest: request, gameStateJson } = req;
@@ -134,6 +164,7 @@ export async function invokeAgentWithTrace(
     };
     const trace: AgentInteractionTrace = {
       type: request.type,
+      backendType: 'local',
       exchanges: [exchange],
       totalToolCalls: toolCalls.length,
       parsedAction: null,
@@ -195,6 +226,7 @@ export async function invokeAgentWithTrace(
 
   const trace: AgentInteractionTrace = {
     type: request.type,
+    backendType: 'local',
     exchanges: [exchange],
     totalToolCalls: toolCalls.length,
     parsedAction,
@@ -204,6 +236,109 @@ export async function invokeAgentWithTrace(
   if (!parsedAction) {
     throw new TrainingAgentError(parseError ?? 'Parse error', trace);
   }
+
+  return {
+    agentResponse: parsedAction,
+    trace,
+    memoriaInicial,
+    memoriaFinal,
+    durationMs: Date.now() - tsStart,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Mattin (remote) backend
+// ---------------------------------------------------------------------------
+
+async function invokeAgentWithTraceMatttin(
+  req: TrainingAgentRequest,
+): Promise<InvokeAgentWithTraceResult> {
+  const { agentRequest: request } = req;
+  const tsStart = Date.now();
+  const isPlayTurn = request.type === 'play_turn';
+  const systemPrompt = isPlayTurn ? PLAY_TURN_SYSTEM_PROMPT : REFUTE_SYSTEM_PROMPT;
+
+  // Memory before the turn (Mattin reads memory via MCP, but we snapshot here for the trace)
+  const memoriaInicial = await getAgentMemory(request.gameId, request.teamId);
+
+  // User prompt stub — Mattin builds its own prompt internally; we record what we sent
+  // as the AgentRequest message so the trace is meaningful.
+  const userPromptRecord = JSON.stringify(request);
+
+  const invocacionId = req.invocacionId ?? crypto.randomUUID();
+  const turnoId      = req.turnoId      ?? crypto.randomUUID();
+
+  // Wrap with per-turn timeout to prevent runaway training games
+  const timeoutPromise = new Promise<never>((_, reject) =>
+    setTimeout(
+      () => reject(new Error(`MattinAI training turn timed out after ${MATTIN_TURN_TIMEOUT_MS} ms`)),
+      MATTIN_TURN_TIMEOUT_MS,
+    ),
+  );
+
+  let rawResponse = '';
+  let parsedAction: AgentResponse | null = null;
+  let parseError: string | null = null;
+
+  try {
+    const { invokeAgent: invokeMattinAgent } = await import('./mattin');
+    const agentResponse = await Promise.race([
+      invokeMattinAgent(request, {
+        invocacionId,
+        turnoId,
+        agentId: req.mattinAgentId,
+        appId:   req.mattinAppId,
+        apiKey:  req.mattinApiKey,
+      }),
+      timeoutPromise,
+    ]);
+
+    parsedAction = agentResponse;
+    rawResponse = JSON.stringify(agentResponse);
+  } catch (err) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    const trace: AgentInteractionTrace = {
+      type: request.type,
+      backendType: 'mattin',
+      exchanges: [
+        {
+          index: 0,
+          systemPrompt,
+          userPrompt: userPromptRecord,
+          rawResponse: '',
+          toolCalls: [],
+          durationMs: Date.now() - tsStart,
+        },
+      ],
+      totalToolCalls: 0,
+      parsedAction: null,
+      parseError: errMsg,
+    };
+    throw new TrainingAgentError(errMsg, trace);
+  }
+
+  // Memory after the turn (Mattin may have called save_agent_memory via MCP)
+  const memoriaFinal = await getAgentMemory(request.gameId, request.teamId);
+
+  const exchange: AgentLlmExchange = {
+    index: 0,
+    systemPrompt,
+    // userPrompt for Mattin: we record the serialised AgentRequest (what we sent to the API)
+    userPrompt: userPromptRecord,
+    rawResponse,
+    // Tool calls are not observable here; they appear in F012 MCP logs under invocacionId
+    toolCalls: [],
+    durationMs: Date.now() - tsStart,
+  };
+
+  const trace: AgentInteractionTrace = {
+    type: request.type,
+    backendType: 'mattin',
+    exchanges: [exchange],
+    totalToolCalls: 0,
+    parsedAction,
+    parseError: null,
+  };
 
   return {
     agentResponse: parsedAction,

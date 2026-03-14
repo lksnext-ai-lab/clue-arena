@@ -96,7 +96,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
           ? {
               id: turnPase.id,
               equipoId: turnPase.equipoId,
-              origen: turnPase.origen as 'voluntario' | 'timeout' | 'invalid_format',
+              origen: turnPase.origen as 'voluntario' | 'timeout' | 'invalid_format' | 'comm_error',
               createdAt: turnPase.createdAt?.toISOString() ?? null,
             }
           : undefined,
@@ -128,19 +128,20 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   }
 
   // Determine authoritative active team (coordinator creates the en_curso turn record)
-  const activeTurno = partida.estado === 'en_curso'
-    ? await db.select({ equipoId: turnos.equipoId })
+  const currentTurno = partida.estado === 'en_curso'
+    ? await db.select({ numero: turnos.numero, equipoId: turnos.equipoId })
         .from(turnos)
         .where(and(eq(turnos.partidaId, gameId), eq(turnos.estado, 'en_curso')))
         .get()
     : undefined;
-  const activeEquipoId = activeTurno?.equipoId ?? null;
+  const activeEquipoId = currentTurno?.equipoId ?? null;
+  const turnoActual = currentTurno?.numero ?? enrichedTurnos.at(-1)?.numero ?? 0;
 
   return NextResponse.json({
     id: gameId,
     nombre: partida.nombre,
     estado: partida.estado,
-    turnoActual: partida.turnoActual,
+    turnoActual,
     maxTurnos: partida.maxTurnos ?? null,
     modoEjecucion: partida.modoEjecucion,
     autoRunActivoDesde: partida.autoRunActivoDesde?.toISOString() ?? null,
@@ -160,6 +161,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
         eliminado: pe.eliminado,
         puntos: pe.puntos,
         numCartas: cartasArray.length,
+        warnings: pe.warnings,
+        eliminadoPorWarnings: pe.eliminacionRazon === 'warnings',
         ...(isAdmin
           ? { cartas: cartasArray }
           : pe.equipoId === session?.user?.equipo?.id

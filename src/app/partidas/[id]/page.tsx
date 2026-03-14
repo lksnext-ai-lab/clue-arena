@@ -139,8 +139,8 @@ async function loadArenaData(gameId: string): Promise<GameDetailResponse | null>
         orden: pe.orden,
         eliminado: pe.eliminado,
         puntos: pe.puntos,
-        numCartas: cartasArray.length,
-      };
+        numCartas: cartasArray.length,        warnings: pe.warnings,
+        eliminadoPorWarnings: pe.eliminacionRazon === 'warnings',      };
     }),
     turnos: enrichedTurnos,
     sobre,

@@ -49,6 +49,8 @@ export async function GET(request: Request) {
           orden: pe.orden,
           eliminado: pe.eliminado,
           puntos: pe.puntos,
+          warnings: pe.warnings,
+          eliminadoPorWarnings: pe.eliminacionRazon === 'warnings',
         })),
       };
     })
@@ -185,6 +187,8 @@ export async function POST(request: Request) {
         orden: pe.orden,
         eliminado: pe.eliminado,
         puntos: pe.puntos,
+        warnings: pe.warnings,
+        eliminadoPorWarnings: pe.eliminacionRazon === 'warnings',
       })),
       // Non-blocking advisory
       ...(teamConflicts.length > 0 ? { advertenciasEquipos: teamConflicts } : {}),

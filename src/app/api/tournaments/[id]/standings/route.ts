@@ -56,6 +56,7 @@ export async function GET(
       .all();
 
     for (const rg of roundGames) {
+      if (!rg.gameId) continue;
       const gameId = rg.gameId;
       gameRoundMap.set(gameId, round.roundNumber);
 

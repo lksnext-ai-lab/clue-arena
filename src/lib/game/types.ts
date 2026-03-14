@@ -22,6 +22,10 @@ export interface EquipoState {
   orden: number;
   cartas: Carta[];
   eliminado: boolean;
+  /** G006: cause of elimination (null = not eliminated) */
+  eliminacionRazon: 'acusacion_incorrecta' | 'warnings' | null;
+  /** G006: number of warnings accumulated this game session (0–3) */
+  warnings: number;
   puntos: number;
   turnosJugados: number;
 }
@@ -36,12 +40,16 @@ export type ScoreEventType =
   | 'EVT_SURVIVE'
   | 'EVT_SUGGESTION'
   | 'EVT_REFUTATION'
+  | 'EVT_FALSE_CANNOT_REFUTE'
   | 'EVT_WRONG_ACCUSATION'
   | 'EVT_PASS'
   | 'EVT_TIMEOUT'
   | 'EVT_INVALID_CARD'
   | 'EVT_REDUNDANT_SUGGESTION'
-  | 'EVT_INVALID_FORMAT';
+  | 'EVT_INVALID_FORMAT'  | 'EVT_COMM_ERROR'          // communication error (agent request failed)  // G006: warnings system
+  | 'EVT_WRONG_REFUTATION'    // refutador showed card not in hand or not in suggestion
+  | 'EVT_WARNING'             // informational: team accumulated a warning (0 pts)
+  | 'EVT_WARNING_ELIMINATION';// team eliminated upon reaching 3 warnings
 
 export interface ScoreEvent {
   equipoId: string;
@@ -56,12 +64,18 @@ export interface ApplyActionResult {
   scoreEvents: ScoreEvent[];
   suggestionResult?: SuggestionResult;
   accusationResult?: AccusationResult;
+  /** G006: populated when the action was warning_elimination */
+  warningEliminationResult?: {
+    equipoId: string;
+    redistribucion: { equipoId: string; cartas: Carta[] }[];
+  };
 }
 
 export type GameAction =
   | SuggestionAction
   | AccusationAction
-  | PassAction;
+  | PassAction
+  | WarningEliminationAction; // G006
 
 export interface SuggestionAction {
   type: 'suggestion';
@@ -94,6 +108,22 @@ export interface AccusationResult {
   ganador: string | null;
 }
 
+/** G006: action type for warning-based elimination */
+export interface WarningEliminationAction {
+  type: 'warning_elimination';
+  equipoId: string;
+}
+
+/** G006: record written to historial when a team is eliminated by warnings */
+export interface WarningEliminationRecord {
+  type: 'warning_elimination';
+  equipoId: string;
+  turno: number;
+  cartasRepartidas: number;
+  /** IDs of teams that received ≥1 card (does not reveal which cards) */
+  equiposReceptores: string[];
+}
+
 export interface ActionRecord {
   turno: number;
   equipoId: string;
@@ -112,6 +142,12 @@ export interface GameStateView {
   equipos: EquipoStateView[];
   historial: ActionRecordView[];
   esElTurnoDeEquipo: boolean;
+  /** Cartas permitidas en el juego: lista completa de sospechosos */
+  sospechosos: readonly Sospechoso[];
+  /** Cartas permitidas en el juego: lista completa de armas */
+  armas: readonly Arma[];
+  /** Cartas permitidas en el juego: lista completa de habitaciones */
+  habitaciones: readonly Habitacion[];
 }
 
 export interface EquipoStateView {
@@ -121,6 +157,10 @@ export interface EquipoStateView {
   numCartas: number; // Public: number of cards in hand
   esPropio: boolean;
   eliminado: boolean;
+  /** G006: cause of elimination visible to all agents for strategic reasoning */
+  eliminadoPorWarnings: boolean;
+  /** G006: warning counter visible to all agents (0–3) */
+  warnings: number;
   puntos: number;
   turnosJugados: number; // Public: how many turns this team has played
 }

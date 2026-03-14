@@ -348,9 +348,11 @@ function ToolCallRow({ call, index }: { call: AgentToolCall; index: number }) {
 function LlmExchangeCard({
   exchange,
   index,
+  showSystemPrompt,
 }: {
   exchange: AgentLlmExchange;
   index: number;
+  showSystemPrompt: boolean;
 }) {
   const [open, setOpen] = useState(index === 0);
   return (
@@ -367,7 +369,9 @@ function LlmExchangeCard({
       </div>
       {open && (
         <div className="flex flex-col gap-3">
-          <ExpandableText text={exchange.systemPrompt} label="System prompt" />
+          {showSystemPrompt && (
+            <ExpandableText text={exchange.systemPrompt} label="System prompt" />
+          )}
           <ExpandableText text={exchange.userPrompt} label="Mensaje al LLM" />
           {exchange.toolCalls.length > 0 && (
             <div>
@@ -477,7 +481,12 @@ function AgentPanel({
       {/* LLM exchanges */}
       <div className="flex flex-col gap-2">
         {trace.exchanges.map((ex, i) => (
-          <LlmExchangeCard key={i} exchange={ex} index={i} />
+          <LlmExchangeCard
+            key={i}
+            exchange={ex}
+            index={i}
+            showSystemPrompt={trace.backendType !== 'mattin'}
+          />
         ))}
       </div>
 

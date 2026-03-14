@@ -39,7 +39,7 @@ const GAME_STATUS_CONFIG: Record<string, { label: string; color: string; bg: str
 function GameCard({ game, idx }: { game: TournamentRoundGameDetail; idx: number }) {
   if (game.isBye) {
     return (
-      <div className="px-3 py-2.5 rounded-lg bg-slate-700/30 border border-slate-700/60 text-sm text-slate-500 italic">
+      <div className="rounded-[22px] border border-dashed border-white/12 bg-white/[0.03] px-4 py-4 text-sm italic text-slate-400">
         Bye — pasa directamente a la siguiente ronda
       </div>
     );
@@ -56,13 +56,13 @@ function GameCard({ game, idx }: { game: TournamentRoundGameDetail; idx: number 
     : -Infinity;
 
   return (
-    <div className="rounded-lg bg-slate-900/60 border border-slate-700/60 overflow-hidden">
+    <div className="overflow-hidden rounded-[22px] border border-white/10 bg-slate-950/45">
       {/* Game header */}
-      <div className="flex items-center justify-between px-3 py-1.5 bg-slate-800/60 border-b border-slate-700/50">
-        <span className="text-xs font-semibold text-slate-400">Partida {idx + 1}</span>
+      <div className="flex items-center justify-between border-b border-white/8 bg-white/[0.03] px-4 py-2.5">
+        <span className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Partida {idx + 1}</span>
         <div className="flex items-center gap-2">
           <span
-            className="px-1.5 py-0.5 rounded text-xs font-semibold"
+            className="rounded-full px-2.5 py-1 text-[11px] font-semibold"
             style={{ background: statusCfg.bg, color: statusCfg.color }}
           >
             {statusCfg.label}
@@ -70,7 +70,7 @@ function GameCard({ game, idx }: { game: TournamentRoundGameDetail; idx: number 
           {gameId && (
             <Link
               href={`/admin/partidas/${gameId}`}
-              className="text-xs text-cyan-500 hover:text-cyan-400 transition-colors font-medium"
+              className="text-xs font-medium text-cyan-300 transition-colors hover:text-cyan-200"
             >
               Ver →
             </Link>
@@ -81,14 +81,14 @@ function GameCard({ game, idx }: { game: TournamentRoundGameDetail; idx: number 
       {/* Teams */}
       {isPending && teams.length > 0 ? (
         // Pending: show team names in a compact list
-        <div className="px-3 py-2.5">
-          <p className="text-sm text-slate-400">
+        <div className="px-4 py-4">
+          <p className="text-sm leading-6 text-slate-300">
             {teams.map((t) => t.teamName).join(' · ')}
           </p>
         </div>
       ) : (
         // Active or finished: show teams with scores
-        <div className="divide-y divide-slate-700/40">
+        <div className="divide-y divide-white/8">
           {teams
             .slice()
             .sort((a, b) => b.puntos - a.puntos)
@@ -97,37 +97,37 @@ function GameCard({ game, idx }: { game: TournamentRoundGameDetail; idx: number 
               return (
                 <div
                   key={team.teamId}
-                  className={`flex items-center justify-between px-3 py-2 text-sm ${
-                    isWinner ? 'bg-amber-500/5' : ''
+                  className={`flex items-center justify-between px-4 py-3 text-sm ${
+                    isWinner ? 'bg-amber-300/5' : ''
                   }`}
                 >
                   <span
                     className={`font-medium flex items-center gap-1.5 ${
                       team.eliminado
-                        ? 'text-slate-500 line-through'
-                        : isWinner
-                          ? 'text-amber-300'
+                          ? 'text-slate-500 line-through'
+                          : isWinner
+                            ? 'text-amber-200'
                           : 'text-slate-200'
                     }`}
                   >
-                    {isWinner && <span className="text-amber-400">★</span>}
+                    {isWinner && <span className="text-amber-300">★</span>}
                     {team.teamName}
                     {team.eliminado && (
-                      <span className="text-xs text-red-400 font-normal ml-1">eliminado</span>
+                      <span className="ml-1 text-xs font-normal text-red-300">eliminado</span>
                     )}
                   </span>
                   <span
                     className={`font-mono font-bold tabular-nums text-sm ${
-                      isWinner ? 'text-amber-300' : 'text-slate-400'
+                      isWinner ? 'text-amber-200' : 'text-slate-300'
                     }`}
                   >
                     {team.puntos} pts
                   </span>
                 </div>
               );
-            })}
+          })}
           {teams.length === 0 && (
-            <p className="px-3 py-2 text-xs text-slate-500">Sin equipos asignados</p>
+            <p className="px-4 py-3 text-xs text-slate-500">Sin equipos asignados</p>
           )}
         </div>
       )}
@@ -285,19 +285,45 @@ export function TournamentRoundsSection({
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <section>
-      <h2 className="text-lg font-semibold text-cyan-400 mb-3">{t('torneoRondas')}</h2>
+    <section className="space-y-5">
+      <div className="rounded-[28px] border border-white/10 bg-[linear-gradient(160deg,rgba(8,17,29,0.92),rgba(15,23,42,0.9))] p-5">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Ejecución de rondas</p>
+            <h2 className="mt-2 text-2xl font-semibold text-white">{t('torneoRondas')}</h2>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400">
+              Sigue el ciclo completo de cada ronda: activación, lanzamiento de partidas y avance cuando el bloque esté realmente listo.
+            </p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3">
+              <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Total</p>
+              <p className="mt-2 text-2xl font-semibold text-white">{rounds.length}</p>
+            </div>
+            <div className="rounded-2xl border border-emerald-300/20 bg-emerald-300/10 px-4 py-3">
+              <p className="text-xs uppercase tracking-[0.2em] text-emerald-100">Activas</p>
+              <p className="mt-2 text-2xl font-semibold text-white">{rounds.filter((round) => round.status === 'active').length}</p>
+            </div>
+            <div className="rounded-2xl border border-amber-300/20 bg-amber-300/10 px-4 py-3">
+              <p className="text-xs uppercase tracking-[0.2em] text-amber-100">Cerradas</p>
+              <p className="mt-2 text-2xl font-semibold text-white">{rounds.filter((round) => round.status === 'finished').length}</p>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {actionError && (
-        <p className="px-4 py-2 rounded-md text-sm mb-3 bg-red-900/40 text-red-300 border border-red-500/30">
+        <p className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
           {actionError}
         </p>
       )}
 
       {rounds.length === 0 ? (
-        <p className="text-sm text-slate-500">{t('torneoNoRondas')}</p>
+        <div className="rounded-[28px] border border-dashed border-white/12 bg-white/[0.03] p-8 text-center text-sm text-slate-400">
+          {t('torneoNoRondas')}
+        </div>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-3">
           {rounds.map((round) => {
             const gamesCount = round.games.filter((g) => !g.isBye).length;
             const byesCount  = round.games.filter((g) => g.isBye).length;
@@ -311,15 +337,15 @@ export function TournamentRoundsSection({
             return (
               <div
                 key={round.id}
-                className="rounded-xl bg-slate-800 border border-slate-700 overflow-hidden"
+                className="overflow-hidden rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(15,23,42,0.92),rgba(7,11,22,0.96))]"
               >
                 {/* ── Round header (clickable) ── */}
                 <button
                   onClick={() => toggleRound(round.id)}
-                  className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-slate-700/30 transition-colors"
+                  className="flex w-full items-center justify-between px-5 py-4 text-left transition-colors hover:bg-white/[0.04]"
                 >
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-semibold text-slate-200">
+                    <span className="text-lg font-semibold text-white">
                       {t('torneoRonda', { n: round.roundNumber })}
                     </span>
                     <PhaseBadge phase={round.phase} />
@@ -327,7 +353,7 @@ export function TournamentRoundsSection({
                   </div>
 
                   <div className="flex items-center gap-3 shrink-0">
-                    <span className="text-xs text-slate-500">
+                    <span className="text-xs uppercase tracking-[0.16em] text-slate-500">
                       {gamesCount} partidas
                       {byesCount > 0 && ` · ${byesCount} ${t('torneoByes')}`}
                     </span>
@@ -340,10 +366,10 @@ export function TournamentRoundsSection({
 
                 {/* ── Expanded body ── */}
                 {isExpanded && (
-                  <div className="border-t border-slate-700/60 px-4 pb-4">
+                  <div className="border-t border-white/10 px-5 pb-5">
 
                     {/* Games grid */}
-                    <div className="mt-3">
+                    <div className="mt-4">
                       {detail === 'loading' && (
                         <p className="text-xs text-slate-500 py-2">{t('torneoCargando')}</p>
                       )}
@@ -354,7 +380,7 @@ export function TournamentRoundsSection({
                         detail.games.length === 0 ? (
                           <p className="text-xs text-slate-500 py-2">Sin partidas en esta ronda</p>
                         ) : (
-                          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+                          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
                             {detail.games.map((game, idx) => (
                               <GameCard key={game.id} game={game} idx={idx} />
                             ))}
@@ -365,12 +391,12 @@ export function TournamentRoundsSection({
 
                     {/* Action buttons */}
                     {canAct && (round.status === 'pending' || round.status === 'active') && (
-                      <div className="flex gap-2 flex-wrap mt-4 pt-3 border-t border-slate-700/50">
+                      <div className="mt-5 flex flex-wrap gap-2 border-t border-white/10 pt-4">
                         {round.status === 'pending' && (
                           <button
                             onClick={() => handleStart(round.id)}
                             disabled={isActing}
-                            className="px-4 py-1.5 rounded-md text-sm font-medium bg-green-600 text-white hover:bg-green-500 disabled:opacity-50 transition-colors"
+                            className="rounded-full bg-emerald-300 px-4 py-2 text-sm font-semibold text-slate-950 transition-all hover:-translate-y-0.5 hover:bg-emerald-200 disabled:opacity-60"
                           >
                             {isActing ? '…' : t('torneoIniciarRonda')}
                           </button>
@@ -381,18 +407,18 @@ export function TournamentRoundsSection({
                               <button
                                 onClick={() => handleStartGames(round.id)}
                                 disabled={isActing}
-                                className="px-4 py-1.5 rounded-md text-sm font-medium bg-cyan-700 text-white hover:bg-cyan-600 disabled:opacity-50 transition-colors"
+                                className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-4 py-2 text-sm font-semibold text-cyan-100 transition-colors hover:bg-cyan-300/20 disabled:opacity-60"
                               >
                                 {isActing ? '…' : t('torneoLanzarPartidas')}
                               </button>
                             )}
-                            <button
-                              onClick={() => handleAdvance(round.id)}
-                              disabled={isActing}
-                              className="px-4 py-1.5 rounded-md text-sm font-medium bg-amber-600 text-white hover:bg-amber-500 disabled:opacity-50 transition-colors"
-                            >
-                              {isActing ? '…' : t('torneoAvanzarRonda')}
-                            </button>
+                              <button
+                                onClick={() => handleAdvance(round.id)}
+                                disabled={isActing}
+                                className="rounded-full bg-amber-300 px-4 py-2 text-sm font-semibold text-slate-950 transition-all hover:-translate-y-0.5 hover:bg-amber-200 disabled:opacity-60"
+                              >
+                                {isActing ? '…' : t('torneoAvanzarRonda')}
+                              </button>
                           </>
                         )}
                       </div>

@@ -1,6 +1,8 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import type { ReactNode } from 'react';
+import { useRef, useState, useEffect } from 'react';
+import { Bot, CalendarDays, ChevronDown, ChevronUp, KeyRound, Orbit, PencilLine, Shield, ShieldCheck, Users } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { UpdateTeamSchema, type UpdateTeamInput } from '@/lib/schemas/team';
@@ -42,6 +44,8 @@ export function EditTeamRow({ team, statusColors, onUpdated, onDeleted }: Props)
     register,
     handleSubmit,
     reset,
+    watch,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<UpdateTeamInput>({
     resolver: zodResolver(UpdateTeamSchema),
@@ -49,8 +53,19 @@ export function EditTeamRow({ team, statusColors, onUpdated, onDeleted }: Props)
       nombre: team.nombre,
       descripcion: team.descripcion ?? '',
       agentId: team.agentId,
+      agentBackend: team.agentBackend ?? 'mattin',
+      appId: team.appId ?? '',
+      // mattinApiKey intentionally left blank — show placeholder when already configured
     },
   });
+  const agentBackend = watch('agentBackend');
+
+  useEffect(() => {
+    if (agentBackend === 'local') {
+      setValue('appId', '');
+      setValue('mattinApiKey', undefined);
+    }
+  }, [agentBackend, setValue]);
 
   const openEdit = async () => {
     setEditing(true);
@@ -101,7 +116,7 @@ export function EditTeamRow({ team, statusColors, onUpdated, onDeleted }: Props)
     setMembers(team.miembros ?? []);
     setAvatarUrl(team.avatarUrl ?? null);
     setOwnerUserId(team.usuarioId);
-    reset({ nombre: team.nombre, descripcion: team.descripcion ?? '', agentId: team.agentId });
+    reset({ nombre: team.nombre, descripcion: team.descripcion ?? '', agentId: team.agentId, agentBackend: team.agentBackend ?? 'mattin', appId: team.appId ?? '' });
   };
 
   // ── Avatar actions ──────────────────────────────────────────────────────
@@ -141,158 +156,306 @@ export function EditTeamRow({ team, statusColors, onUpdated, onDeleted }: Props)
   };
 
   const statusColor = statusColors[team.estado] ?? '#64748b';
+  const statusLabel = t(`status.${team.estado}`);
+  const createdAt = new Intl.DateTimeFormat('es-ES', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  }).format(new Date(team.createdAt));
 
-  // ── Edit mode (full-width panel via colSpan) ──────────────────────────────
-  if (editing) {
-    return (
-      <tr className="border-b border-slate-700">
-        <td colSpan={5} className="px-4 py-4">
-          <div className="space-y-4">
-
-            {/* nombre + agentId */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs mb-1 text-slate-400">
-                  {t('nombreEquipo')}
-                </label>
-                <input
-                  {...register('nombre')}
-                  className="w-full px-2 py-1.5 rounded text-sm bg-slate-900/70 text-slate-200 border border-slate-700 focus:ring-2 focus:ring-cyan-500 outline-none"
-                />
-                {errors.nombre && (
-                  <p className="text-xs mt-0.5 text-red-400">
-                    {errors.nombre.message}
-                  </p>
-                )}
-              </div>
-              <div>
-                <label className="block text-xs mb-1 text-slate-400">
-                  Agent ID
-                </label>
-                <input
-                  {...register('agentId')}
-                  className="w-full px-2 py-1.5 rounded text-sm font-mono bg-slate-900/70 text-slate-200 border border-slate-700 focus:ring-2 focus:ring-cyan-500 outline-none"
-                />
-                {errors.agentId && (
-                  <p className="text-xs mt-0.5 text-red-400">
-                    {errors.agentId.message}
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {/* descripcion */}
-            <div>
-              <label className="block text-xs mb-1 text-slate-400">
-                {t('descripcionEquipo')}
-              </label>
-              <textarea
-                {...register('descripcion')}
-                rows={2}
-                className="w-full px-2 py-1.5 rounded text-sm resize-none bg-slate-900/70 text-slate-200 border border-slate-700 focus:ring-2 focus:ring-cyan-500 outline-none"
-                placeholder={t('descripcionPlaceholder')}
-              />
-              {errors.descripcion && (
-                <p className="text-xs mt-0.5 text-red-400">
-                  {errors.descripcion.message}
-                </p>
-              )}
-            </div>
-
-            {/* Avatar section */}
-            <div
-              className="rounded-lg p-3 flex items-start gap-4 bg-slate-900/50 border border-slate-700"
-            >
-              {/* Thumbnail */}
-              <div
-                className="flex-shrink-0 w-16 h-16 rounded-md overflow-hidden flex items-center justify-center bg-slate-800"
-              >
-                {avatarUrl ? (
+  return (
+    <article
+      className="overflow-hidden rounded-[28px] border"
+      style={{ borderColor: 'rgba(148, 163, 184, 0.14)', background: 'rgba(9, 17, 31, 0.84)' }}
+    >
+      <div
+        className="relative overflow-hidden px-5 py-5 sm:px-6"
+        style={{ background: 'linear-gradient(160deg, rgba(245,158,11,0.06), rgba(34,197,94,0.04) 62%, transparent)' }}
+      >
+        <div className="flex flex-col gap-5">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex items-start gap-4">
+              {avatarUrl ? (
+                <div
+                  className="relative h-16 w-16 shrink-0 overflow-hidden rounded-2xl border"
+                  style={{ borderColor: 'rgba(245,158,11,0.28)', boxShadow: '0 16px 30px rgba(245,158,11,0.14)' }}
+                >
                   <Image
                     src={avatarUrl}
                     alt={`Avatar de ${team.nombre}`}
-                    width={64}
-                    height={64}
-                    className="object-cover w-full h-full"
+                    fill
+                    sizes="64px"
+                    className="object-cover"
                     unoptimized
                   />
-                ) : (
-                  <span className="text-2xl">🛡️</span>
-                )}
-              </div>
-
-              {/* Controls */}
-              <div className="flex-1 space-y-2">
-                <p className="text-xs font-medium text-slate-400">
-                  {t('avatar')}
-                </p>
-                <div className="flex gap-2 flex-wrap">
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={avatarLoading}
-                    className="text-xs px-3 py-1.5 rounded font-medium disabled:opacity-50 bg-slate-700 text-slate-300 hover:bg-slate-600"
-                  >
-                    {t('subirAvatar')}
-                  </button>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) handleUpload(file);
-                      e.target.value = '';
-                    }}
-                  />
-                  <button
-                    type="button"
-                    onClick={handleGenerate}
-                    disabled={avatarLoading}
-                    className="text-xs px-3 py-1.5 rounded font-medium disabled:opacity-50 bg-indigo-600/20 text-indigo-300 border border-indigo-600/40 hover:bg-indigo-600/30"
-                  >
-                    {avatarLoading ? `⏳ ${t('generandoAvatar')}` : `✨ ${t('generarConIA')}`}
-                  </button>
                 </div>
-                {avatarError && (
-                  <p className="text-xs text-red-400">{avatarError}</p>
-                )}
-                {avatarLoading && !avatarError && (
-                  <p className="text-xs text-slate-500">{t('generandoAvatarDesc')}</p>
-                )}
+              ) : (
+                <div
+                  className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl"
+                  style={{ background: 'rgba(245,158,11,0.1)', color: '#fbbf24' }}
+                >
+                  <Shield size={22} />
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="text-2xl font-semibold" style={{ color: '#f8fafc' }}>
+                    {team.nombre}
+                  </h3>
+                  <span
+                    className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold"
+                    style={{ background: `${statusColor}22`, color: statusColor }}
+                  >
+                    <span className="h-2 w-2 rounded-full" style={{ background: statusColor }} />
+                    {statusLabel}
+                  </span>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 text-xs" style={{ color: '#94a3b8' }}>
+                  <span
+                    className="inline-flex items-center gap-2 rounded-full px-3 py-1"
+                    style={{ background: 'rgba(56,189,248,0.12)', color: '#7dd3fc' }}
+                  >
+                    <Orbit size={13} />
+                    {team.id}
+                  </span>
+                  <span
+                    className="inline-flex items-center gap-2 rounded-full px-3 py-1"
+                    style={{ background: 'rgba(52,211,153,0.12)', color: '#86efac' }}
+                  >
+                    <Bot size={13} />
+                    {team.agentBackend === 'local' ? t('agentBackendLocal') : t('agentBackendMattin')}
+                  </span>
+                </div>
+
+                <p className="max-w-2xl text-sm leading-6" style={{ color: '#cbd5e1' }}>
+                  {team.descripcion?.trim() || t('teamCardNoDescription')}
+                </p>
               </div>
             </div>
 
-            {/* Owner selector */}
-            <div>
-              <label className="block text-xs mb-1 text-slate-400">
-                {t('ownerEquipo')}
-              </label>
-              <select
-                value={ownerUserId}
-                onChange={(e) => setOwnerUserId(e.target.value)}
-                disabled={usersLoading}
-                className="w-full px-2 py-1.5 rounded text-sm bg-slate-900/70 text-slate-200 border border-slate-700 focus:ring-2 focus:ring-cyan-500 outline-none disabled:opacity-60"
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={editing ? handleCancel : openEdit}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold transition"
+                style={{ background: editing ? 'rgba(51,65,85,0.9)' : 'rgba(56,189,248,0.14)', color: editing ? '#cbd5e1' : '#7dd3fc' }}
+                title={t('editarEquipo')}
               >
-                {usersLoading && (
-                  <option value="">{t('cargandoUsuarios')}</option>
-                )}
-                {users.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.nombre} ({u.email})
-                  </option>
-                ))}
-                {/* Fallback: if users not yet loaded, show the current id */}
-                {!usersLoading && users.length === 0 && (
-                  <option value={ownerUserId}>{ownerUserId}</option>
-                )}
-              </select>
+                <PencilLine size={16} />
+                {editing ? tCommon('cancelar') : t('editarEquipo')}
+              </button>
+              <DeleteTeamButton
+                teamId={team.id}
+                teamName={team.nombre}
+                onDeleted={onDeleted}
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <InfoPill icon={<KeyRound size={15} />} label={t('agentId')} value={team.agentId} mono />
+            <InfoPill icon={<Users size={15} />} label={t('miembros')} value={String(members.length)} />
+            <InfoPill icon={<CalendarDays size={15} />} label={t('createdAtLabel')} value={createdAt} />
+            <InfoPill icon={<ShieldCheck size={15} />} label={t('ownerEquipo')} value={ownerUserId} mono />
+          </div>
+
+          <button
+            type="button"
+            onClick={editing ? handleCancel : openEdit}
+            className="inline-flex items-center gap-2 self-start rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em]"
+            style={{ background: 'rgba(148, 163, 184, 0.1)', color: '#94a3b8' }}
+          >
+            {editing ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            {editing ? t('cerrarEdicion') : t('abrirEdicion')}
+          </button>
+        </div>
+      </div>
+
+      {editing ? (
+        <div className="border-t px-5 py-5 sm:px-6" style={{ borderColor: 'rgba(148, 163, 184, 0.14)' }}>
+          <div className="space-y-6">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label={t('nombreEquipo')}>
+                <input
+                  {...register('nombre')}
+                  className={fieldClassName}
+                  style={fieldStyle}
+                />
+                {errors.nombre && <FieldError message={errors.nombre.message} />}
+              </Field>
+
+              <Field label={t('agentId')}>
+                <input
+                  {...register('agentId')}
+                  className={fieldClassName}
+                  style={fieldStyle}
+                />
+                {errors.agentId && <FieldError message={errors.agentId.message} />}
+              </Field>
+
+              <Field label={t('agentBackendLabel')}>
+                <select
+                  {...register('agentBackend')}
+                  className={fieldClassName}
+                  style={fieldStyle}
+                >
+                  <option value="mattin">{t('agentBackendMattin')}</option>
+                  <option value="local">{t('agentBackendLocal')}</option>
+                </select>
+              </Field>
+
+              {agentBackend === 'mattin' ? (
+                <Field label={t('appIdLabel')}>
+                  <input
+                    {...register('appId')}
+                    className={fieldClassName}
+                    style={fieldStyle}
+                    placeholder={t('appIdPlaceholder')}
+                  />
+                  {errors.appId && <FieldError message={errors.appId.message} />}
+                </Field>
+              ) : (
+                <div
+                  className="rounded-[24px] border px-4 py-4"
+                  style={{ borderColor: 'rgba(148, 163, 184, 0.14)', background: 'rgba(8, 17, 29, 0.55)' }}
+                >
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em]" style={{ color: '#94a3b8' }}>
+                    {t('agentBackendLabel')}
+                  </p>
+                  <p className="mt-2 text-sm" style={{ color: '#cbd5e1' }}>
+                    {t('localBackendHint')}
+                  </p>
+                </div>
+              )}
             </div>
 
-            {/* Members section */}
+            {agentBackend === 'mattin' && (
+              <Field label={t('mattinApiKeyLabel')}>
+                <input
+                  {...register('mattinApiKey')}
+                  type="password"
+                  autoComplete="new-password"
+                  className={fieldClassName}
+                  style={fieldStyle}
+                  placeholder={team.hasMattinApiKey ? t('mattinApiKeyConfigured') : t('mattinApiKeyPlaceholder')}
+                />
+                {errors.mattinApiKey && <FieldError message={errors.mattinApiKey.message} />}
+              </Field>
+            )}
+
+            <Field label={t('descripcionEquipo')}>
+              <textarea
+                {...register('descripcion')}
+                rows={3}
+                className={`${fieldClassName} resize-none`}
+                style={fieldStyle}
+                placeholder={t('descripcionPlaceholder')}
+              />
+              {errors.descripcion && <FieldError message={errors.descripcion.message} />}
+            </Field>
+
+            <div className="grid gap-5 lg:grid-cols-[0.8fr_1.2fr]">
+              <div
+                className="rounded-[24px] border p-4"
+                style={{ borderColor: 'rgba(148, 163, 184, 0.14)', background: 'rgba(8, 17, 29, 0.55)' }}
+              >
+                <div className="flex items-start gap-4">
+                  <div className="relative h-20 w-20 overflow-hidden rounded-2xl" style={{ background: 'rgba(15, 23, 42, 0.78)' }}>
+                    {avatarUrl ? (
+                      <Image
+                        src={avatarUrl}
+                        alt={`Avatar de ${team.nombre}`}
+                        fill
+                        sizes="80px"
+                        className="object-cover"
+                        unoptimized
+                      />
+                    ) : (
+                      <div className="flex h-full items-center justify-center" style={{ color: '#fbbf24' }}>
+                        <Shield size={26} />
+                      </div>
+                    )}
+                  </div>
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em]" style={{ color: '#94a3b8' }}>
+                        {t('avatar')}
+                      </p>
+                      <p className="mt-2 text-sm leading-6" style={{ color: '#cbd5e1' }}>
+                        {t('avatarAdminDesc')}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={avatarLoading}
+                        className="inline-flex items-center justify-center rounded-2xl px-4 py-3 text-sm font-semibold transition disabled:opacity-60"
+                        style={{ background: 'rgba(56,189,248,0.14)', color: '#7dd3fc' }}
+                      >
+                        {t('subirAvatar')}
+                      </button>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleUpload(file);
+                          e.target.value = '';
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={handleGenerate}
+                        disabled={avatarLoading}
+                        className="inline-flex items-center justify-center rounded-2xl px-4 py-3 text-sm font-semibold transition disabled:opacity-60"
+                        style={{ background: 'rgba(245,158,11,0.14)', color: '#fbbf24' }}
+                      >
+                        {avatarLoading ? t('generandoAvatar') : t('generarConIA')}
+                      </button>
+                    </div>
+                    {avatarError ? <FieldError message={avatarError} /> : null}
+                    {avatarLoading && !avatarError ? (
+                      <p className="text-xs" style={{ color: '#94a3b8' }}>{t('generandoAvatarDesc')}</p>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+
+              <div
+                className="rounded-[24px] border p-4"
+                style={{ borderColor: 'rgba(148, 163, 184, 0.14)', background: 'rgba(8, 17, 29, 0.55)' }}
+              >
+                <Field label={t('ownerEquipo')}>
+                  <select
+                    value={ownerUserId}
+                    onChange={(e) => setOwnerUserId(e.target.value)}
+                    disabled={usersLoading}
+                    className={fieldClassName}
+                    style={fieldStyle}
+                  >
+                    {usersLoading && (
+                      <option value="">{t('cargandoUsuarios')}</option>
+                    )}
+                    {users.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.nombre} ({u.email})
+                      </option>
+                    ))}
+                    {!usersLoading && users.length === 0 && (
+                      <option value={ownerUserId}>{ownerUserId}</option>
+                    )}
+                  </select>
+                </Field>
+              </div>
+            </div>
+
             <div
-              className="rounded-lg p-3 bg-slate-900/50 border border-slate-700"
+              className="rounded-[24px] border p-4"
+              style={{ borderColor: 'rgba(148, 163, 184, 0.14)', background: 'rgba(8, 17, 29, 0.55)' }}
             >
               <MembersEditor
                 teamId={team.id}
@@ -302,96 +465,78 @@ export function EditTeamRow({ team, statusColors, onUpdated, onDeleted }: Props)
               />
             </div>
 
-            {/* Submit / cancel */}
-            {serverError && (
-              <p className="text-xs text-red-400">{serverError}</p>
-            )}
-            <div className="flex gap-2">
-              <button
-                onClick={handleSubmit(onSubmit)}
-                disabled={isSubmitting || avatarLoading}
-                className="text-xs px-3 py-1.5 rounded font-semibold disabled:opacity-50 bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30"
-              >
-                {isSubmitting ? '...' : tCommon('guardar')}
-              </button>
+            {serverError ? <FieldError message={serverError} /> : null}
+
+            <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
               <button
                 onClick={handleCancel}
-                className="text-xs px-2 py-1.5 rounded bg-slate-700 text-slate-300 hover:bg-slate-600"
+                className="inline-flex items-center justify-center rounded-2xl px-4 py-3 text-sm font-semibold transition"
+                style={{ background: 'rgba(51,65,85,0.9)', color: '#cbd5e1' }}
               >
                 {tCommon('cancelar')}
               </button>
+              <button
+                onClick={handleSubmit(onSubmit)}
+                disabled={isSubmitting || avatarLoading}
+                className="inline-flex items-center justify-center rounded-2xl px-4 py-3 text-sm font-semibold transition disabled:opacity-60"
+                style={{ background: '#f59e0b', color: '#111827', boxShadow: '0 14px 30px rgba(245,158,11,0.18)' }}
+              >
+                {isSubmitting ? '...' : tCommon('guardar')}
+              </button>
             </div>
           </div>
-        </td>
-      </tr>
-    );
-  }
+        </div>
+      ) : null}
+    </article>
+  );
+}
 
-  // ── View mode ─────────────────────────────────────────────────────────────
+const fieldClassName = 'w-full rounded-2xl px-4 py-3 text-sm outline-none transition focus:ring-2 focus:ring-cyan-400/30';
+const fieldStyle = {
+  background: 'rgba(15, 23, 42, 0.78)',
+  color: '#f8fafc',
+  border: '1px solid rgba(148, 163, 184, 0.22)',
+} as const;
+
+function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <tr className="border-b border-slate-700/50">
-      {/* Avatar */}
-      <td className="px-4 py-3">
-        <div
-          className="w-10 h-10 rounded-md overflow-hidden flex items-center justify-center bg-slate-700"
-        >
-          {avatarUrl ? (
-            <Image
-              src={avatarUrl}
-              alt={`Avatar de ${team.nombre}`}
-              width={40}
-              height={40}
-              className="object-cover w-full h-full"
-              unoptimized
-            />
-          ) : (
-            <span className="text-lg">🛡️</span>
-          )}
-        </div>
-      </td>
+    <label className="block">
+      <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em]" style={{ color: '#94a3b8' }}>
+        {label}
+      </span>
+      {children}
+    </label>
+  );
+}
 
-      {/* Nombre + descripcion */}
-      <td className="px-4 py-3">
-        <span className="font-medium">{team.nombre}</span>
-        {team.descripcion && (
-          <p className="text-xs mt-0.5 truncate max-w-[200px] text-slate-500">
-            {team.descripcion}
-          </p>
-        )}
-      </td>
+function FieldError({ message }: { message?: string }) {
+  if (!message) return null;
+  return <p className="mt-2 text-xs" style={{ color: '#fca5a5' }}>{message}</p>;
+}
 
-      {/* Agent ID */}
-      <td className="px-4 py-3 font-mono text-xs text-slate-500">
-        {team.agentId}
-      </td>
-
-      {/* Estado */}
-      <td className="px-4 py-3">
-        <span
-          className="px-2 py-0.5 rounded-full text-xs"
-          style={{ background: statusColor + '22', color: statusColor }}
-        >
-          {team.estado}
-        </span>
-      </td>
-
-      {/* Acciones */}
-      <td className="px-4 py-3">
-        <div className="flex gap-2">
-          <button
-            onClick={openEdit}
-            className="text-xs px-2 py-1 rounded bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20"
-            title={t('editarEquipo')}
-          >
-            ✎
-          </button>
-          <DeleteTeamButton
-            teamId={team.id}
-            teamName={team.nombre}
-            onDeleted={onDeleted}
-          />
-        </div>
-      </td>
-    </tr>
+function InfoPill({
+  icon,
+  label,
+  value,
+  mono = false,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: string;
+  mono?: boolean;
+}) {
+  return (
+    <div
+      className="rounded-[22px] border px-4 py-3"
+      style={{ borderColor: 'rgba(148, 163, 184, 0.12)', background: 'rgba(8, 17, 29, 0.5)' }}
+    >
+      <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em]" style={{ color: '#94a3b8' }}>
+        {icon}
+        {label}
+      </div>
+      <p className={`mt-2 text-sm ${mono ? 'font-mono' : ''}`} style={{ color: '#f8fafc' }}>
+        {value}
+      </p>
+    </div>
   );
 }

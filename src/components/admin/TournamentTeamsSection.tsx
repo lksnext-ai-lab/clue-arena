@@ -1,44 +1,49 @@
-// src/components/admin/TournamentTeamsSection.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
-import { apiFetch } from '@/lib/api/client';
+import { useEffect, useMemo, useState } from 'react';
+import { Check, Shield, Users, UserPlus, X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
+import { apiFetch } from '@/lib/api/client';
 import type { TournamentTeamResponse, TeamResponse } from '@/types/api';
 import type { TournamentStatus } from '@/types/domain';
 
 interface Props {
   tournamentId: string;
-  status:       TournamentStatus;
-  teams:        TournamentTeamResponse[];
-  onRefresh:    () => void;
+  status: TournamentStatus;
+  teams: TournamentTeamResponse[];
+  onRefresh: () => void;
 }
 
 export function TournamentTeamsSection({ tournamentId, status, teams, onRefresh }: Props) {
   const t = useTranslations('admin');
-  const [allTeams, setAllTeams]       = useState<TeamResponse[]>([]);
+  const [allTeams, setAllTeams] = useState<TeamResponse[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [enrolling, setEnrolling]     = useState(false);
-  const [removing, setRemoving]       = useState<string | null>(null);
-  const [error, setError]             = useState<string | null>(null);
+  const [enrolling, setEnrolling] = useState(false);
+  const [removing, setRemoving] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const canEdit = status === 'draft';
 
   useEffect(() => {
     if (!canEdit) return;
+
     apiFetch<{ teams: TeamResponse[] }>('/teams')
-      .then((d) => setAllTeams(d.teams))
-      .catch(() => {/* non-critical */});
+      .then((data) => setAllTeams(data.teams))
+      .catch(() => {
+        // Non-blocking: the enrolled list can still be managed.
+      });
   }, [canEdit]);
 
-  const enrolledIds = new Set(teams.map((t) => t.teamId));
-  const available   = allTeams.filter((t) => !enrolledIds.has(t.id));
-  const allSelected = available.length > 0 && available.every((t) => selectedIds.has(t.id));
+  const enrolledIds = useMemo(() => new Set(teams.map((team) => team.teamId)), [teams]);
+  const available = useMemo(() => allTeams.filter((team) => !enrolledIds.has(team.id)), [allTeams, enrolledIds]);
+  const allSelected = available.length > 0 && available.every((team) => selectedIds.has(team.id));
+  const activeTeams = teams.filter((team) => !team.eliminated).length;
 
   const toggleTeam = (id: string) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
   };
@@ -47,12 +52,13 @@ export function TournamentTeamsSection({ tournamentId, status, teams, onRefresh 
     if (allSelected) {
       setSelectedIds(new Set());
     } else {
-      setSelectedIds(new Set(available.map((t) => t.id)));
+      setSelectedIds(new Set(available.map((team) => team.id)));
     }
   };
 
   const handleEnroll = async () => {
     if (selectedIds.size === 0) return;
+
     setEnrolling(true);
     setError(null);
     try {
@@ -83,131 +89,216 @@ export function TournamentTeamsSection({ tournamentId, status, teams, onRefresh 
   };
 
   return (
-    <section>
-      <h2 className="text-lg font-semibold text-cyan-400 mb-3">{t('torneoEquipos')}</h2>
-
-      {error && (
-        <p className="px-4 py-2 rounded-md text-sm mb-3 bg-red-900/40 text-red-300 border border-red-500/30">
-          {error}
-        </p>
-      )}
-
-      {/* Multi-select enroll panel (draft only) */}
-      {canEdit && (
-        <div className="mb-4 rounded-xl border border-slate-700 bg-slate-800 overflow-hidden">
-          {/* Panel header — select-all toggle + clear link */}
-          <div className="flex items-center justify-between px-4 py-2.5 bg-slate-900/50 border-b border-slate-700">
-            <label className="flex items-center gap-2.5 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={allSelected}
-                onChange={toggleAll}
-                disabled={available.length === 0}
-                className="accent-cyan-400 cursor-pointer"
-              />
-              <span className="text-sm text-slate-400">
-                {t('torneoEquiposDisponibles')}
-                <span className="ml-1.5 text-slate-500">({available.length})</span>
-              </span>
-            </label>
-            {selectedIds.size > 0 && (
-              <button
-                onClick={() => setSelectedIds(new Set())}
-                className="text-xs text-slate-500 hover:text-slate-300 transition-colors"
-              >
-                {t('torneoBorrarSeleccion')}
-              </button>
-            )}
+    <section className="space-y-5">
+      <div className="grid gap-4 lg:grid-cols-[1.05fr_0.95fr]">
+        <div className="rounded-[28px] border border-white/10 bg-[linear-gradient(160deg,rgba(8,17,29,0.92),rgba(15,23,42,0.9))] p-5">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Roster del torneo</p>
+              <h2 className="mt-2 text-2xl font-semibold text-white">{t('torneoEquipos')}</h2>
+            </div>
+            <div className="rounded-2xl border border-cyan-400/20 bg-cyan-400/10 p-3 text-cyan-100">
+              <Users size={18} />
+            </div>
           </div>
 
-          {/* Team checklist */}
+          <div className="mt-5 grid gap-3 sm:grid-cols-3">
+            <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+              <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Inscritos</p>
+              <p className="mt-3 text-3xl font-semibold text-white">{teams.length}</p>
+            </div>
+            <div className="rounded-2xl border border-emerald-300/20 bg-emerald-300/10 p-4">
+              <p className="text-xs uppercase tracking-[0.2em] text-emerald-100">Activos</p>
+              <p className="mt-3 text-3xl font-semibold text-white">{activeTeams}</p>
+            </div>
+            <div className="rounded-2xl border border-amber-300/20 bg-amber-300/10 p-4">
+              <p className="text-xs uppercase tracking-[0.2em] text-amber-100">Disponibles</p>
+              <p className="mt-3 text-3xl font-semibold text-white">{available.length}</p>
+            </div>
+          </div>
+
+          <p className="mt-4 text-sm leading-6 text-slate-400">
+            La inscripción queda abierta mientras el torneo está en borrador. Cuando arranca, esta vista pasa a ser un panel de control del roster ya fijado.
+          </p>
+        </div>
+
+        <div className="rounded-[28px] border border-white/10 bg-slate-950/45 p-5">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Estado de edición</p>
+              <p className="mt-2 text-xl font-semibold text-white">
+                {canEdit ? 'Inscripción abierta' : 'Roster bloqueado'}
+              </p>
+            </div>
+            <div className={`rounded-2xl border p-3 ${canEdit ? 'border-emerald-300/20 bg-emerald-300/10 text-emerald-100' : 'border-white/10 bg-white/[0.04] text-slate-300'}`}>
+              <Shield size={18} />
+            </div>
+          </div>
+
+          <div className="mt-5 space-y-3 text-sm text-slate-300">
+            <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3">
+              <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Selección actual</p>
+              <p className="mt-2 text-white">
+                {selectedIds.size > 0
+                  ? `${selectedIds.size} ${selectedIds.size === 1 ? t('torneoSeleccionado') : t('torneoSeleccionados')}`
+                  : t('torneoNingunSeleccionado')}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3">
+              <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Semillas asignadas</p>
+              <p className="mt-2 text-white">{teams.filter((team) => team.seed !== null).length}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {error ? (
+        <p className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+          {error}
+        </p>
+      ) : null}
+
+      {canEdit ? (
+        <div className="rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(15,23,42,0.92),rgba(7,11,22,0.96))] p-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Pool disponible</p>
+              <p className="mt-2 text-xl font-semibold text-white">{t('torneoEquiposDisponibles')}</p>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <label className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm text-slate-300">
+                <input
+                  type="checkbox"
+                  checked={allSelected}
+                  onChange={toggleAll}
+                  disabled={available.length === 0}
+                  className="accent-emerald-300"
+                />
+                Seleccionar todo
+              </label>
+              {selectedIds.size > 0 ? (
+                <button
+                  onClick={() => setSelectedIds(new Set())}
+                  className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm text-slate-300 hover:bg-white/[0.08]"
+                >
+                  <X size={16} />
+                  {t('torneoBorrarSeleccion')}
+                </button>
+              ) : null}
+            </div>
+          </div>
+
           {available.length === 0 ? (
-            <p className="px-4 py-3 text-sm text-slate-500 italic">
+            <div className="mt-5 rounded-[24px] border border-dashed border-white/12 bg-white/[0.03] p-8 text-center text-sm text-slate-400">
               {t('torneoSinEquiposDisponibles')}
-            </p>
+            </div>
           ) : (
-            <ul className="max-h-56 overflow-y-auto divide-y divide-slate-700/40">
-              {available.map((team) => (
-                <li key={team.id}>
-                  <label className="flex items-center gap-3 px-4 py-2.5 cursor-pointer select-none hover:bg-slate-700/30 transition-colors">
+            <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {available.map((team) => {
+                const selected = selectedIds.has(team.id);
+                return (
+                  <label
+                    key={team.id}
+                    className={`cursor-pointer rounded-[24px] border p-4 transition-all ${
+                      selected
+                        ? 'border-emerald-300/40 bg-emerald-300/10'
+                        : 'border-white/10 bg-white/[0.03] hover:border-white/20 hover:bg-white/[0.05]'
+                    }`}
+                  >
                     <input
                       type="checkbox"
-                      checked={selectedIds.has(team.id)}
+                      checked={selected}
                       onChange={() => toggleTeam(team.id)}
-                      className="accent-cyan-400 cursor-pointer"
+                      className="sr-only"
                     />
-                    <span className="text-sm text-slate-200">{team.nombre}</span>
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-base font-semibold text-white">{team.nombre}</p>
+                        <p className="mt-1 text-xs uppercase tracking-[0.2em] text-slate-500">{team.id}</p>
+                      </div>
+                      <div className={`rounded-full border p-2 ${selected ? 'border-emerald-300/30 bg-emerald-300/10 text-emerald-100' : 'border-white/10 bg-white/[0.04] text-slate-400'}`}>
+                        {selected ? <Check size={16} /> : <UserPlus size={16} />}
+                      </div>
+                    </div>
                   </label>
-                </li>
-              ))}
-            </ul>
+                );
+              })}
+            </div>
           )}
 
-          {/* Enroll action footer */}
-          <div className="flex items-center justify-between px-4 py-2.5 bg-slate-900/30 border-t border-slate-700">
-            <span className="text-xs text-slate-500">
-              {selectedIds.size > 0
-                ? `${selectedIds.size} ${selectedIds.size === 1 ? t('torneoSeleccionado') : t('torneoSeleccionados')}`
-                : t('torneoNingunSeleccionado')}
-            </span>
+          <div className="mt-5 flex flex-col gap-3 border-t border-white/10 pt-4 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-slate-400">
+              Selecciona varios equipos y añádelos de una sola vez para acelerar la preparación.
+            </p>
             <button
               onClick={handleEnroll}
               disabled={selectedIds.size === 0 || enrolling}
-              className="px-4 py-1.5 rounded-md text-sm font-medium bg-cyan-500 text-slate-900 hover:bg-cyan-400 disabled:opacity-50 transition-colors"
+              className="inline-flex items-center justify-center gap-2 rounded-full bg-emerald-300 px-5 py-3 text-sm font-semibold text-slate-950 transition-all hover:-translate-y-0.5 hover:bg-emerald-200 disabled:cursor-not-allowed disabled:opacity-60"
             >
+              <UserPlus size={16} />
               {enrolling ? '…' : t('torneoInscribirSeleccionados')}
             </button>
           </div>
         </div>
-      )}
+      ) : null}
 
-      {/* Enrolled teams table */}
       {teams.length === 0 ? (
-        <p className="text-sm text-slate-500">{t('torneoNoEquipos')}</p>
+        <div className="rounded-[28px] border border-dashed border-white/12 bg-white/[0.03] p-8 text-center text-sm text-slate-400">
+          {t('torneoNoEquipos')}
+        </div>
       ) : (
-        <div className="rounded-xl overflow-hidden border border-slate-700 bg-slate-800">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-900/50">
-              <tr className="border-b border-slate-700">
-                <th className="px-4 py-2.5 text-left text-slate-500">Equipo</th>
-                <th className="px-4 py-2.5 text-center text-slate-500">{t('torneoSeed')}</th>
-                <th className="px-4 py-2.5 text-center text-slate-500">{t('torneoFase')}</th>
-                <th className="px-4 py-2.5 text-center text-slate-500">Estado</th>
-                {canEdit && <th className="px-4 py-2.5 text-right text-slate-500" />}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-700/70">
-              {teams.map((tt) => (
-                <tr key={tt.id} className="hover:bg-slate-700/20 transition-colors">
-                  <td className="px-4 py-2.5 font-medium text-slate-200">{tt.teamName}</td>
-                  <td className="px-4 py-2.5 text-center font-mono text-slate-400">
-                    {tt.seed ?? '—'}
-                  </td>
-                  <td className="px-4 py-2.5 text-center text-slate-400">
-                    {tt.groupIndex !== null ? t('torneoGrupo', { n: tt.groupIndex + 1 }) : '—'}
-                  </td>
-                  <td className="px-4 py-2.5 text-center">
-                    {tt.eliminated ? (
-                      <span className="text-xs text-red-400">{t('torneoEliminado')}</span>
-                    ) : (
-                      <span className="text-xs text-green-400">{t('torneoActivo')}</span>
-                    )}
-                  </td>
-                  {canEdit && (
-                    <td className="px-4 py-2.5 text-right">
-                      <button
-                        onClick={() => handleRemove(tt.teamId)}
-                        disabled={removing === tt.teamId}
-                        className="text-xs px-2 py-1 rounded bg-red-900/30 text-red-400 hover:bg-red-900/50 disabled:opacity-50 transition-colors"
-                      >
-                        {removing === tt.teamId ? '…' : t('torneoDesinscribir')}
-                      </button>
-                    </td>
-                  )}
+        <div className="overflow-hidden rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(15,23,42,0.92),rgba(7,11,22,0.96))]">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[720px] text-sm">
+              <thead className="bg-white/[0.04]">
+                <tr className="border-b border-white/10 text-slate-400">
+                  <th className="px-5 py-3 text-left font-medium">Equipo</th>
+                  <th className="px-5 py-3 text-center font-medium">{t('torneoSeed')}</th>
+                  <th className="px-5 py-3 text-center font-medium">{t('torneoFase')}</th>
+                  <th className="px-5 py-3 text-center font-medium">Estado</th>
+                  {canEdit ? <th className="px-5 py-3 text-right font-medium">Acciones</th> : null}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-white/8">
+                {teams.map((team) => (
+                  <tr key={team.id} className="transition-colors hover:bg-white/[0.03]">
+                    <td className="px-5 py-4">
+                      <div>
+                        <p className="font-semibold text-white">{team.teamName}</p>
+                        <p className="mt-1 text-xs uppercase tracking-[0.2em] text-slate-500">{team.teamId}</p>
+                      </div>
+                    </td>
+                    <td className="px-5 py-4 text-center font-mono text-slate-300">{team.seed ?? '—'}</td>
+                    <td className="px-5 py-4 text-center text-slate-300">
+                      {team.groupIndex !== null ? t('torneoGrupo', { n: team.groupIndex + 1 }) : '—'}
+                    </td>
+                    <td className="px-5 py-4 text-center">
+                      {team.eliminated ? (
+                        <span className="rounded-full border border-red-400/20 bg-red-400/10 px-3 py-1 text-xs font-semibold text-red-200">
+                          {t('torneoEliminado')}
+                        </span>
+                      ) : (
+                        <span className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1 text-xs font-semibold text-emerald-100">
+                          {t('torneoActivo')}
+                        </span>
+                      )}
+                    </td>
+                    {canEdit ? (
+                      <td className="px-5 py-4 text-right">
+                        <button
+                          onClick={() => handleRemove(team.teamId)}
+                          disabled={removing === team.teamId}
+                          className="rounded-full border border-red-400/20 bg-red-400/10 px-3 py-2 text-xs font-semibold text-red-100 transition-colors hover:bg-red-400/20 disabled:opacity-60"
+                        >
+                          {removing === team.teamId ? '…' : t('torneoDesinscribir')}
+                        </button>
+                      </td>
+                    ) : null}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </section>

@@ -1,9 +1,9 @@
-# RFC F008 — Gestión de partidas por el administrador
+# RFC F008 — Dashboard y gestión de partidas por el administrador
 
 | Campo | Valor |
 |---|---|
 | **ID** | F008 |
-| **Título** | Gestión del ciclo de vida de partidas: creación, arranque, ejecución (auto/manual) y cierre |
+| **Título** | Dashboard operativo del administrador y ciclo de vida de partidas: creación, arranque, ejecución (auto/manual) y cierre |
 | **Estado** | Draft |
 | **Autor** | Equipo Clue Arena |
 | **Fecha** | 2026-02-26 |
@@ -14,15 +14,16 @@
 
 ## 1. Resumen
 
-Este RFC describe el diseño completo de la **gestión de partidas por parte del administrador** en Clue Arena. Cubre:
+Este RFC describe el diseño completo del **panel de administración y la gestión de partidas** en Clue Arena. Cubre:
 
-1. **Creación** de partidas con selección de equipos participantes (UI-007 / API-010).
-2. **Arranque** de una partida pendiente (API-012) y elección del **modo de ejecución** (auto o manual).
-3. **Ciclo de ejecución** en modo auto (`run`) con soporte para pausa (`pause`) y reanudación (`resume`), y en modo manual con avance turno a turno (`advance-turn`).
-4. **Cierre forzado** de una partida en curso (API-013) y cierre automático por victoria o eliminación total.
-5. **Monitorización** en tiempo real desde el detalle de partida (UI-008): historial completo de turnos, cartas mostradas, errores, sobre revelado.
+1. **Dashboard home `/admin` (UI-006)** como pantalla operativa única del evento: KPIs, partidas priorizadas, equipos e incidencias recientes.
+2. **Creación** de partidas con selección de equipos participantes (UI-007 / API-010).
+3. **Arranque** de una partida pendiente (API-012) y elección del **modo de ejecución** (auto o manual).
+4. **Ciclo de ejecución** en modo auto (`run`) con soporte para pausa (`pause`) y reanudación (`resume`), y en modo manual con avance turno a turno (`advance-turn`).
+5. **Cierre forzado** de una partida en curso (API-013) y cierre automático por victoria o eliminación total.
+6. **Monitorización** en tiempo real desde el detalle de partida (UI-008): historial completo de turnos, cartas mostradas, errores, sobre revelado.
 
-El resultado es una plataforma que permite al administrador orquestar competiciones completas con mínima intervención, o depurar paso a paso durante pruebas.
+El resultado es una plataforma que permite al administrador supervisar el estado global del evento, detectar incidencias sin consultar logs externos y orquestar competiciones completas con mínima intervención, o depurar paso a paso durante pruebas.
 
 ---
 
@@ -284,7 +285,7 @@ Los endpoints base (API-009..013) están definidos en la spec. Este RFC document
 
 - **Roles**: Admin (puede relajarse a `Autenticado` si se decide exponer a espectadores).
 - **Query params**: `?limit=10` (1–50, por defecto 10).
-- **Propósito**: feed de actividad reciente de **todas** las partidas para el panel admin (sección "Errores/actividad reciente" de UI-006).
+- **Propósito**: feed de actividad/incidencias recientes de **todas** las partidas para el dashboard admin (UI-006), sin necesidad de abrir logs del servidor.
 - **Respuesta 200**:
   ```json
   {
@@ -306,19 +307,122 @@ Los endpoints base (API-009..013) están definidos en la spec. Este RFC document
 
 ### 6.1 UI-006 — Panel Admin (`/admin`)
 
-**Componentes relevantes a partidas**:
+`/admin` es la **home operativa** del evento. No es solo una landing con accesos rápidos: debe responder en segundos a tres preguntas del admin:
 
-- **Sección "Partidas"**: lista de todas las partidas con pill de estado (`pendiente`, `en_curso`, `finalizada`) y enlace a UI-008.
-- **Botón "Nueva partida"**: navega a UI-007.
-- **Sección "Actividad reciente"**: últimas 10 acciones via `GET /api/games/activity?limit=10`.
+1. ¿Cómo va el evento?
+2. ¿Qué requiere mi acción ahora?
+3. ¿Dónde hay riesgo o error?
+
+**Estructura de la pantalla**:
+
+1. **Cabecera operativa**
+2. **Resumen KPI**
+3. **Partidas activas y pendientes**
+4. **Equipos**
+5. **Incidencias recientes**
+
+#### Cabecera operativa
+
+- título: `Panel de control del evento`
+- subtítulo con marca de última actualización exitosa
+- acción primaria `Nueva partida`
+- acción secundaria `Ver ranking`
+  - abre la vista pública de ranking con selector de ámbito `Global` / `Por torneo`
+  - si la navegación parte del contexto de un torneo, precarga ese `torneoId` en el filtro
+
+#### Resumen KPI
+
+Tarjetas compactas con:
+
+- `Equipos registrados`
+- `Partidas pendientes`
+- `Partidas en curso`
+- `Partidas finalizadas`
+- `Incidencias recientes`
+
+Reglas:
+
+- sin gráficas en MVP; solo cifra, etiqueta y microtexto contextual
+- `Incidencias recientes` usa color de alerta solo cuando el contador es mayor que 0
+
+#### Integración con ranking
+
+El ranking sigue siendo una vista **pública** del producto. Desde UI-006 y UI-008 solo se documenta cómo las pantallas de administración enlazan hacia esa vista, que soporta dos modos de visualización:
+
+- **Ranking global**: agrega los resultados de todas las partidas del evento.
+- **Ranking por torneo**: limita la clasificación a las partidas asociadas a un torneo concreto, manteniendo el mismo acceso público que el ranking global.
+
+Requisitos de UX:
+
+- el CTA `Ver ranking` debe abrir la vista pública de ranking en la última variante usada, si existe
+- si la navegación se lanza desde una partida asociada a torneo, el ranking debe abrirse filtrado por ese torneo
+- el ranking debe dejar visible el torneo activo y permitir volver a `Global` sin recargar la página
+
+#### Sección "Partidas"
+
+Bloque principal del dashboard. Debe priorizar supervisión antes que CRUD.
+
+- lista ordenada por estado: `en_curso` → `pendiente` → `finalizada`
+- columnas mínimas:
+  - nombre o id corto
+  - equipos participantes
+  - estado
+  - turno actual
+  - último evento
+  - acciones
+
+Acciones por fila:
+
+- `Gestionar` / enlace a UI-008
+- `Iniciar` si `pendiente`
+- `Finalizar` si `en_curso`
+
+Si una partida presenta turno bloqueado, timeout repetido o error de ejecución, la fila debe marcarse como `requiere atención`.
 
 **Estados de la sección de partidas**:
 
 | Estado | Vista |
 |---|---|
 | Sin partidas | "No hay partidas. Crea la primera." |
-| Listado normal | Tarjetas con nombre, turno actual, estado y botón "Gestionar" |
+| Listado normal | Filas priorizadas por estado con nombre, turno actual, estado y acciones |
 | Error al cargar | Banner de error con botón reintentar |
+
+#### Sección "Equipos"
+
+Tabla compacta con:
+
+- nombre
+- usuario/propietario si aplica
+- `agent_id`
+- disponibilidad
+- acciones `Editar` y `Eliminar`
+
+Reglas:
+
+- si el equipo está en partida activa, mostrar badge `en partida`
+- si falta `agent_id`, mostrar warning y excluirlo visualmente de “listo para jugar”
+- esta sección nunca debe competir visualmente con la sección de partidas
+
+#### Sección "Incidencias recientes"
+
+Lista de los últimos 10 eventos operativos obtenidos vía `GET /api/games/activity?limit=10`:
+
+- timestamp
+- partida
+- equipo/agente afectado
+- tipo (`timeout`, `error`, `stop_manual`, `reintento`, `sugerencia`, `acusacion`)
+- acceso rápido a la partida afectada
+
+Reglas:
+
+- no mostrar stack traces en producción
+- el objetivo es triage rápido, no observabilidad profunda
+
+#### Frecuencia de actualización
+
+- polling del dashboard cada 10 s
+- actualización del sello `Actualizado hace X s` en cada refresh exitoso
+- si la pestaña está oculta, se puede pausar el polling si no añade complejidad relevante
 
 ---
 
@@ -507,7 +611,7 @@ En ambos casos, `advanceTurn` (coordinador F007) detecta `gameOver = true` y:
 | `NuevaPartidaPage` | `src/app/admin/partidas/nueva/page.tsx` | Formulario de creación (Client Component) |
 | `AdminPartidaPage` | `src/app/admin/partidas/[id]/page.tsx` | Shell async + `GameProvider` |
 | `AdminPartidaContent` | (en el mismo fichero) | Panel de control con polling (Client Component) |
-| `AdminPage` | `src/app/admin/page.tsx` | Panel general; sección de partidas + botón crear |
+| `AdminPage` | `src/app/admin/page.tsx` | Dashboard operativo: KPIs, partidas, equipos e incidencias |
 | `GameContext` | `src/contexts/GameContext.tsx` | Polling compartido con espectador; admin usa mismo contexto con privilegios adicionales |
 | `CreateGameSchema` | `src/lib/schemas/game.ts` | Validación compartida cliente/servidor |
 

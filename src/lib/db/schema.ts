@@ -18,6 +18,9 @@ export const equipos = sqliteTable('equipos', {
   nombre: text('nombre').notNull().unique(),
   descripcion: text('descripcion'),
   agentId: text('agent_id').notNull(),
+  agentBackend: text('agent_backend', { enum: ['mattin', 'local'] }).notNull().default('mattin'), // Per-team agent backend
+  appId: text('app_id'),                           // MattinAI app ID (optional)
+  mattinApiKey: text('mattin_api_key'),             // Per-team API key — NEVER expose in API responses
   avatarUrl: text('avatar_url'),
   miembros: text('miembros').notNull().default('[]'), // JSON array of member emails
   usuarioId: text('usuario_id')
@@ -60,6 +63,12 @@ export const partidaEquipos = sqliteTable('partida_equipos', {
     .notNull(),
   orden: integer('orden').notNull(),
   eliminado: integer('eliminado', { mode: 'boolean' }).notNull().default(false),
+  /** G006: cause of elimination; null = not eliminated */
+  eliminacionRazon: text('eliminacion_razon', {
+    enum: ['acusacion_incorrecta', 'warnings'],
+  }),
+  /** G006: accumulated warnings counter (resets on resume) */
+  warnings: integer('warnings').notNull().default(0),
   puntos: real('puntos').notNull().default(0),
   cartas: text('cartas').notNull().default('[]'), // JSON array
 });
@@ -154,7 +163,7 @@ export const pases = sqliteTable('pases', {
   equipoId: text('equipo_id')
     .references(() => equipos.id)
     .notNull(),
-  origen: text('origen', { enum: ['voluntario', 'timeout', 'invalid_format'] }).notNull(),
+  origen: text('origen', { enum: ['voluntario', 'timeout', 'invalid_format', 'comm_error'] }).notNull(),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 });
 
@@ -181,6 +190,19 @@ export const scoreEvents = sqliteTable('score_events', {
   points:    integer('points').notNull(),
   meta:      text('meta'),                  // JSON serializado
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+});
+
+// --- G006: warning_eliminaciones ---
+/** Log of warning-based eliminations and card redistribution results */
+export const warningEliminaciones = sqliteTable('warning_eliminaciones', {
+  id: text('id').primaryKey(),
+  gameId: text('game_id').notNull().references(() => partidas.id),
+  equipoEliminadoId: text('equipo_eliminado_id').notNull(),
+  turno: integer('turno').notNull(),
+  cartasCount: integer('cartas_count').notNull(),
+  /** JSON: { equipoId: string; cartas: Carta[] }[] */
+  redistribucionJson: text('redistribucion_json').notNull(),
+  creadoEn: integer('creado_en', { mode: 'timestamp' }).notNull(),
 });
 
 // --- Relations ---

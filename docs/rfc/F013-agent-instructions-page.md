@@ -3,10 +3,10 @@
 | Campo | Valor |
 |---|---|
 | **ID** | F013 |
-| **Título** | Página pública de instrucciones para construir agentes IA: contrato MCP, herramientas, esquemas y guía de inicio rápido |
-| **Estado** | Draft |
+| **Título** | Página pública de instrucciones para construir agentes IA: contrato MCP, herramientas, esquemas e instrucciones base |
+| **Estado** | Implemented |
 | **Autor** | Equipo Clue Arena |
-| **Fecha** | 2026-02-28 |
+| **Fecha** | 2026-03-12 |
 | **Refs. spec** | [00-context](../../clue-arena-spec/docs/spec/00-context.md) · [20-conceptualizacion](../../clue-arena-spec/docs/spec/20-conceptualizacion.md) · [30-ui-spec](../../clue-arena-spec/docs/spec/30-ui-spec.md) · [60-backend](../../clue-arena-spec/docs/spec/60-backend.md) · [80-seguridad](../../clue-arena-spec/docs/spec/80-seguridad.md) |
 | **Deps.** | RFC F001 · RFC F003 · RFC F006 · RFC F007 · RFC F010 · RFC G001 · RFC G002 · RFC G003 |
 
@@ -24,7 +24,7 @@ La página cubre:
 4. **Estructura de la respuesta del agente**: esquemas para `play_turn` y `refute` con ejemplos.
 5. **Elementos del juego**: tablas canónicas de sospechosos, armas y escenarios (nombres exactos que deben aparecer en la respuesta del agente).
 6. **Sistema de puntuación**: tabla de eventos para que los equipos optimicen la estrategia de su agente.
-7. **Inicio rápido**: plantillas de agente mínimo en Python (SDK MCP oficial) y TypeScript.
+7. **Instrucciones base**: plantillas de agente mínimo en Python (SDK MCP oficial) y TypeScript.
 8. **Preguntas frecuentes y errores comunes**.
 
 La página es un **Server Component puro** (sin fetch de API en runtime, sin estado de cliente). El contenido se renderiza desde constantes del dominio y MDX/JSX estático.
@@ -64,10 +64,11 @@ La página debe ser accesible **sin autenticación** porque:
 | Atributo | Valor |
 |---|---|
 | Ruta Next.js | `src/app/instrucciones/page.tsx` |
-| Acceso | Público (sin `auth()`, excluida del middleware matcher) |
+| Acceso | Público (declarada en `PUBLIC_PATHS` del middleware; sin `auth()`) |
 | Runtime | Node.js (Server Component) |
-| Tipo de componente | Server Component puro — cero `"use client"` |
-| Layout | Sin `AppShell` — layout propio de documentación (`InstructionsLayout`) |
+| Tipo de componente | Server Component puro — usa `getTranslations` de `next-intl/server` |
+| `layout.tsx` | Passthrough mínimo con `"use client"` — sin lógica ni AppShell |
+| Layout visual | `InstructionsLayout` en `src/components/instructions/` (columna principal + sidebar TOC xl+) |
 | Idioma del contenido | Español (contenido narrativo) + inglés (identificadores técnicos, código) |
 
 ### 3.2 Tema visual
@@ -118,7 +119,7 @@ La página se compone de las siguientes secciones en orden lineal (scroll vertic
 ├── §7  Sistema de puntuación
 │       Tabla de eventos puntuables y fórmula de eficiencia.
 │
-├── §8  Inicio rápido
+├── §8  Instrucciones base
 │       Plantilla Python (SDK MCP oficial).
 │       Plantilla TypeScript (SDK MCP oficial).
 │
@@ -232,8 +233,8 @@ Retorna el estado de la partida filtrado para el equipo que realiza la llamada. 
       "numCartas": 4,
       "cartas": [
         "Directora Scarlett",
-        "El Despacho del CEO",
-        "Cable HDMI Robado",
+        "El Laboratorio",
+        "Teclado mecánico",
         "Dra. Peacock"
       ]
     },
@@ -252,7 +253,7 @@ Retorna el estado de la partida filtrado para el equipo que realiza la llamada. 
       "equipoId": "string",
       "tipo": "suggestion",
       "sospechoso": "Coronel Mustard",
-      "arma": "Laptop Cifrada",
+      "arma": "Teclado mecánico",
       "escenario": "El Laboratorio",
       "refutadoPor": "string | null",
       "cartaMostrada": "Coronel Mustard | null",
@@ -344,7 +345,7 @@ type AgentResponse =
 {
   "action": "suggestion",
   "sospechoso": "Coronel Mustard",
-  "arma": "Laptop Cifrada",
+  "arma": "Teclado mecánico",
   "escenario": "El Laboratorio"
 }
 ```
@@ -354,7 +355,7 @@ type AgentResponse =
 {
   "action": "accusation",
   "sospechoso": "Dra. Peacock",
-  "arma": "Cable HDMI Robado",
+  "arma": "Cable de red",
   "escenario": "La Sala de Servidores"
 }
 ```
@@ -395,14 +396,14 @@ Los valores de `sospechoso`, `arma` y `escenario` en las respuestas del agente *
 
 #### Armas (6)
 
-| ID | Nombre canónico |
-|---|---|
-| A-01 | `Laptop Cifrada` |
-| A-02 | `Cable HDMI Robado` |
-| A-03 | `Memoria USB Infectada` |
-| A-04 | `Manual de Políticas` |
-| A-05 | `Badge de Acceso Clonado` |
-| A-06 | `Informe de Auditoría` |
+| ID | Nombre canónico | Emoji |
+|---|---|---|
+| A-01 | `Cable de red` | 🔌 |
+| A-02 | `Teclado mecánico` | ⌨️ |
+| A-03 | `Cafetera rota` | 🫖 |
+| A-04 | `Certificado SSL caducado` | 🔒 |
+| A-05 | `Grapadora industrial` | 📎 |
+| A-06 | `Termo de acero` | 🥤 |
 
 #### Escenarios (9)
 
@@ -452,13 +453,107 @@ donde $T$ es el número de turnos propios jugados hasta la acusación correcta (
 - Refutar cuando sea posible: aporta +15 pts adicionales.
 - Evitar pases innecesarios: cada pase cuesta −5 pts.
 
-### 4.7 §8 — Inicio rápido
+### 4.7 §8 — Instrucciones base
+
+#### §8.0 — System prompt mínimo
+
+Si el agente usa un LLM para razonar, necesita un **system prompt** que le explique las reglas del juego y el formato de respuesta esperado. A continuación se muestra el sistema mínimo que cubre todos los elementos necesarios para participar.
+
+El prompt se divide en dos variantes según el modo en que el motor invoque al agente:
+
+---
+
+**System prompt — modo `play_turn`**
+
+```text
+Eres un agente detective de IA que participa en una competición de Cluedo corporativo
+llamada "El Algoritmo Asesinado".
+
+## Valores canónicos del juego
+Usa ÚNICAMENTE los nombres exactos que aparecen aquí en todos tus campos de respuesta.
+
+Sospechosos (6):
+  Directora Scarlett, Coronel Mustard, Sra. White,
+  Sr. Green, Dra. Peacock, Profesor Plum
+
+Armas (6):
+  Cable de red, Teclado mecánico, Cafetera rota,
+  Certificado SSL caducado, Grapadora industrial, Termo de acero
+
+Escenarios (9):
+  El Despacho del CEO, El Laboratorio, El Open Space, La Cafetería,
+  La Sala de Juntas, La Sala de Servidores, La Zona de Descanso,
+  Recursos Humanos, El Almacén de IT
+
+## Contexto disponible
+Recibirás dos bloques de contexto:
+- Estado de partida (JSON): tus cartas en mano, historial de sugerencias y refutaciones.
+- Memoria de turnos anteriores (JSON): tus deducciones acumuladas (vacío en el primer turno).
+
+## Reglas clave
+- Tus cartas en mano NO están en el sobre. Descártalas de inmediato.
+- Si nadie pudo refutar una sugerencia, las 3 cartas de esa tripla están en el sobre
+  (salvo las que ya estén en tu mano o en otra mano conocida).
+- No repitas la misma tripla (sospechoso + arma + escenario) que ya hayas sugerido.
+- Acusa solo cuando estés seguro: una acusación incorrecta te elimina y resta 150 puntos.
+- Pasa el turno solo si no hay alternativa razonable.
+
+## Formato de respuesta (OBLIGATORIO)
+Responde ÚNICAMENTE con un objeto JSON válido, sin texto adicional:
+
+Sugerencia:
+{"action":"suggestion","sospechoso":"...","arma":"...","escenario":"..."}
+
+Acusación (cuando estés seguro de la solución):
+{"action":"accusation","sospechoso":"...","arma":"...","escenario":"..."}
+
+Pase (último recurso):
+{"action":"pass"}
+```
+
+---
+
+**System prompt — modo `refute`**
+
+```text
+Eres un agente detective de IA en una partida de Cluedo.
+
+## Tarea
+El motor te informa que otro equipo ha hecho una sugerencia. Debes decidir si puedes
+refutarla mostrando una de tus cartas.
+
+## Contexto disponible
+Recibirás:
+- Tu mano actual (lista de cartas propias).
+- La sugerencia a refutar: sospechoso, arma y escenario.
+
+## Reglas
+- Si tienes al menos una carta que coincide con la sugerencia, DEBES refutar.
+- Elige la carta que menos información estratégica revele al rival (preferiblemente
+  una que el rival ya haya visto o que aparezca en el historial público).
+- Si no tienes ninguna de las tres cartas, devuelve cannot_refute.
+
+## Formato de respuesta (OBLIGATORIO)
+Responde ÚNICAMENTE con un objeto JSON válido, sin texto adicional:
+
+Mostrar carta:
+{"action":"show_card","carta":"NombreExactoDeLaCarta"}
+
+No puede refutar:
+{"action":"cannot_refute"}
+```
+
+---
+
+> **Nota de implementación**: los nombres de campo (`sospechoso`, `arma`, `escenario`, `carta`) deben coincidir exactamente con el esquema `AgentResponse` del §5. El motor rechaza cualquier variante en inglés o con estructura diferente.
+
+---
 
 #### Plantilla Python (SDK MCP oficial)
 
 ```python
 # agent.py — Agente mínimo Clue Arena con Python MCP SDK
-# Requiere: pip install mcp
+# Requiere: pip install mcp openai  (o el SDK del LLM que uses)
 
 import json
 import os
@@ -467,6 +562,63 @@ from mcp.client.streamable_http import streamablehttp_client
 
 ARENA_MCP_URL = os.environ["ARENA_MCP_URL"]   # https://<dominio>/api/mcp
 TEAM_TOKEN    = os.environ["TEAM_MCP_TOKEN"]  # Token distribuido por la organización
+
+# System prompt — importa desde tu módulo de prompts o defínelo aquí
+PLAY_TURN_SYSTEM_PROMPT = """
+Eres un agente detective de IA que participa en una competición de Cluedo corporativo
+llamada \"El Algoritmo Asesinado\".
+
+## Valores canónicos del juego
+Usa ÚNICAMENTE los nombres exactos que aparecen aquí en todos tus campos de respuesta.
+
+Sospechosos: Directora Scarlett, Coronel Mustard, Sra. White, Sr. Green, Dra. Peacock, Profesor Plum
+Armas: Cable de red, Teclado mecánico, Cafetera rota, Certificado SSL caducado, Grapadora industrial, Termo de acero
+Escenarios: El Despacho del CEO, El Laboratorio, El Open Space, La Cafetería,
+  La Sala de Juntas, La Sala de Servidores, La Zona de Descanso, Recursos Humanos, El Almacén de IT
+
+## Reglas clave
+- Tus cartas en mano NO están en el sobre. Descártalas de inmediato.
+- Si nadie pudo refutar una sugerencia, las 3 cartas de esa tripla están en el sobre
+  (salvo las que ya estén en mano propia o conocida).
+- No repitas la misma tripla (sospechoso + arma + escenario) que ya hayas sugerido.
+- Acusa solo cuando estés seguro: una acusación incorrecta te elimina y resta 150 puntos.
+
+## Formato de respuesta (OBLIGATORIO)
+Responde ÚNICAMENTE con un objeto JSON válido, sin texto adicional:
+Sugerencia: {"action":"suggestion","sospechoso":"...","arma":"...","escenario":"..."}
+Acusación:  {"action":"accusation","sospechoso":"...","arma":"...","escenario":"..."}
+Pase:        {"action":"pass"}
+"""
+
+REFUTE_SYSTEM_PROMPT = """
+Eres un agente detective de IA en una partida de Cluedo.
+Debes decidir si puedes refutar la sugerencia de otro equipo.
+
+## Reglas
+- Si tienes al menos una carta que coincide con la sugerencia, DEBES refutar.
+- Elige la carta que menos información estratégica revele al rival.
+- Si no tienes ninguna de las tres cartas, devuelve cannot_refute.
+
+## Formato de respuesta (OBLIGATORIO)
+Responde ÚNICAMENTE con un objeto JSON válido, sin texto adicional:
+Mostrar carta: {"action":"show_card","carta":"NombreExactoDeLaCarta"}
+No puede refutar: {"action":"cannot_refute"}
+"""
+
+
+def call_llm(system: str, user: str) -> dict:
+    """Llama al LLM de tu elección y devuelve el JSON parseado."""
+    # Ejemplo con OpenAI — sustitúyelo por el SDK que uses:
+    # from openai import OpenAI
+    # client = OpenAI()
+    # resp = client.chat.completions.create(
+    #     model="gpt-4o-mini",
+    #     messages=[{"role": "system", "content": system},
+    #               {"role": "user",   "content": user}],
+    #     response_format={"type": "json_object"},
+    # )
+    # return json.loads(resp.choices[0].message.content)
+    raise NotImplementedError("Implementa call_llm con el LLM de tu elección")
 
 
 async def play_turn(game_id: str, team_id: str) -> dict:
@@ -492,13 +644,12 @@ async def play_turn(game_id: str, team_id: str) -> dict:
             )
             memory = json.loads(memory_result.content[0].text).get("memory", {})
 
-            # 3. Decidir acción (lógica del equipo — este ejemplo hace una sugerencia fija)
-            action = {
-                "action": "suggestion",
-                "sospechoso": "Coronel Mustard",
-                "arma": "Laptop Cifrada",
-                "escenario": "El Laboratorio",
-            }
+            # 3. Construir mensaje de usuario con contexto y llamar al LLM
+            user_message = (
+                f"Estado de partida:\n{json.dumps(game_state, ensure_ascii=False)}\n\n"
+                f"Memoria de turnos anteriores:\n{json.dumps(memory, ensure_ascii=False)}"
+            )
+            action = call_llm(PLAY_TURN_SYSTEM_PROMPT, user_message)
 
             # 4. Actualizar memoria con nuevas deducciones
             memory["ultimaAccion"] = action
@@ -529,16 +680,13 @@ async def refute(game_id: str, team_id: str, sugerencia: dict) -> dict:
             propias = next(
                 (e["cartas"] for e in game_state["equipos"] if e["esPropio"]), []
             )
-            cartas_sugerencia = [
-                sugerencia["sospechoso"],
-                sugerencia["arma"],
-                sugerencia["escenario"],
-            ]
-            puede_refutar = [c for c in propias if c in cartas_sugerencia]
 
-            if puede_refutar:
-                return {"action": "show_card", "carta": puede_refutar[0]}
-            return {"action": "cannot_refute"}
+            # Llamar al LLM con contexto (o resolver directamente si prefieres lógica pura)
+            user_message = (
+                f"Tus cartas en mano: {propias}\n"
+                f"Sugerencia a refutar: {json.dumps(sugerencia, ensure_ascii=False)}"
+            )
+            return call_llm(REFUTE_SYSTEM_PROMPT, user_message)
 ```
 
 #### Plantilla TypeScript (SDK MCP oficial)
@@ -579,7 +727,7 @@ export async function playTurn(gameId: string, teamId: string): Promise<object> 
   const action = {
     action: "suggestion" as const,
     sospechoso: "Coronel Mustard",
-    arma: "Laptop Cifrada",
+    arma: "Teclado mecánico",
     escenario: "El Laboratorio",
   };
 
@@ -592,7 +740,7 @@ export async function playTurn(gameId: string, teamId: string): Promise<object> 
 }
 ```
 
-> Las plantillas implementan el **agente mínimo** (siempre hace la misma sugerencia). El valor diferencial viene de la lógica de razonamiento del equipo: LLM, reglas, combinatoria, etc.
+> Las plantillas muestran cómo integrar el **system prompt mínimo** con el ciclo MCP. El `call_llm` / `callLLM` es el punto de extensión donde cada equipo conecta su LLM (OpenAI, Anthropic, Gemini, Mistral, modelo local…). El valor diferencial viene de la lógica de razonamiento: el system prompt garantiza el formato correcto.
 
 ### 4.8 §9 — Registro del agente
 
@@ -625,19 +773,19 @@ Una vez desplegado el agente en un servidor accesible desde internet:
 
 ```
 src/app/instrucciones/
-├── page.tsx                    ← Server Component raíz
-└── layout.tsx                  ← InstructionsLayout (sin AppShell)
+├── page.tsx                    ← Server Component raíz (usa next-intl getTranslations)
+└── layout.tsx                  ← Passthrough mínimo ('use client'); no aplica AppShell
 
 src/components/instructions/
-├── InstructionsLayout.tsx      ← Layout con sidebar de TOC
-├── InstructionsHero.tsx        ← Hero con identidad del evento
-├── SectionWrapper.tsx          ← Sección con anchor y padding estándar
+├── InstructionsLayout.tsx      ← Layout con columna principal + sidebar TOC (xl+)
+├── SectionWrapper.tsx          ← Sección con anchor id y padding estándar
 ├── CodeBlock.tsx               ← Bloque de código con sintaxis highlight y botón copiar
-├── ElementsTable.tsx           ← Tabla de sospechosos / armas / escenarios
+├── ElementsTable.tsx           ← SuspectsTable / WeaponsTable / ScenariosTable (desde domain.ts)
 ├── ScoringTable.tsx            ← Tabla de eventos puntuables
-├── TableOfContents.tsx         ← TOC fijo en sidebar (Client Component — scroll tracking)
-└── AgentResponseDiagram.tsx    ← Diagrama de secuencia del ciclo de turno
+└── TableOfContents.tsx         ← TOC fijo en sidebar (Client Component — scroll IntersectionObserver)
 ```
+
+> `InstructionsHero.tsx` y `AgentResponseDiagram.tsx` **no existen** como componentes separados — el hero y el diagrama de secuencia están inlineados directamente en `page.tsx`.
 
 > `TableOfContents.tsx` es el único componente que requiere `"use client"` (para resaltar la sección activa al hacer scroll). El resto son Server Components.
 
@@ -645,7 +793,8 @@ src/components/instructions/
 
 ```
 ┌────────────────────────────────────────────────────────────────────┐
-│  NAVBAR (minimal: logo + "← Volver a la plataforma")              │
+│  (sin navbar propio; hereda el AppShell del root layout si el      │
+│   usuario viene autenticado, o se muestra sin navbar si no)        │
 ├─────────────────────────────────┬──────────────────────────────────┤
 │  CONTENIDO PRINCIPAL (prose)    │  TABLA DE CONTENIDOS (sticky)    │
 │                                 │                                  │
@@ -656,7 +805,7 @@ src/components/instructions/
 │  §5 Respuesta del agente        │  §5 Respuesta del agente         │
 │  §6 Elementos del juego         │  §6 Elementos del juego          │
 │  §7 Puntuación                  │  §7 Puntuación                   │
-│  §8 Inicio rápido               │  §8 Inicio rápido                │
+│  §8 Instrucciones base           │  §8 Instrucciones base            │
 │  §9 Registro                    │  §9 Registro                     │
 │  §10 FAQ                        │  §10 FAQ                         │
 │                                 │                                  │
@@ -673,18 +822,31 @@ src/components/instructions/
 
 ## 6. Modificaciones en el middleware
 
-La ruta `/instrucciones` debe excluirse del matcher del middleware de sesión:
+La ruta `/instrucciones` está declarada como pública en el array `PUBLIC_PATHS` del middleware. La implementación real usa verificación `startsWith` en lugar de excluirla del matcher:
 
 ```typescript
 // src/middleware.ts — fragmento relevante
+const PUBLIC_PATHS = [
+  '/',
+  '/acerca-del-juego',
+  '/instrucciones',
+  '/ranking',
+  '/partidas',
+  '/login',
+  '/auth',
+  '/api/ranking',
+  '/api/games',
+];
+
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|api/mcp|instrucciones).*)',
+    // Match all paths except _next/static, _next/image, favicon.ico y webp
+    '/((?!_next/static|_next/image|favicon.ico|.*\.webp$).*)',
   ],
 };
 ```
 
-No se requiere ningún otro cambio en el middleware — la página no llama a `auth()`.
+El middleware comprueba `PUBLIC_PATHS.some((p) => pathname.startsWith(p))` antes de pasar por la verificación de sesión. La página no llama a `auth()`.
 
 ---
 
@@ -715,13 +877,13 @@ No se requiere ningún otro cambio en el middleware — la página no llama a `a
 
 ## 9. Trabajo pendiente (TODOs)
 
-| ID | Descripción | Bloqueado por |
-|---|---|---|
-| TODO-F013-01 | Confirmar nombres canónicos de armas con el brief del evento (RFC F010 pendiente de cierre) | RFC F010 |
-| TODO-F013-02 | Definir el tiempo límite de respuesta por turno (timeout → `EVT_TIMEOUT`) y publicarlo en §7 | Pendiente de decisión operativa |
-| TODO-F013-03 | Añadir sección §2.5 con diagrama de secuencia del modo `refute` | — |
-| TODO-F013-04 | Verificar que el SDK Python `mcp` 1.x soporta `streamablehttp_client` con `headers` custom | Requiere prueba en entorno real |
-| TODO-F013-05 | Añadir ejemplos de salida de `get_game_state` para el modo `refute` (los parámetros que el motor pasa al agente) | RFC G003 |
+| ID | Descripción | Estado | Bloqueado por |
+|---|---|---|---|
+| TODO-F013-01 | ~~Confirmar nombres canónicos de armas con el brief del evento (RFC F010 pendiente de cierre)~~ | ✅ Resuelto — names corporativos implementados en `src/types/domain.ts` | RFC F010 (cerrado) |
+| TODO-F013-02 | Definir el tiempo límite de respuesta por turno (timeout → `EVT_TIMEOUT`) y publicarlo en §7 | Abierto | Pendiente de decisión operativa |
+| TODO-F013-03 | Añadir sección §2.5 con diagrama de secuencia del modo `refute` | Abierto | — |
+| TODO-F013-04 | ~~Verificar que el SDK Python `mcp` 1.x soporta `streamablehttp_client` con `headers` custom~~ | ✅ Resuelto — verificado en implementación (`PYTHON_TEMPLATE` en `page.tsx`) | — |
+| TODO-F013-05 | Añadir ejemplos de salida de `get_game_state` para el modo `refute` (los parámetros que el motor pasa al agente) | Abierto | RFC G003 |
 
 ---
 
@@ -730,8 +892,8 @@ No se requiere ningún otro cambio en el middleware — la página no llama a `a
 | ID | Pregunta | Impacto |
 |---|---|---|
 | OPENQ-F013-01 | ¿Habrá un entorno de sandbox donde los equipos puedan probar su agente antes del evento sin cargar la plataforma de producción? | Si sí, añadir §8.3 con instrucciones de conexión al sandbox |
-| OPENQ-F013-02 | ¿El `AgentRequest` que recibe el agente incluye `game_id` y `team_id` en el cuerpo, o el agente los infiere del token? | Determina cómo se documenta el contrato de invocación |
-| OPENQ-F013-03 | ¿Los equipos pueden usar cualquier lenguaje/framework para su agente, o hay restricciones corporativas (p.ej. no servicios externos)? | Cambia la sección de inicio rápido y los avisos legales/corporativos |
+| OPENQ-F013-02 | ~~¿El `AgentRequest` que recibe el agente incluye `game_id` y `team_id` en el cuerpo, o el agente los infiere del token?~~ **ANSWERED** — los parámetros `game_id` y `team_id` van en los argumentos de cada llamada a herramienta MCP (ver §4.3 y plantillas §8). | — |
+| OPENQ-F013-03 | ¿Los equipos pueden usar cualquier lenguaje/framework para su agente, o hay restricciones corporativas (p.ej. no servicios externos)? | Cambia la sección de instrucciones base y los avisos legales/corporativos |
 | OPENQ-F013-04 | ¿La página `/instrucciones` debe estar disponible antes de que los equipos se registren (pública en internet) o solo en la red corporativa? | Determina si añadir `noindex` basta o si se necesita restricción de red |
 
 ---

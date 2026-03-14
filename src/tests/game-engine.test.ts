@@ -6,6 +6,7 @@ import {
   getWinner,
   calcEfficiencyBonus,
   getGameStateView,
+  applyWarningElimination,
 } from '@/lib/game/engine';
 import type { SuggestionAction, AccusationAction } from '@/lib/game/types';
 import type { Sospechoso, Habitacion } from '@/types/domain';
@@ -398,5 +399,90 @@ describe('Game Engine', () => {
       expect(viewA.esElTurnoDeEquipo).toBe(true);
       expect(viewB.esElTurnoDeEquipo).toBe(false);
     });
+  });
+});
+
+// ── G006: applyWarningElimination ────────────────────────────────────────────
+describe('applyWarningElimination', () => {
+  const TEAMS = ['team-a', 'team-b', 'team-c', 'team-d'];
+
+  it('marks the eliminated team as eliminated with eliminacionRazon=warnings', () => {
+    const state = initGame(TEAMS, 7);
+    const result = applyWarningElimination(state, 'team-a');
+    const elim = result.state.equipos.find((e) => e.equipoId === 'team-a')!;
+    expect(elim.eliminado).toBe(true);
+    expect(elim.eliminacionRazon).toBe('warnings');
+  });
+
+  it('returns warningEliminationResult with the eliminated equipoId', () => {
+    const state = initGame(TEAMS, 7);
+    const result = applyWarningElimination(state, 'team-b');
+    expect(result.warningEliminationResult).toBeDefined();
+    expect(result.warningEliminationResult!.equipoId).toBe('team-b');
+  });
+
+  it('redistributes all cards of the eliminated team to remaining active teams', () => {
+    const state = initGame(TEAMS, 7);
+    const elimState = state.equipos.find((e) => e.equipoId === 'team-a')!;
+    const originalCardCount = elimState.cartas.length;
+
+    const result = applyWarningElimination(state, 'team-a');
+
+    const redistribucion = result.warningEliminationResult!.redistribucion;
+    const totalRedist = redistribucion.reduce((sum, r) => sum + r.cartas.length, 0);
+    expect(totalRedist).toBe(originalCardCount);
+
+    // Eliminated team has no cards left
+    const elimAfter = result.state.equipos.find((e) => e.equipoId === 'team-a')!;
+    expect(elimAfter.cartas).toHaveLength(0);
+  });
+
+  it('does not include already-eliminated teams as card recipients', () => {
+    const state = initGame(TEAMS, 7);
+    // Pre-eliminate team-b
+    const stateWithElim = {
+      ...state,
+      equipos: state.equipos.map((e) =>
+        e.equipoId === 'team-b' ? { ...e, eliminado: true } : e,
+      ),
+    };
+    const result = applyWarningElimination(stateWithElim, 'team-a');
+    const redistribucion = result.warningEliminationResult!.redistribucion;
+    const recipientIds = redistribucion.map((r) => r.equipoId);
+    expect(recipientIds).not.toContain('team-b');
+    expect(recipientIds).not.toContain('team-a');
+  });
+
+  it('handles zero-card elimination gracefully (no cards redistributed)', () => {
+    const state = initGame(TEAMS, 7);
+    // Strip team-a cards
+    const stateNoCards = {
+      ...state,
+      equipos: state.equipos.map((e) =>
+        e.equipoId === 'team-a' ? { ...e, cartas: [] } : e,
+      ),
+    };
+    const result = applyWarningElimination(stateNoCards, 'team-a');
+    const totalRedist = result.warningEliminationResult!.redistribucion.reduce(
+      (sum, r) => sum + r.cartas.length,
+      0,
+    );
+    expect(totalRedist).toBe(0);
+  });
+
+  it('throws if the equipoId does not exist', () => {
+    const state = initGame(TEAMS, 7);
+    expect(() => applyWarningElimination(state, 'nonexistent')).toThrow();
+  });
+
+  it('throws if the team is already eliminated', () => {
+    const state = initGame(TEAMS, 7);
+    const alreadyElim = {
+      ...state,
+      equipos: state.equipos.map((e) =>
+        e.equipoId === 'team-a' ? { ...e, eliminado: true } : e,
+      ),
+    };
+    expect(() => applyWarningElimination(alreadyElim, 'team-a')).toThrow();
   });
 });

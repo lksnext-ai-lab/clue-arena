@@ -41,6 +41,7 @@ export async function GET(request: NextRequest) {
 
   interface ActivityEvent {
     id: string;
+    partidaId: string | null;
     timestampMs: number;
     tipo: EventType;
     actorNombre: string;
@@ -60,6 +61,7 @@ export async function GET(request: NextRequest) {
       const refutador = equipoMap.get(s.refutadaPor) ?? 'otro equipo';
       events.push({
         id: `sug-${s.id}`,
+        partidaId: s.partidaId,
         timestampMs: tsMs,
         tipo: 'descarte',
         actorNombre: nombre,
@@ -69,6 +71,7 @@ export async function GET(request: NextRequest) {
     } else {
       events.push({
         id: `sug-${s.id}`,
+        partidaId: s.partidaId,
         timestampMs: tsMs,
         tipo: 'sugerencia',
         actorNombre: nombre,
@@ -86,6 +89,7 @@ export async function GET(request: NextRequest) {
 
     events.push({
       id: `acu-${a.id}`,
+      partidaId: a.partidaId,
       timestampMs: tsMs,
       tipo: 'acusacion',
       actorNombre: nombre,

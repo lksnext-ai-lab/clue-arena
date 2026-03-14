@@ -78,6 +78,12 @@ export interface TrainingLoopOptions {
   /** Maximum turns before the game is aborted (default: MAX_TRAINING_TURNS) */
   maxTurnos?: number;
   seed?:     string;
+  /** Per-team agent backend — defaults to 'local' when omitted */
+  agentBackend?: 'mattin' | 'local';
+  /** MattinAI per-team credentials — required when agentBackend === 'mattin' */
+  mattinAgentId?: string;
+  mattinAppId?:   string;
+  mattinApiKey?:  string;
 }
 
 export interface TrainingLoopResult {
@@ -226,6 +232,12 @@ async function resolveRefutation(
   weapon: string,
   room: string,
   realEquipoId: string,
+  backendOptions: {
+    agentBackend?: 'mattin' | 'local';
+    mattinAgentId?: string;
+    mattinAppId?: string;
+    mattinApiKey?: string;
+  },
 ): Promise<RefutationResult> {
   const suggesterIdx = state.equipos.findIndex((e) => e.equipoId === suggesterEquipoId);
   const n = state.equipos.length;
@@ -257,6 +269,10 @@ async function resolveRefutation(
           room,
         },
         gameStateJson,
+        agentBackend:  backendOptions.agentBackend,
+        mattinAgentId: backendOptions.mattinAgentId,
+        mattinAppId:   backendOptions.mattinAppId,
+        mattinApiKey:  backendOptions.mattinApiKey,
       });
       refuteResponse = result.agentResponse;
 
@@ -372,6 +388,10 @@ export async function runTrainingGameLoop(
         const result = await invokeAgentWithTrace({
           agentRequest: { type: 'play_turn', gameId, teamId: currentTeamId },
           gameStateJson,
+          agentBackend:  options.agentBackend,
+          mattinAgentId: options.mattinAgentId,
+          mattinAppId:   options.mattinAppId,
+          mattinApiKey:  options.mattinApiKey,
         });
         agentResponse = result.agentResponse;
         traceJson = JSON.stringify(result.trace);
@@ -413,6 +433,12 @@ export async function runTrainingGameLoop(
         gameAction.arma,
         gameAction.habitacion,
         equipoId,
+        {
+          agentBackend:  options.agentBackend,
+          mattinAgentId: options.mattinAgentId,
+          mattinAppId:   options.mattinAppId,
+          mattinApiKey:  options.mattinApiKey,
+        },
       );
       const { refutadorId, card, realTeamRefuteResult, botRefutacionRazonamiento } = refutRes;
 

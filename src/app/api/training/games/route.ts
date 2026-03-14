@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse, after } from 'next/server';
 import { getAuthSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
-import { partidasEntrenamiento, turnosEntrenamiento } from '@/lib/db/schema';
+import { partidasEntrenamiento, turnosEntrenamiento, equipos } from '@/lib/db/schema';
 import { eq, desc, count } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 import { CreateTrainingGameSchema } from '@/lib/schemas/training';
@@ -163,6 +163,22 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  // Load team credentials so the loop can invoke the correct backend
+  const equipoRow = await db
+    .select({
+      agentBackend: equipos.agentBackend,
+      agentId:      equipos.agentId,
+      appId:        equipos.appId,
+      mattinApiKey: equipos.mattinApiKey,
+    })
+    .from(equipos)
+    .where(eq(equipos.id, equipoId))
+    .get();
+
+  if (!equipoRow) {
+    return NextResponse.json({ error: 'Equipo no encontrado' }, { status: 404 });
+  }
+
   // Create row first so loop can update it
   const gameId = uuidv4();
   const resolvedSeed = seed ?? uuidv4();
@@ -181,7 +197,17 @@ export async function POST(request: NextRequest) {
   // The client navigates to the detail page immediately and polls for updates.
   after(async () => {
     try {
-      await runTrainingGameLoop({ gameId, equipoId, numBots, maxTurnos, seed: resolvedSeed });
+      await runTrainingGameLoop({
+        gameId,
+        equipoId,
+        numBots,
+        maxTurnos,
+        seed: resolvedSeed,
+        agentBackend:   equipoRow.agentBackend as 'mattin' | 'local',
+        mattinAgentId:  equipoRow.agentId ?? undefined,
+        mattinAppId:    equipoRow.appId ?? undefined,
+        mattinApiKey:   equipoRow.mattinApiKey ?? undefined,
+      });
     } catch (err) {
       await db
         .update(partidasEntrenamiento)

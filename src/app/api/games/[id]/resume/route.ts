@@ -14,7 +14,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getAuthSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
-import { partidas } from '@/lib/db/schema';
+import { partidas, partidaEquipos } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { gameRunner } from '@/lib/game/runner';
 import { gameEventEmitter } from '@/lib/ws/GameEventEmitter';
@@ -91,6 +91,12 @@ export async function POST(
   });
 
   // Delegar al GameRunner (proceso servidor, fuera del ciclo HTTP)
+  // G006: reset warning counters on resume (§3.2)
+  await db
+    .update(partidaEquipos)
+    .set({ warnings: 0 })
+    .where(eq(partidaEquipos.partidaId, id));
+
   gameRunner.start(id, delay);
 
   return NextResponse.json(

@@ -19,9 +19,15 @@ const SCORING_EVENTS = [
   },
   {
     id: 'EVT_REFUTATION',
-    description: 'Refutar con éxito la sugerencia de otro equipo',
-    points: '+15',
+    description: 'Refutar con éxito la sugerencia de otro equipo (mostrar carta válida)',
+    points: '+5',
     color: 'text-emerald-400',
+  },
+  {
+    id: 'EVT_FALSE_CANNOT_REFUTE',
+    description: 'Declarar cannot_refute o mostrar carta inválida cuando el coordinador sabe que el equipo puede refutar',
+    points: '−20',
+    color: 'text-red-400',
   },
   {
     id: 'EVT_SUGGESTION',

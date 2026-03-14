@@ -1,5 +1,6 @@
 'use client';
 
+import { Shield, UserRound, Users } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { DEV_COOKIE } from '@/lib/auth/dev';
 
@@ -9,6 +10,26 @@ import { DEV_COOKIE } from '@/lib/auth/dev';
  */
 export default function DevLoginButtons() {
   const t = useTranslations('auth');
+  const devRoles = [
+    {
+      role: 'admin' as const,
+      label: t('entrarAdmin'),
+      Icon: Shield,
+      className: 'border-cyan-300/30 bg-cyan-300/10 text-cyan-100 hover:bg-cyan-300/16',
+    },
+    {
+      role: 'equipo' as const,
+      label: t('entrarEquipo'),
+      Icon: Users,
+      className: 'border-white/12 bg-white/5 text-slate-100 hover:bg-white/10',
+    },
+    {
+      role: 'sinEquipo' as const,
+      label: t('entrarSinEquipo'),
+      Icon: UserRound,
+      className: 'border-white/10 bg-slate-900/70 text-slate-300 hover:bg-slate-800/90',
+    },
+  ];
 
   function loginAs(role: 'admin' | 'equipo' | 'sinEquipo') {
     document.cookie = `${DEV_COOKIE}=${role}; path=/; max-age=86400; SameSite=Lax`;
@@ -16,29 +37,22 @@ export default function DevLoginButtons() {
   }
 
   return (
-    <div className="mt-6 border-t border-slate-800 pt-6 space-y-3">
-      <p className="text-xs font-mono text-amber-500">
+    <div className="mt-6 rounded-[28px] border border-amber-300/14 bg-[linear-gradient(180deg,rgba(245,158,11,0.08),rgba(15,23,42,0.42))] p-5">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-amber-300">
         {t('devMode')}
       </p>
-      <div className="flex gap-3 justify-center">
-        <button
-          onClick={() => loginAs('admin')}
-          className="px-5 py-2 rounded-lg text-sm font-semibold border transition-opacity hover:opacity-80 border-cyan-500 text-cyan-400 bg-transparent hover:bg-cyan-500/10"
-        >
-          {t('entrarAdmin')}
-        </button>
-        <button
-          onClick={() => loginAs('equipo')}
-          className="px-5 py-2 rounded-lg text-sm font-semibold border transition-opacity hover:opacity-80 border-slate-500 text-slate-400 bg-transparent hover:bg-slate-700"
-        >
-          {t('entrarEquipo')}
-        </button>
-        <button
-          onClick={() => loginAs('sinEquipo')}
-          className="px-5 py-2 rounded-lg text-sm font-semibold border transition-opacity hover:opacity-80 border-slate-600 text-slate-500 bg-transparent hover:bg-slate-700"
-        >
-          {t('entrarSinEquipo')}
-        </button>
+      <p className="mt-2 text-sm leading-6 text-slate-400">{t('devModeDesc')}</p>
+      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        {devRoles.map(({ role, label, Icon, className }) => (
+          <button
+            key={role}
+            onClick={() => loginAs(role)}
+            className={`inline-flex items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-sm font-semibold transition-colors ${className}`}
+          >
+            <Icon size={16} />
+            {label}
+          </button>
+        ))}
       </div>
     </div>
   );

@@ -45,7 +45,7 @@ export const ServerMessageSchema = z.discriminatedUnion('type', [
     turnoNumero: z.number(),
     equipoId: z.string(),
     equipoNombre: z.string(),
-    accion: z.enum(['sugerencia', 'acusacion', 'pasar', 'timeout', 'formato_invalido']),
+    accion: z.enum(['sugerencia', 'acusacion', 'pasar', 'timeout', 'formato_invalido', 'error_comunicacion']),
     // Presente cuando accion === 'sugerencia': expuesto al espectador para máximo dinamismo
     sugerencia: z.object({
       sospechoso: z.string(),
@@ -81,6 +81,22 @@ export const ServerMessageSchema = z.discriminatedUnion('type', [
     durationMs: z.number(),
     // G004: short natural-language comment from the refutador for spectators (max 160 chars)
     spectatorComment: z.string().max(500).optional(),
+    ts: z.number(),
+  }),
+  // G006: warning system events
+  z.object({
+    type: z.literal('warning:issued'),
+    gameId: z.string(),
+    equipoId: z.string(),
+    warnings: z.number().int().min(1).max(3),
+    reason: z.string(),
+    ts: z.number(),
+  }),
+  z.object({
+    type: z.literal('warning:agent_eliminated'),
+    gameId: z.string(),
+    equipoId: z.string(),
+    equiposConCartasNuevas: z.array(z.string()),
     ts: z.number(),
   }),
   // Heartbeat para mantener la conexión

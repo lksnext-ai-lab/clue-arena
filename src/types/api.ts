@@ -17,6 +17,9 @@ export interface TeamResponse {
   nombre: string;
   descripcion: string | null;
   agentId: string;
+  agentBackend: 'mattin' | 'local';
+  appId: string | null;
+  hasMattinApiKey: boolean;
   avatarUrl: string | null;
   usuarioId: string;
   estado: TeamStatus;
@@ -25,8 +28,12 @@ export interface TeamResponse {
 }
 
 export interface CreateTeamRequest {
+  id?: string;
   nombre: string;
   agentId: string;
+  agentBackend?: 'mattin' | 'local';
+  appId?: string;
+  mattinApiKey?: string;
   miembros?: string[];
 }
 
@@ -34,6 +41,9 @@ export interface UpdateTeamRequest {
   nombre?: string;
   descripcion?: string | null;
   agentId?: string;
+  agentBackend?: 'mattin' | 'local';
+  appId?: string | null;
+  mattinApiKey?: string;
   avatarUrl?: string | null;
   estado?: TeamStatus;
   miembros?: string[];
@@ -72,6 +82,8 @@ export interface GameTeamResponse {
   eliminado: boolean;
   puntos: number;
   numCartas: number;   // Recuento público de cartas
+  warnings: number;    // G006: warnings acumuladas
+  eliminadoPorWarnings?: boolean; // True cuando la eliminación fue por warnings
   cartas?: string[];   // Solo para el equipo propietario o admin
 }
 
@@ -117,7 +129,7 @@ export interface ScoreEventsResponse {
 export interface PaseResponse {
   id: string;
   equipoId: string;
-  origen: 'voluntario' | 'timeout' | 'invalid_format';
+  origen: 'voluntario' | 'timeout' | 'invalid_format' | 'comm_error';
   createdAt: string;
 }
 
@@ -174,6 +186,8 @@ export interface CreateGameRequest {
 export interface RankingResponse {
   ranking: RankingEntry[];
   updatedAt: string;
+  scope: 'global' | 'tournament';
+  tournament: { id: string; name: string } | null;
 }
 
 // --- Errors ---
@@ -267,6 +281,14 @@ export interface AgentInvocationContext {
    * Undefined when the view was not pre-computed by the caller.
    */
   gameStateViewHash?: string;
+  /** Per-team MattinAI agent ID (overrides global env var if set) */
+  mattinAgentId?: string;
+  /** Per-team MattinAI app ID passed as app_id query param */
+  mattinAppId?: string;
+  /** Per-team MattinAI API key (overrides MATTIN_API_KEY env var if set) */
+  mattinApiKey?: string;
+  /** Per-team backend override ('mattin' | 'local'). Overrides global AGENT_BACKEND when set. */
+  agentBackend?: 'mattin' | 'local';
 }
 
 // ── F015 — Training Arena types ──────────────────────────────────────────────
@@ -290,6 +312,12 @@ export interface AgentLlmExchange {
 
 export interface AgentInteractionTrace {
   type:           'play_turn' | 'refute';
+  /**
+   * 'local' — Genkit/local backend; full LLM exchange and tool calls are captured.
+   * 'mattin' — Remote MattinAI backend; only input/output are observable from here.
+   *             Internal tool calls appear in F012 MCP logs keyed by invocacionId.
+   */
+  backendType:    'local' | 'mattin';
   exchanges:      AgentLlmExchange[];
   totalToolCalls: number;
   parsedAction:   AgentResponse | null;
@@ -306,6 +334,7 @@ export interface TrainingGameResponse {
   ganador:     string | null;  // equipoId that won, or null
   sobres:      { sospechoso: string; arma: string; habitacion: string } | null; // visible when finalizada
   resultado:   TrainingResultado | null;
+  botHands:    Record<string, string[]>;
   motivoAbort: string | null;
   createdAt:   string;
   finishedAt:  string | null;
@@ -365,6 +394,10 @@ export interface TournamentResponse {
   createdAt:  string;
   startedAt:  string | null;
   finishedAt: string | null;
+}
+
+export interface TournamentListResponse {
+  tournaments: TournamentResponse[];
 }
 
 export interface TournamentTeamResponse {

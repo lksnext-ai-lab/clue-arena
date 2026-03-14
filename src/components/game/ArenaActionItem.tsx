@@ -15,8 +15,9 @@ export function ArenaActionItem({ turno, isNew, teams }: ArenaActionItemProps) {
   const [expanded, setExpanded] = useState(false);
   const hasSugerencias = turno.sugerencias.length > 0;
   const hasAcusacion = !!turno.acusacion;
+  const hasPase = !!turno.pase;
 
-  if (!hasSugerencias && !hasAcusacion) return null;
+  if (!hasSugerencias && !hasAcusacion && !hasPase) return null;
 
   const equipoNombre = turno.equipoNombre || teams[turno.equipoId] || turno.equipoId;
 
@@ -127,6 +128,35 @@ export function ArenaActionItem({ turno, isNew, teams }: ArenaActionItemProps) {
               </p>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Pase */}
+      {turno.pase && (
+        <div
+          className={cn(
+            'p-3',
+            (hasSugerencias || hasAcusacion) && 'border-t border-slate-700/60',
+            turno.pase.origen === 'comm_error'
+              ? 'bg-amber-400/5'
+              : turno.pase.origen === 'timeout'
+                ? 'bg-orange-400/5'
+                : 'bg-slate-400/5',
+          )}
+        >
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="shrink-0 text-xs font-mono text-slate-500">T{turno.numero}</span>
+            <span className="shrink-0 text-xs px-1.5 py-0.5 rounded font-semibold bg-slate-700 text-slate-300">
+              PASE
+            </span>
+            <span className="text-sm font-medium text-white truncate">{equipoNombre}</span>
+            <span className="text-xs text-slate-400">
+              {turno.pase.origen === 'voluntario' && 'pasó voluntariamente'}
+              {turno.pase.origen === 'timeout' && 'forzado por timeout'}
+              {turno.pase.origen === 'invalid_format' && 'forzado por formato inválido'}
+              {turno.pase.origen === 'comm_error' && 'forzado por error de comunicación'}
+            </span>
+          </div>
         </div>
       )}
 

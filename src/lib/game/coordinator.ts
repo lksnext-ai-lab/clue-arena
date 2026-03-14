@@ -23,10 +23,30 @@ import {
   pases,
   scoreEvents,
   equipos,
+  warningEliminaciones,
 } from '@/lib/db/schema';
 import { SOSPECHOSOS, ARMAS, HABITACIONES } from '@/types/domain';
 import { eq, and, count, sql, inArray } from 'drizzle-orm';
 import type { ScoreEventType } from '@/lib/game/types';
+import {
+  EVT_WIN_POINTS,
+  EVT_SURVIVE_POINTS,
+  EVT_SUGGESTION_POINTS,
+  EVT_SUGGESTION_CAP,
+  EVT_REFUTATION_POINTS,
+  EVT_FALSE_CANNOT_REFUTE_POINTS,
+  EVT_WRONG_ACCUSATION_POINTS,
+  EVT_PASS_POINTS,
+  EVT_INVALID_CARD_POINTS,
+  EVT_REDUNDANT_SUGGESTION_POINTS,
+  EVT_INVALID_FORMAT_POINTS,
+  EVT_TIMEOUT_POINTS,
+  EVT_COMM_ERROR_POINTS,
+  EVT_WRONG_REFUTATION_POINTS,
+  EVT_WARNING_POINTS,
+  EVT_WARNING_ELIMINATION_POINTS,
+  calcEfficiencyBonus,
+} from '@/lib/game/engine';
 import type { InferSelectModel } from 'drizzle-orm';
 import { gameEventEmitter } from '@/lib/ws/GameEventEmitter';
 import { notificationEmitter } from '@/lib/ws/NotificationEmitter';
@@ -121,16 +141,189 @@ async function countOwnTurns(gameId: string, teamId: string): Promise<number> {
 }
 
 /** Calculates EVT_WIN_EFFICIENCY bonus based on own turns played. */
-function calcEfficiencyBonus(turnosJugados: number): number {
-  const T_MIN = 2;
-  const BONUS_BASE = 500;
-  const DECAY = 25;
-  return Math.max(0, BONUS_BASE - (turnosJugados - T_MIN) * DECAY);
-}
+// Note: imported from engine.ts — local definition removed to avoid duplication.
 
 // ---------------------------------------------------------------------------
-// G004 — Spectator comment sanitization
+// G006 — Warning system helpers
 // ---------------------------------------------------------------------------
+
+/**
+ * Score event types that count as a protocol infraction and generate a warning.
+ * Priority order: EVT_INVALID_FORMAT > EVT_INVALID_CARD > EVT_WRONG_REFUTATION > EVT_TIMEOUT
+ */
+const WARNING_THRESHOLD = 3;
+
+/**
+ * Increments the warning counter for a team, emits the WebSocket warning event,
+ * and — when the threshold (3) is reached — performs elimination + card redistribution.
+ *
+ * Must be called BEFORE _advanceTurnoIndex so elimination is reflected in the
+ * active-team count when the next turn index is computed.
+ *
+ * Returns `{ newWarnings, eliminated, gameOver }`.
+ */
+async function processWarning(
+  gameId: string,
+  equipoId: string,
+  turnoActual: number,
+  reason: ScoreEventType,
+): Promise<{ newWarnings: number; eliminated: boolean; gameOver: boolean }> {
+  // 1. Atomically increment warnings
+  await db
+    .update(partidaEquipos)
+    .set({ warnings: sql`${partidaEquipos.warnings} + 1` })
+    .where(
+      and(
+        eq(partidaEquipos.partidaId, gameId),
+        eq(partidaEquipos.equipoId, equipoId),
+      ),
+    );
+
+  const row = await db
+    .select({ warnings: partidaEquipos.warnings })
+    .from(partidaEquipos)
+    .where(
+      and(
+        eq(partidaEquipos.partidaId, gameId),
+        eq(partidaEquipos.equipoId, equipoId),
+      ),
+    )
+    .get();
+  const newWarnings = row?.warnings ?? 0;
+
+  // 2. Insert informational EVT_WARNING score event (0 pts, for traceability)
+  await insertScoreEvents(gameId, [
+    {
+      equipoId,
+      type: 'EVT_WARNING',
+      points: EVT_WARNING_POINTS,
+      turno: turnoActual,
+      meta: { reason, count: newWarnings },
+    },
+  ]);
+
+  // 3. Emit warning:issued WebSocket event
+  gameEventEmitter.emitTurnMicroEvent({
+    type: 'warning:issued',
+    gameId,
+    equipoId,
+    warnings: newWarnings,
+    reason,
+    ts: Date.now(),
+  });
+
+  if (newWarnings < WARNING_THRESHOLD) {
+    return { newWarnings, eliminated: false, gameOver: false };
+  }
+
+  // 4. Threshold reached — load current state and compute redistribution
+  const allTeams = await db
+    .select()
+    .from(partidaEquipos)
+    .where(eq(partidaEquipos.partidaId, gameId))
+    .all();
+
+  const eliminatedRow = allTeams.find((t) => t.equipoId === equipoId)!;
+  const cartasEliminado: import('@/types/domain').Carta[] = JSON.parse(
+    eliminatedRow.cartas as string,
+  );
+
+  // Active teams sorted by order; redistribute starting from the one after eliminated
+  const allActive = allTeams
+    .filter((t) => !t.eliminado)
+    .sort((a, b) => a.orden - b.orden);
+  const elimIdx = allActive.findIndex((t) => t.equipoId === equipoId);
+  const equiposActivos = [
+    ...allActive.slice(elimIdx + 1),
+    ...allActive.slice(0, elimIdx),
+  ];
+
+  const redistribucion: { equipoId: string; cartas: import('@/types/domain').Carta[] }[] =
+    equiposActivos.map((e) => ({ equipoId: e.equipoId, cartas: [] }));
+
+  cartasEliminado.forEach((carta, i) => {
+    if (redistribucion.length > 0) {
+      redistribucion[i % redistribucion.length].cartas.push(carta);
+    }
+  });
+
+  // 5. Persist card redistribution
+  for (const recv of redistribucion) {
+    if (recv.cartas.length === 0) continue;
+    const recvRow = allTeams.find((t) => t.equipoId === recv.equipoId)!;
+    const currentCartas: import('@/types/domain').Carta[] = JSON.parse(recvRow.cartas as string);
+    await db
+      .update(partidaEquipos)
+      .set({ cartas: JSON.stringify([...currentCartas, ...recv.cartas]) })
+      .where(
+        and(
+          eq(partidaEquipos.partidaId, gameId),
+          eq(partidaEquipos.equipoId, recv.equipoId),
+        ),
+      );
+  }
+
+  // 6. Mark team as eliminated by warnings
+  await db
+    .update(partidaEquipos)
+    .set({ eliminado: true, eliminacionRazon: 'warnings', cartas: '[]' })
+    .where(
+      and(
+        eq(partidaEquipos.partidaId, gameId),
+        eq(partidaEquipos.equipoId, equipoId),
+      ),
+    );
+
+  // 7. Persist to warning_eliminaciones log
+  await db.insert(warningEliminaciones).values({
+    id: uuidv4(),
+    gameId,
+    equipoEliminadoId: equipoId,
+    turno: turnoActual,
+    cartasCount: cartasEliminado.length,
+    redistribucionJson: JSON.stringify(redistribucion),
+    creadoEn: new Date(),
+  });
+
+  // 8. Insert EVT_WARNING_ELIMINATION score event
+  await insertScoreEvents(gameId, [
+    {
+      equipoId,
+      type: 'EVT_WARNING_ELIMINATION',
+      points: EVT_WARNING_ELIMINATION_POINTS,
+      turno: turnoActual,
+      meta: { cartasRepartidas: cartasEliminado.length },
+    },
+  ]);
+
+  // 9. Emit WebSocket event
+  const equiposConCartasNuevas = redistribucion
+    .filter((r) => r.cartas.length > 0)
+    .map((r) => r.equipoId);
+  gameEventEmitter.emitTurnMicroEvent({
+    type: 'warning:agent_eliminated',
+    gameId,
+    equipoId,
+    equiposConCartasNuevas,
+    ts: Date.now(),
+  });
+
+  // 10. Check if game is now over (no active teams remain)
+  const remaining = allTeams.filter(
+    (t) => !t.eliminado && t.equipoId !== equipoId,
+  );
+  const gameOver = remaining.length === 0;
+  if (gameOver) {
+    await db
+      .update(partidas)
+      .set({ estado: 'finalizada', finishedAt: new Date() })
+      .where(eq(partidas.id, gameId));
+  }
+
+  return { newWarnings, eliminated: true, gameOver };
+}
+
+
 
 /**
  * Sanitizes a raw spectatorComment from the agent:
@@ -150,6 +343,61 @@ import { invokeAgent } from '@/lib/api/agent';
 import { AgentResponseError } from '@/lib/api/local-agent';
 import { logInvocacionValidity } from '@/lib/utils/log';
 import type { Carta } from '@/types/domain';
+
+type ForcedPassOrigin = 'timeout' | 'invalid_format' | 'comm_error';
+
+function errorMessageIncludes(err: Error, pattern: RegExp): boolean {
+  if (pattern.test(err.message)) return true;
+
+  const cause =
+    typeof err === 'object' &&
+    err !== null &&
+    'cause' in err &&
+    typeof (err as { cause?: unknown }).cause === 'object' &&
+    (err as { cause?: unknown }).cause !== null
+      ? (err as { cause: { message?: unknown; code?: unknown } }).cause
+      : null;
+
+  if (cause?.message && typeof cause.message === 'string' && pattern.test(cause.message)) {
+    return true;
+  }
+  if (cause?.code && typeof cause.code === 'string' && pattern.test(cause.code)) {
+    return true;
+  }
+
+  return false;
+}
+
+function classifyAgentFailure(err: unknown): ForcedPassOrigin {
+  if (
+    err instanceof Error &&
+    (
+      err.name === 'AbortError' ||
+      err.name === 'TimeoutError' ||
+      errorMessageIncludes(err, /timeout|timed out/i)
+    )
+  ) {
+    return 'timeout';
+  }
+
+  if (
+    err instanceof Error &&
+    errorMessageIncludes(
+      err,
+      /fetch|failed to fetch|network|socket|econn|ecoff|eai_again|enotfound|unreachable|500|502|503|504|service unavailable|bad gateway|gateway timeout|internal server error/i,
+    )
+  ) {
+    return 'comm_error';
+  }
+
+  return 'invalid_format';
+}
+
+function forcedPassAction(origin: ForcedPassOrigin): 'timeout' | 'formato_invalido' | 'error_comunicacion' {
+  if (origin === 'timeout') return 'timeout';
+  if (origin === 'comm_error') return 'error_comunicacion';
+  return 'formato_invalido';
+}
 
 // ---------------------------------------------------------------------------
 // Error type
@@ -213,11 +461,15 @@ export async function advanceTurn(gameId: string): Promise<AdvanceTurnResult> {
 
   // Load human-readable team names for micro-event messages (F016)
   const equipoRows = await db
-    .select({ id: equipos.id, nombre: equipos.nombre })
+    .select({ id: equipos.id, nombre: equipos.nombre, agentId: equipos.agentId, agentBackend: equipos.agentBackend, appId: equipos.appId, mattinApiKey: equipos.mattinApiKey })
     .from(equipos)
     .where(inArray(equipos.id, allTeams.map((t) => t.equipoId)))
     .all();
   const teamNombres = new Map(equipoRows.map((e) => [e.id, e.nombre]));
+  /** Per-team MattinAI credentials keyed by equipoId */
+  const teamCredentials = new Map(
+    equipoRows.map((e) => [e.id, { agentId: e.agentId, agentBackend: e.agentBackend as 'mattin' | 'local', appId: e.appId ?? undefined, mattinApiKey: e.mattinApiKey ?? undefined }]),
+  );
 
   const activeTeams = allTeams.filter((t) => !t.eliminado);
   if (activeTeams.length === 0) {
@@ -267,7 +519,7 @@ export async function advanceTurn(gameId: string): Promise<AdvanceTurnResult> {
   let agentRawSpectatorComment: string | undefined;
   let agentRawReasoning: string | undefined;
   let invocacionId!: string;
-  let passOrigen: 'timeout' | 'invalid_format' | null = null;
+  let passOrigen: ForcedPassOrigin | null = null;
   let agentDurationMs = 0;
 
   // F016: emit turn:agent_invoked before calling the agent
@@ -285,24 +537,24 @@ export async function advanceTurn(gameId: string): Promise<AdvanceTurnResult> {
   try {
     const { response: agentResponse, invocacionId: invId } = await invokeAgent(
       { type: 'play_turn', gameId, teamId: currentTeam.equipoId },
-      { turnoId: turno.id },
+      {
+        turnoId: turno.id,
+        mattinAgentId: teamCredentials.get(currentTeam.equipoId)?.agentId,
+        mattinAppId: teamCredentials.get(currentTeam.equipoId)?.appId,
+        mattinApiKey: teamCredentials.get(currentTeam.equipoId)?.mattinApiKey,
+        agentBackend: teamCredentials.get(currentTeam.equipoId)?.agentBackend,
+      },
     );
     agentAction = agentResponse.action;
     agentRawSpectatorComment = agentResponse.spectatorComment;
     agentRawReasoning = agentResponse.reasoning || undefined;
     invocacionId = invId;
   } catch (err) {
-    // Determine pass origin from error type
-    if (
-      err instanceof Error &&
-      (err.name === 'AbortError' || err.name === 'TimeoutError' || err.message.toLowerCase().includes('timeout'))
-    ) {
-      passOrigen = 'timeout';
-    } else if (err instanceof AgentResponseError) {
-      passOrigen = 'invalid_format';
-    } else {
-      throw err;
-    }
+    // Determine pass origin from error type. ALL errors become a pass with warning.
+    passOrigen = classifyAgentFailure(err);
+
+    // Keep agent raw reasoning for debugging
+    agentRawReasoning = err instanceof Error ? err.message : String(err);
 
     // F016: emit turn:agent_responded for forced-pass cases
     agentDurationMs = Date.now() - tsAgentInvoke;
@@ -313,27 +565,40 @@ export async function advanceTurn(gameId: string): Promise<AdvanceTurnResult> {
       turnoNumero: turno.numero,
       equipoId: currentTeam.equipoId,
       equipoNombre: teamNombres.get(currentTeam.equipoId) ?? currentTeam.equipoId,
-      accion: passOrigen === 'timeout' ? 'timeout' : 'formato_invalido',
+      accion: forcedPassAction(passOrigen),
       durationMs: agentDurationMs,
       ts: Date.now(),
     });
 
-    const { maxTurnsReached, nextEquipoId: nextTeamId } = await handlePass({
-      gameId,
-      teamId: currentTeam.equipoId,
-      turnoId: turno.id,
-      turnoNumero: turno.numero,
-      turnoActual: partida.turnoActual,
-      activeTeamCount: activeTeams.length,
-      allTeams,
-      maxTurnos: partida.maxTurnos,
-      origen: passOrigen!,
-      agentDurationMs,
-    });
+    // G006: Insert forced penalty score event BEFORE advancing turn so
+    // processWarning can eliminate the team and use the updated active count.
+    const forcedEvtType: ScoreEventType =
+      passOrigen === 'timeout'
+        ? 'EVT_TIMEOUT'
+        : passOrigen === 'comm_error'
+          ? 'EVT_COMM_ERROR'
+          : 'EVT_INVALID_FORMAT';
+    const forcedEvtPoints =
+      passOrigen === 'timeout'
+        ? EVT_TIMEOUT_POINTS
+        : passOrigen === 'comm_error'
+          ? EVT_COMM_ERROR_POINTS
+          : EVT_INVALID_FORMAT_POINTS;
 
-    // Apply scoring for forced passes via score events
-    const forcedEvtType: ScoreEventType = passOrigen === 'timeout' ? 'EVT_TIMEOUT' : 'EVT_INVALID_FORMAT';
-    const forcedEvtPoints = passOrigen === 'timeout' ? -20 : -25;
+    // Persist pass record and mark turn completed (no turn advance yet)
+    await db.insert(pases).values({
+      id: uuidv4(),
+      turnoId: turno.id,
+      partidaId: gameId,
+      equipoId: currentTeam.equipoId,
+      origen: passOrigen!,
+      createdAt: new Date(),
+    });
+    await db
+      .update(turnos)
+      .set({ estado: 'completado', finishedAt: new Date(), agentDurationMs })
+      .where(eq(turnos.id, turno.id));
+
     await insertScoreEvents(gameId, [
       {
         equipoId: currentTeam.equipoId,
@@ -351,6 +616,56 @@ export async function advanceTurn(gameId: string): Promise<AdvanceTurnResult> {
         points: forcedEvtPoints,
       },
     });
+
+    // G006: process warning — may eliminate the team before we advance the turn
+    const warningResult = await processWarning(
+      gameId,
+      currentTeam.equipoId,
+      partida.turnoActual,
+      forcedEvtType,
+    );
+
+    if (warningResult.gameOver) {
+      gameEventEmitter.emitTurnCompleted(gameId, {
+        type: 'turn_completed',
+        gameId,
+        payload: {
+          turnoNumero: turno.numero,
+          equipoId: currentTeam.equipoId,
+          resultadoTipo: 'pase',
+          nextEquipoId: null,
+        },
+      });
+      gameEventEmitter.emitTurnCompleted(gameId, {
+        type: 'status_changed',
+        gameId,
+        payload: { nuevoEstado: 'finalizada' },
+      });
+      notificationEmitter.emitGlobal({ type: 'notification:game_finished', gameId, nombre: partida.nombre, ganadorId: null, ganadorNombre: null, ts: Date.now() });
+      notificationEmitter.emitGlobal({ type: 'notification:ranking_updated', ts: Date.now() });
+      return {
+        gameOver: true,
+        reason: 'warning_elimination',
+        teamId: currentTeam.equipoId,
+        actionType: 'pass',
+      };
+    }
+
+    // Advance turn (using updated team list if eliminated, or original if not)
+    const teamsAfterWarning = await db
+      .select()
+      .from(partidaEquipos)
+      .where(eq(partidaEquipos.partidaId, gameId))
+      .all();
+    const activeAfterWarning = teamsAfterWarning.filter((t) => !t.eliminado);
+
+    const { maxTurnsReached, nextEquipoId: nextTeamId } = await _advanceTurnoIndex(
+      gameId,
+      partida.turnoActual,
+      activeAfterWarning.length,
+      teamsAfterWarning,
+      partida.maxTurnos,
+    );
 
     gameEventEmitter.emitTurnCompleted(gameId, {
       type: 'turn_completed',
@@ -446,6 +761,7 @@ export async function advanceTurn(gameId: string): Promise<AdvanceTurnResult> {
       maxTurnos: partida.maxTurnos,
       agentDurationMs,
       teamNombres,
+      teamCredentials,
       agentSpectatorComment,
       agentReasoning,
     });
@@ -587,6 +903,7 @@ interface SuggestionParams {
   maxTurnos: number | null;
   agentDurationMs: number;
   teamNombres: Map<string, string>;
+  teamCredentials: Map<string, { agentId: string; agentBackend?: 'mattin' | 'local'; appId?: string; mattinApiKey?: string }>;
   /** G004: sanitized spectator comment from the active agent */
   agentSpectatorComment?: string;
   /** Agent LLM reasoning (truncated to 2000 chars) */
@@ -594,7 +911,7 @@ interface SuggestionParams {
 }
 
 async function handleSuggestion(p: SuggestionParams): Promise<{ maxTurnsReached: boolean; nextEquipoId: string | null }> {
-  const { gameId, teamId, turnoId, turnoNumero, suspect, weapon, room, allTeams, turnoActual, activeTeamCount, maxTurnos, agentDurationMs, teamNombres, agentSpectatorComment, agentReasoning } = p;
+  const { gameId, teamId, turnoId, turnoNumero, suspect, weapon, room, allTeams, turnoActual, maxTurnos, agentDurationMs, teamNombres, teamCredentials, agentSpectatorComment, agentReasoning } = p;
 
   // ── Validate suggestion (invalid card + redundant checks) ─────────────
   const isInvalidCard =
@@ -603,21 +920,35 @@ async function handleSuggestion(p: SuggestionParams): Promise<{ maxTurnsReached:
     !HABITACIONES.includes(room as typeof HABITACIONES[number]);
 
   if (isInvalidCard) {
-    // Penalise — turn is consumed; no suggestion record, no refutation
+    // G006: Penalise — turn is consumed; no suggestion record, no refutation
     await insertScoreEvents(gameId, [
-      { equipoId: teamId, type: 'EVT_INVALID_CARD', points: -30, turno: turnoActual,
+      { equipoId: teamId, type: 'EVT_INVALID_CARD', points: EVT_INVALID_CARD_POINTS, turno: turnoActual,
         meta: { sospechoso: suspect, arma: weapon, habitacion: room } },
     ]);
     gameEventEmitter.emitTurnCompleted(gameId, {
       type: 'score_event',
       gameId,
-      payload: { equipoId: teamId, scoreEventType: 'EVT_INVALID_CARD', points: -30 },
+      payload: { equipoId: teamId, scoreEventType: 'EVT_INVALID_CARD', points: EVT_INVALID_CARD_POINTS },
     });
     await db
       .update(turnos)
       .set({ estado: 'completado', finishedAt: new Date(), agentDurationMs, agentSpectatorComment: agentSpectatorComment ?? null, agentReasoning: agentReasoning ?? null })
       .where(eq(turnos.id, turnoId));
-    return _advanceTurnoIndex(gameId, turnoActual, activeTeamCount, allTeams, maxTurnos);
+
+    // G006: process warning before advancing so active count is correct
+    const invalidCardWarning = await processWarning(gameId, teamId, turnoActual, 'EVT_INVALID_CARD');
+    if (invalidCardWarning.gameOver) {
+      return { maxTurnsReached: false, nextEquipoId: null };
+    }
+
+    // Reload teams after possible elimination
+    const teamsAfterInvalidCard = await db
+      .select()
+      .from(partidaEquipos)
+      .where(eq(partidaEquipos.partidaId, gameId))
+      .all();
+    const activeAfterInvalidCard = teamsAfterInvalidCard.filter((t) => !t.eliminado);
+    return _advanceTurnoIndex(gameId, turnoActual, activeAfterInvalidCard.length, teamsAfterInvalidCard, maxTurnos);
   }
 
   // Check for redundant suggestion (same combo already suggested by this team)
@@ -666,29 +997,23 @@ async function handleSuggestion(p: SuggestionParams): Promise<{ maxTurnsReached:
     suggestionScoreEvents.push({
       equipoId: teamId,
       type: 'EVT_REDUNDANT_SUGGESTION',
-      points: -20,
+      points: EVT_REDUNDANT_SUGGESTION_POINTS,
       turno: turnoActual,
       meta: { sospechoso: suspect, arma: weapon, habitacion: room },
     });
   } else {
     const alreadyEarned = await countSuggestionEvents(gameId, teamId);
-    if (alreadyEarned < 5) {
+    if (alreadyEarned < EVT_SUGGESTION_CAP) {
       suggestionScoreEvents.push({
         equipoId: teamId,
         type: 'EVT_SUGGESTION',
-        points: 10,
+        points: EVT_SUGGESTION_POINTS,
         turno: turnoActual,
       });
     }
   }
-  if (refutadaPor) {
-    suggestionScoreEvents.push({
-      equipoId: refutadaPor,
-      type: 'EVT_REFUTATION',
-      points: 15,
-      turno: turnoActual,
-    });
-  }
+  // Note: EVT_REFUTATION / EVT_FALSE_CANNOT_REFUTE are scored after the refutation
+  // sub-flow below, conditional on whether the agent actually shows a valid card.
   await insertScoreEvents(gameId, suggestionScoreEvents);
   // Emit WebSocket for any penalty events
   for (const evt of suggestionScoreEvents) {
@@ -719,58 +1044,146 @@ async function handleSuggestion(p: SuggestionParams): Promise<{ maxTurnsReached:
     });
     const tsRef = Date.now();
 
-    const { response: refuteResponse, invocacionId: refuteInvocacionId } = await invokeAgent(
-      { type: 'refute', gameId, teamId: refutadaPor, suspect, weapon, room },
-      { turnoId },
-    );
-    refutacionDurationMs = Date.now() - tsRef;
-    refutadorSpectatorComment = sanitizeSpectatorComment(refuteResponse.spectatorComment);
+    try {
+      const { response: refuteResponse, invocacionId: refuteInvocacionId } = await invokeAgent(
+        { type: 'refute', gameId, teamId: refutadaPor, suspect, weapon, room },
+        {
+          turnoId,
+          mattinAgentId: teamCredentials.get(refutadaPor)?.agentId,
+          mattinAppId: teamCredentials.get(refutadaPor)?.appId,
+          mattinApiKey: teamCredentials.get(refutadaPor)?.mattinApiKey,
+          agentBackend: teamCredentials.get(refutadaPor)?.agentBackend,
+        },
+      );
+      refutacionDurationMs = Date.now() - tsRef;
+      refutadorSpectatorComment = sanitizeSpectatorComment(refuteResponse.spectatorComment);
 
-    const refAction = refuteResponse.action;
-    const isValidRefute = refAction.type === 'show_card' || refAction.type === 'cannot_refute';
-    logInvocacionValidity(
-      refuteInvocacionId,
-      gameId,
-      refutadaPor,
-      turnoId,
-      isValidRefute,
-      isValidRefute ? null : `Tipo de acción inválido para refute: "${refAction.type}"`,
-    );
+      const refAction = refuteResponse.action;
+      const isValidRefute = refAction.type === 'show_card' || refAction.type === 'cannot_refute';
+      logInvocacionValidity(
+        refuteInvocacionId,
+        gameId,
+        refutadaPor,
+        turnoId,
+        isValidRefute,
+        isValidRefute ? null : `Tipo de acción inválido para refute: "${refAction.type}"`,
+      );
 
-    let cartaMostradaValue: string | undefined;
-    if (refAction.type === 'show_card') {
-      // Validate the card belongs to the refutador and matches the suggestion
-      const refTeam = allTeams.find((t) => t.equipoId === refutadaPor)!;
-      const cartas: Carta[] = JSON.parse(refTeam.cartas as string);
-      const isValid =
-        (cartas as string[]).includes(refAction.card) &&
-        (refAction.card === suspect || refAction.card === weapon || refAction.card === room);
+      let cartaMostradaValue: string | undefined;
+      // G006: true = agent said show_card with an invalid card → EVT_WRONG_REFUTATION
+      let wrongRefutation = false;
+      if (refAction.type === 'show_card') {
+        // Validate the card belongs to the refutador and matches the suggestion
+        const refTeam = allTeams.find((t) => t.equipoId === refutadaPor)!;
+        const cartas: Carta[] = JSON.parse(refTeam.cartas as string);
+        const isValid =
+          (cartas as string[]).includes(refAction.card) &&
+          (refAction.card === suspect || refAction.card === weapon || refAction.card === room);
 
-      if (isValid) {
-        cartaMostradaValue = refAction.card;
-        await db
-          .update(sugerencias)
-          .set({ cartaMostrada: refAction.card })
-          .where(eq(sugerencias.id, suggestionId));
+        if (isValid) {
+          cartaMostradaValue = refAction.card;
+          await db
+            .update(sugerencias)
+            .set({ cartaMostrada: refAction.card })
+            .where(eq(sugerencias.id, suggestionId));
+        } else {
+          // G006: invalid show_card → EVT_WRONG_REFUTATION (protocol violation + warning)
+          wrongRefutation = true;
+        }
       }
-      // If invalid card claimed: treat as cannot_refute; cartaMostrada stays null
-    }
-    // cannot_refute: cartaMostrada remains null
+      // cannot_refute (or unknown action): cartaMostrada remains null, wrongRefutation stays false
 
-    // F016: emit result of refutation (cartaMostrada visible to spectators)
-    gameEventEmitter.emitTurnMicroEvent({
-      type: 'turn:refutation_received',
-      gameId,
-      turnoId,
-      turnoNumero,
-      equipoId: refutadaPor,
-      equipoNombre: refutadorNombre,
-      resultado: cartaMostradaValue ? 'refutada' : 'no_puede_refutar',
-      cartaMostrada: cartaMostradaValue,
-      durationMs: refutacionDurationMs,
-      spectatorComment: refutadorSpectatorComment,
-      ts: Date.now(),
-    });
+      // F016: emit result of refutation (cartaMostrada visible to spectators)
+      gameEventEmitter.emitTurnMicroEvent({
+        type: 'turn:refutation_received',
+        gameId,
+        turnoId,
+        turnoNumero,
+        equipoId: refutadaPor,
+        equipoNombre: refutadorNombre,
+        resultado: cartaMostradaValue ? 'refutada' : 'no_puede_refutar',
+        cartaMostrada: cartaMostradaValue,
+        durationMs: refutacionDurationMs,
+        spectatorComment: refutadorSpectatorComment,
+        ts: Date.now(),
+      });
+
+      // ── Score the refutation outcome ──────────────────────────────────────────────────
+      // EVT_REFUTATION:          correctly showed a matching card.
+      // EVT_WRONG_REFUTATION:    showed a card not in hand or not in suggestion (G006 warning).
+      // EVT_FALSE_CANNOT_REFUTE: claimed cannot_refute when coordinator knows they have a card.
+      const refutationEvt: ScoreEventInput = cartaMostradaValue !== undefined
+        ? { equipoId: refutadaPor, type: 'EVT_REFUTATION',            points: EVT_REFUTATION_POINTS,           turno: turnoActual }
+        : wrongRefutation
+          ? { equipoId: refutadaPor, type: 'EVT_WRONG_REFUTATION',   points: EVT_WRONG_REFUTATION_POINTS,    turno: turnoActual }
+          : { equipoId: refutadaPor, type: 'EVT_FALSE_CANNOT_REFUTE', points: EVT_FALSE_CANNOT_REFUTE_POINTS, turno: turnoActual };
+      await insertScoreEvents(gameId, [refutationEvt]);
+      gameEventEmitter.emitTurnCompleted(gameId, {
+        type: 'score_event',
+        gameId,
+        payload: {
+          equipoId: refutadaPor,
+          scoreEventType: refutationEvt.type,
+          points: refutationEvt.points,
+        },
+      });
+
+      // G006: EVT_WRONG_REFUTATION generates a warning for the refutador
+      if (wrongRefutation) {
+        await processWarning(gameId, refutadaPor, turnoActual, 'EVT_WRONG_REFUTATION');
+        // Note: even if the refutador is eliminated here, we do NOT abort the suggestion
+        // turn — the suggestor's turn completes normally. The refutador's elimination
+        // is recorded; the turn advance at end of handleSuggestion uses the updated teams.
+      }
+    } catch (err) {
+      // Refute agent unreachable or returned an unrecoverable error.
+      // Treat as cannot_refute (no card shown) and issue a comm/timeout/format penalty
+      // against the refutador. The suggestor's turn continues and advances normally.
+      refutacionDurationMs = Date.now() - tsRef;
+
+      const refutePassOrigin = classifyAgentFailure(err);
+
+      // F016: emit refutation_received with no card (unreachable agent ≡ cannot_refute)
+      gameEventEmitter.emitTurnMicroEvent({
+        type: 'turn:refutation_received',
+        gameId,
+        turnoId,
+        turnoNumero,
+        equipoId: refutadaPor,
+        equipoNombre: refutadorNombre,
+        resultado: 'no_puede_refutar',
+        cartaMostrada: undefined,
+        durationMs: refutacionDurationMs,
+        ts: Date.now(),
+      });
+
+      // Issue penalty score event against the refutador
+      const refuteErrEvtType: ScoreEventType =
+        refutePassOrigin === 'timeout'
+          ? 'EVT_TIMEOUT'
+          : refutePassOrigin === 'comm_error'
+            ? 'EVT_COMM_ERROR'
+            : 'EVT_INVALID_FORMAT';
+      const refuteErrEvtPoints =
+        refutePassOrigin === 'timeout'
+          ? EVT_TIMEOUT_POINTS
+          : refutePassOrigin === 'comm_error'
+            ? EVT_COMM_ERROR_POINTS
+            : EVT_INVALID_FORMAT_POINTS;
+
+      await insertScoreEvents(gameId, [
+        { equipoId: refutadaPor, type: refuteErrEvtType, points: refuteErrEvtPoints, turno: turnoActual },
+      ]);
+      gameEventEmitter.emitTurnCompleted(gameId, {
+        type: 'score_event',
+        gameId,
+        payload: { equipoId: refutadaPor, scoreEventType: refuteErrEvtType, points: refuteErrEvtPoints },
+      });
+
+      // Warning + potential elimination of the refutador (same pattern as play_turn errors).
+      // The suggestor's turn continues normally; _advanceTurnoIndex runs below.
+      await processWarning(gameId, refutadaPor, turnoActual, refuteErrEvtType);
+    }
   }
 
   // ── Mark turn as completed and advance ──────────────────────────────
@@ -787,7 +1200,19 @@ async function handleSuggestion(p: SuggestionParams): Promise<{ maxTurnsReached:
     })
     .where(eq(turnos.id, turnoId));
 
-  return _advanceTurnoIndex(gameId, turnoActual, activeTeamCount, allTeams, maxTurnos);
+  // G006: reload teams in case refutador was eliminated by warning
+  const teamsAfterSuggestion = await db
+    .select()
+    .from(partidaEquipos)
+    .where(eq(partidaEquipos.partidaId, gameId))
+    .all();
+  const activeAfterSuggestion = teamsAfterSuggestion.filter((t) => !t.eliminado);
+
+  if (activeAfterSuggestion.length === 0) {
+    return { maxTurnsReached: false, nextEquipoId: null };
+  }
+
+  return _advanceTurnoIndex(gameId, turnoActual, activeAfterSuggestion.length, teamsAfterSuggestion, maxTurnos);
 }
 
 // ---------------------------------------------------------------------------
@@ -854,7 +1279,7 @@ async function handleAccusation(p: AccusationParams): Promise<{ gameOver: boolea
     const T = await countOwnTurns(gameId, teamId);
     const effBonus = calcEfficiencyBonus(T);
     const winEvents: ScoreEventInput[] = [
-      { equipoId: teamId, type: 'EVT_WIN', points: 1_000, turno: turnoActual, meta: { T } },
+      { equipoId: teamId, type: 'EVT_WIN', points: EVT_WIN_POINTS, turno: turnoActual, meta: { T } },
     ];
     if (effBonus > 0) {
       winEvents.push({
@@ -871,7 +1296,7 @@ async function handleAccusation(p: AccusationParams): Promise<{ gameOver: boolea
         winEvents.push({
           equipoId: t.equipoId,
           type: 'EVT_SURVIVE',
-          points: 200,
+          points: EVT_SURVIVE_POINTS,
           turno: turnoActual,
         });
       }
@@ -882,17 +1307,17 @@ async function handleAccusation(p: AccusationParams): Promise<{ gameOver: boolea
 
   // Incorrect accusation: penalise with EVT_WRONG_ACCUSATION then eliminate
   await insertScoreEvents(gameId, [
-    { equipoId: teamId, type: 'EVT_WRONG_ACCUSATION', points: -150, turno: turnoActual },
+    { equipoId: teamId, type: 'EVT_WRONG_ACCUSATION', points: EVT_WRONG_ACCUSATION_POINTS, turno: turnoActual },
   ]);
   gameEventEmitter.emitTurnCompleted(gameId, {
     type: 'score_event',
     gameId,
-    payload: { equipoId: teamId, scoreEventType: 'EVT_WRONG_ACCUSATION', points: -150 },
+    payload: { equipoId: teamId, scoreEventType: 'EVT_WRONG_ACCUSATION', points: EVT_WRONG_ACCUSATION_POINTS },
   });
-  // Eliminate the team
+  // Eliminate the team (G006: record eliminacionRazon)
   await db
     .update(partidaEquipos)
-    .set({ eliminado: true })
+    .set({ eliminado: true, eliminacionRazon: 'acusacion_incorrecta' })
     .where(
       and(
         eq(partidaEquipos.partidaId, gameId),
@@ -935,11 +1360,11 @@ interface PassParams {
   activeTeamCount: number;
   allTeams: TeamRow[];
   maxTurnos: number | null;
-  origen: 'voluntario' | 'timeout' | 'invalid_format';
+  origen: 'voluntario' | 'timeout' | 'invalid_format' | 'comm_error';
   agentDurationMs: number;
   /** G004: sanitized spectator comment from the active agent (undefined for forced passes) */
   agentSpectatorComment?: string;
-  /** Agent LLM reasoning (undefined for forced/timeout passes) */
+  /** Agent LLM reasoning (undefined for forced/error passes) */
   agentReasoning?: string;
 }
 
@@ -965,7 +1390,7 @@ async function handlePass(p: PassParams): Promise<{ maxTurnsReached: boolean; ne
   // Forced passes (timeout / invalid_format) are scored in the caller before handlePass.
   if (origen === 'voluntario') {
     await insertScoreEvents(gameId, [
-      { equipoId: teamId, type: 'EVT_PASS', points: -5, turno: turnoActual },
+      { equipoId: teamId, type: 'EVT_PASS', points: EVT_PASS_POINTS, turno: turnoActual },
     ]);
   }
 

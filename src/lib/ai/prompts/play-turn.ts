@@ -88,6 +88,16 @@ Ejemplos:
   descarte su presencia en el sobre. Y la Biblioteca fue sugerida dos veces sin que nadie pudiera
   refutarla. Por tanto acuso: Profesor Plum, con el Cuchillo, en la Biblioteca."
 
+## Sistema de Warnings (G006)
+Cada infracción acumula un warning en tu agente. Las infracciones son:
+- **Timeout** (EVT_TIMEOUT): no responder a tiempo.
+- **Formato inválido** (EVT_INVALID_FORMAT): JSON mal formado o acción no reconocida.
+- **Cartas inexistentes** (EVT_INVALID_CARD): sugerir cartas que no existen en el juego.
+- **Refutación inválida** (EVT_WRONG_REFUTATION): mostrar una carta que no tienes o enviar una carta que no refuta la sugerencia (−30 pts adicionales).
+
+Al acumular **3 warnings**, tu agente es **ELIMINADO automáticamente** y tus cartas son redistribuidas entre los demás equipos.
+Consulta el campo \`warnings\` en el estado del juego para conocer tu contador actual.
+
 ## Estrategia
 - Haz sugerencias con combinaciones donde al menos dos de las tres cartas sean desconocidas para ti.
 - NO repitas sugerencias idénticas que ya realizaste (EVT_REDUNDANT_SUGGESTION: −20 pts). Consulta el historial para evitarlo.

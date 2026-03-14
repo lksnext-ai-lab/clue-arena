@@ -57,10 +57,11 @@ export function DeleteTeamButton({ teamId, teamName, onDeleted }: Props) {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="text-xs px-2 py-1 rounded bg-red-500/10 text-red-400 hover:bg-red-500/20"
+        className="inline-flex items-center justify-center rounded-2xl px-4 py-3 text-sm font-semibold transition"
+        style={{ background: 'rgba(248,113,113,0.12)', color: '#fca5a5' }}
         title={t('eliminarEquipo')}
       >
-        ✕
+        {t('eliminarEquipo')}
       </button>
 
       {open && (
@@ -69,25 +70,26 @@ export function DeleteTeamButton({ teamId, teamName, onDeleted }: Props) {
           onClick={handleClose}
         >
           <div
-            className="w-full max-w-sm rounded-xl p-6 space-y-4 bg-slate-800 border border-slate-700"
+            className="w-full max-w-sm space-y-4 rounded-[28px] border p-6"
+            style={{ borderColor: 'rgba(148, 163, 184, 0.14)', background: 'rgba(9, 17, 31, 0.96)' }}
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-lg font-semibold text-cyan-400">
+            <h3 className="text-lg font-semibold" style={{ color: '#f8fafc' }}>
               {t('eliminarEquipo')}
             </h3>
 
             {bloqueado ? (
-              <p className="text-sm text-amber-300">
+              <p className="text-sm" style={{ color: '#fcd34d' }}>
                 {t('equipoEnPartida')}
               </p>
             ) : (
-              <p className="text-sm text-slate-300">
+              <p className="text-sm" style={{ color: '#cbd5e1' }}>
                 {t('confirmarEliminar', { nombre: teamName })}
               </p>
             )}
 
             {error && !bloqueado && (
-              <p className="text-xs text-red-400">
+              <p className="text-xs" style={{ color: '#fca5a5' }}>
                 {error}
               </p>
             )}
@@ -95,7 +97,8 @@ export function DeleteTeamButton({ teamId, teamName, onDeleted }: Props) {
             <div className="flex gap-3 justify-end">
               <button
                 onClick={handleClose}
-                className="px-4 py-1.5 rounded text-sm bg-slate-700 text-slate-300 hover:bg-slate-600"
+                className="rounded-2xl px-4 py-3 text-sm font-semibold transition"
+                style={{ background: 'rgba(51,65,85,0.9)', color: '#cbd5e1' }}
               >
                 {tCommon('cancelar')}
               </button>
@@ -103,7 +106,8 @@ export function DeleteTeamButton({ teamId, teamName, onDeleted }: Props) {
                 <button
                   onClick={handleDelete}
                   disabled={isDeleting}
-                  className="px-4 py-1.5 rounded text-sm font-semibold disabled:opacity-50 bg-red-500 text-white hover:bg-red-600"
+                  className="rounded-2xl px-4 py-3 text-sm font-semibold transition disabled:opacity-50"
+                  style={{ background: '#ef4444', color: '#fff' }}
                 >
                   {isDeleting ? '...' : t('eliminarEquipo')}
                 </button>

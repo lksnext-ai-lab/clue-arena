@@ -1,0 +1,64 @@
+<svg width="720" height="720" viewBox="0 0 720 720" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="720" height="720" rx="32" fill="#07111F"/>
+  <g filter="url(#filter0_f)">
+    <ellipse cx="138" cy="138" rx="110" ry="90" fill="#06B6D4" fill-opacity="0.18"/>
+  </g>
+  <g filter="url(#filter1_f)">
+    <ellipse cx="565" cy="586" rx="144" ry="110" fill="#F59E0B" fill-opacity="0.14"/>
+  </g>
+  <rect x="56" y="58" width="200" height="262" rx="24" fill="#0D1A2A" stroke="#254057" stroke-width="2"/>
+  <rect x="77" y="82" width="158" height="112" rx="18" fill="#10273A"/>
+  <circle cx="156" cy="134" r="34" fill="#16344C"/>
+  <path d="M156 154C138.327 154 124 168.327 124 186H188C188 168.327 173.673 154 156 154Z" fill="#1F4D69"/>
+  <rect x="78" y="212" width="109" height="13" rx="6.5" fill="#7DD3FC"/>
+  <rect x="78" y="238" width="140" height="9" rx="4.5" fill="#32526B"/>
+  <rect x="78" y="257" width="122" height="9" rx="4.5" fill="#32526B"/>
+  <rect x="78" y="276" width="88" height="9" rx="4.5" fill="#32526B"/>
+  <rect x="462" y="78" width="202" height="226" rx="24" fill="#0D1A2A" stroke="#4B2134" stroke-width="2"/>
+  <rect x="486" y="102" width="154" height="98" rx="18" fill="#1A1320"/>
+  <path d="M516 170C534.667 130.667 571.333 130.667 590 170" stroke="#FB7185" stroke-width="8" stroke-linecap="round"/>
+  <path d="M516 188C534.667 148.667 571.333 148.667 590 188" stroke="#FB7185" stroke-opacity="0.5" stroke-width="6" stroke-linecap="round"/>
+  <rect x="486" y="216" width="122" height="13" rx="6.5" fill="#FCA5A5"/>
+  <rect x="486" y="242" width="132" height="9" rx="4.5" fill="#533547"/>
+  <rect x="486" y="261" width="104" height="9" rx="4.5" fill="#533547"/>
+  <rect x="111" y="418" width="230" height="164" rx="22" fill="#0D1A2A" stroke="#2A4F68" stroke-width="2"/>
+  <rect x="138" y="446" width="176" height="14" rx="7" fill="#67E8F9"/>
+  <rect x="138" y="478" width="145" height="10" rx="5" fill="#34566F"/>
+  <rect x="138" y="498" width="123" height="10" rx="5" fill="#34566F"/>
+  <rect x="138" y="518" width="160" height="10" rx="5" fill="#34566F"/>
+  <rect x="138" y="544" width="92" height="11" rx="5.5" fill="#FCD34D"/>
+  <rect x="411" y="396" width="218" height="186" rx="24" fill="#0D1A2A" stroke="#5B4720" stroke-width="2"/>
+  <rect x="438" y="424" width="164" height="120" rx="20" fill="#171C1D"/>
+  <path d="M470 471H570" stroke="#FBBF24" stroke-width="8" stroke-linecap="round"/>
+  <path d="M470 497H542" stroke="#FBBF24" stroke-opacity="0.72" stroke-width="8" stroke-linecap="round"/>
+  <path d="M470 523H586" stroke="#FBBF24" stroke-opacity="0.44" stroke-width="8" stroke-linecap="round"/>
+  <circle cx="360" cy="356" r="74" fill="#0A1827" stroke="#2A465F" stroke-width="3"/>
+  <circle cx="360" cy="356" r="44" stroke="#3A6F90" stroke-width="2"/>
+  <circle cx="360" cy="356" r="9" fill="#67E8F9"/>
+  <path d="M360 282V430" stroke="#2A5975" stroke-width="2"/>
+  <path d="M286 356H434" stroke="#2A5975" stroke-width="2"/>
+  <path d="M156 194L325 320" stroke="#B91C1C" stroke-width="4" stroke-linecap="round"/>
+  <path d="M564 200L400 325" stroke="#B91C1C" stroke-width="4" stroke-linecap="round"/>
+  <path d="M225 418L329 388" stroke="#B91C1C" stroke-width="4" stroke-linecap="round"/>
+  <path d="M520 396L397 386" stroke="#B91C1C" stroke-width="4" stroke-linecap="round"/>
+  <circle cx="325" cy="320" r="8" fill="#F87171"/>
+  <circle cx="400" cy="325" r="8" fill="#F87171"/>
+  <circle cx="329" cy="388" r="8" fill="#F87171"/>
+  <circle cx="397" cy="386" r="8" fill="#F87171"/>
+  <circle cx="156" cy="194" r="7" fill="#F87171"/>
+  <circle cx="564" cy="200" r="7" fill="#F87171"/>
+  <circle cx="225" cy="418" r="7" fill="#F87171"/>
+  <circle cx="520" cy="396" r="7" fill="#F87171"/>
+  <defs>
+    <filter id="filter0_f" x="-32" y="-12" width="340" height="300" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
+      <feGaussianBlur stdDeviation="30" result="effect1_foregroundBlur"/>
+    </filter>
+    <filter id="filter1_f" x="361" y="416" width="408" height="340" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
+      <feGaussianBlur stdDeviation="30" result="effect1_foregroundBlur"/>
+    </filter>
+  </defs>
+</svg>

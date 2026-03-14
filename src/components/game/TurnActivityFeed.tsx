@@ -49,6 +49,29 @@ function WaitingRow({ fromTs }: { fromTs: number }) {
   );
 }
 
+function warningReasonLabel(reason: string | undefined): string {
+  switch (reason) {
+    case 'EVT_TIMEOUT':
+      return 'timeout';
+    case 'EVT_COMM_ERROR':
+      return 'error de comunicacion';
+    case 'EVT_INVALID_FORMAT':
+      return 'formato invalido';
+    case 'EVT_INVALID_CARD':
+      return 'carta invalida';
+    case 'EVT_WRONG_REFUTATION':
+      return 'refutacion invalida';
+    default:
+      return reason?.toLowerCase() ?? 'warning';
+  }
+}
+
+function shouldShowWaiting(entry: TurnActivityEntry): boolean {
+  if (entry.isCompleted) return false;
+  const lastEvent = entry.events.at(-1);
+  return lastEvent?.type === 'turn:agent_invoked' || lastEvent?.type === 'turn:refutation_requested';
+}
+
 // ── Single micro-event row ────────────────────────────────────────────────────
 function EventRow({ ev }: { ev: TurnMicroEventUI }) {
   switch (ev.type) {
@@ -62,7 +85,10 @@ function EventRow({ ev }: { ev: TurnMicroEventUI }) {
       );
 
     case 'turn:agent_responded': {
-      const isError = ev.accion === 'timeout' || ev.accion === 'formato_invalido';
+      const isError =
+        ev.accion === 'timeout' ||
+        ev.accion === 'formato_invalido' ||
+        ev.accion === 'error_comunicacion';
       return (
         <span className={cn('flex flex-col gap-0.5 text-xs', isError ? 'text-red-400' : 'text-emerald-400')}>
           <span className="flex items-center gap-2">
@@ -73,6 +99,7 @@ function EventRow({ ev }: { ev: TurnMicroEventUI }) {
             {ev.accion === 'pasar'     && <span className="text-slate-500">pasa</span>}
             {ev.accion === 'timeout'          && <span>timeout</span>}
             {ev.accion === 'formato_invalido' && <span>formato inválido</span>}
+            {ev.accion === 'error_comunicacion' && <span>error de comunicación</span>}
             {ev.durationMs !== undefined && (
               <span className="ml-auto text-slate-500 font-mono text-xs">{ev.durationMs} ms</span>
             )}
@@ -91,6 +118,31 @@ function EventRow({ ev }: { ev: TurnMicroEventUI }) {
         </span>
       );
     }
+
+    case 'warning:issued':
+      return (
+        <span className="flex flex-col gap-0.5 text-xs text-amber-300">
+          <span className="flex items-center gap-2">
+            <span>!</span>
+            <span className="font-semibold text-slate-200">{ev.equipoNombre ?? ev.equipoId}</span>
+            <span>warning {ev.warnings ?? '?'}/3</span>
+          </span>
+          <span className="ml-5 text-slate-400">
+            motivo: {warningReasonLabel(ev.reason)}
+          </span>
+        </span>
+      );
+
+    case 'warning:agent_eliminated':
+      return (
+        <span className="flex flex-col gap-0.5 text-xs text-red-300">
+          <span className="flex items-center gap-2">
+            <span>✗</span>
+            <span className="font-semibold text-slate-200">{ev.equipoNombre ?? ev.equipoId}</span>
+            <span>eliminado por warnings</span>
+          </span>
+        </span>
+      );
 
     case 'turn:refutation_requested':
       return (
@@ -207,7 +259,7 @@ export function TurnActivityFeed() {
           {active && (
             <TurnFeedBlock
               entry={active}
-              showWaiting={!active.isCompleted}
+              showWaiting={shouldShowWaiting(active)}
             />
           )}
 

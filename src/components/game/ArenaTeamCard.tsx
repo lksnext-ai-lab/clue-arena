@@ -42,6 +42,29 @@ interface DeltaFlash {
   delta: number;
 }
 
+function WarningCards({ warnings, eliminatedByWarnings }: { warnings: number; eliminatedByWarnings?: boolean }) {
+  const yellowCount = Math.min(warnings, 2);
+  const showRed = warnings >= 3 && eliminatedByWarnings;
+
+  if (warnings <= 0) return null;
+
+  return (
+    <div className="flex items-center gap-1" title={`${warnings} warning${warnings === 1 ? '' : 's'}`}>
+      {[...Array(yellowCount)].map((_, i) => (
+        <span
+          key={`yellow-${i}`}
+          className="w-4 h-6 rounded-sm bg-amber-400 border border-amber-500"
+        />
+      ))}
+      {showRed ? (
+        <span className="w-4 h-6 rounded-sm bg-red-500 border border-red-600" />
+      ) : warnings > 2 ? (
+        <span className="w-4 h-6 rounded-sm bg-amber-400 border border-amber-500" />
+      ) : null}
+    </div>
+  );
+}
+
 export function ArenaTeamCard({ gameId, equipo, isActiveTurn, pendingRequest }: ArenaTeamCardProps) {
   const elapsed = useElapsed(pendingRequest?.fromTs);
 
@@ -129,6 +152,14 @@ export function ArenaTeamCard({ gameId, equipo, isActiveTurn, pendingRequest }: 
             </span>
           )}
         </div>
+
+        {/* Warnings (G006) */}
+        {equipo.warnings > 0 && (
+          <div className="mt-2 flex items-center justify-between">
+            <span className="text-xs text-slate-400">Warnings</span>
+            <WarningCards warnings={equipo.warnings} eliminatedByWarnings={equipo.eliminadoPorWarnings} />
+          </div>
+        )}
 
         {/* Stats */}
         <div className="mt-3 flex items-center justify-between text-sm">

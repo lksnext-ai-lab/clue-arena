@@ -154,6 +154,16 @@ export function GameProvider({ children, gameId }: GameProviderProps) {
     });
   }, []);
 
+  const appendToActiveTurn = useCallback((ev: TurnMicroEventUI) => {
+    setCurrentTurnActivity((prev) => {
+      if (!prev.active) return prev;
+      return {
+        ...prev,
+        active: { ...prev.active, events: [...prev.active.events, ev] },
+      };
+    });
+  }, []);
+
   const sealActiveTurn = useCallback(() => {
     setCurrentTurnActivity((prev) => {
       if (!prev.active) return prev;
@@ -256,7 +266,51 @@ export function GameProvider({ children, gameId }: GameProviderProps) {
       }
       return;
     }
-  }, [fetchGame, scheduleActiveEquipoId, appendTurnMicroEvent, sealActiveTurn]);
+    if (msg.type === 'warning:issued') {
+      const ev: TurnMicroEventUI = {
+        type: 'warning:issued',
+        equipoId: msg.equipoId,
+        equipoNombre: partida?.equipos.find((equipo) => equipo.equipoId === msg.equipoId)?.equipoNombre ?? msg.equipoId,
+        warnings: msg.warnings,
+        reason: msg.reason,
+        ts: msg.ts,
+      };
+      appendToActiveTurn(ev);
+      setPartida((prev) => prev ? {
+        ...prev,
+        equipos: prev.equipos.map((equipo) =>
+          equipo.equipoId === msg.equipoId
+            ? { ...equipo, warnings: msg.warnings }
+            : equipo
+        ),
+      } : prev);
+      return;
+    }
+    if (msg.type === 'warning:agent_eliminated') {
+      const ev: TurnMicroEventUI = {
+        type: 'warning:agent_eliminated',
+        equipoId: msg.equipoId,
+        equipoNombre: partida?.equipos.find((equipo) => equipo.equipoId === msg.equipoId)?.equipoNombre ?? msg.equipoId,
+        equiposConCartasNuevas: msg.equiposConCartasNuevas,
+        ts: msg.ts,
+      };
+      appendToActiveTurn(ev);
+      setPartida((prev) => prev ? {
+        ...prev,
+        equipos: prev.equipos.map((equipo) =>
+          equipo.equipoId === msg.equipoId
+            ? {
+                ...equipo,
+                eliminado: true,
+                eliminadoPorWarnings: true,
+                warnings: Math.max(equipo.warnings, 3),
+              }
+            : equipo
+        ),
+      } : prev);
+      return;
+    }
+  }, [fetchGame, scheduleActiveEquipoId, appendTurnMicroEvent, appendToActiveTurn, partida, sealActiveTurn]);
 
   const handleWsDisconnect = useCallback(() => {
     setIsConnected(false);

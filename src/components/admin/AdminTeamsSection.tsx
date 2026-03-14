@@ -1,6 +1,8 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import { useState, useEffect } from 'react';
+import { Bot, Filter, Search, ShieldPlus, Sparkles, Users } from 'lucide-react';
 import { apiFetch } from '@/lib/api/client';
 import { useTranslations } from 'next-intl';
 import type { TeamResponse } from '@/types/api';
@@ -23,6 +25,7 @@ export function AdminTeamsSection() {
   const [isLoading, setIsLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [query, setQuery] = useState('');
 
   const loadTeams = async () => {
     try {
@@ -41,6 +44,26 @@ export function AdminTeamsSection() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const normalizedQuery = query.trim().toLowerCase();
+  const filteredTeams = teams.filter((team) => {
+    if (!normalizedQuery) return true;
+    return [
+      team.nombre,
+      team.id,
+      team.agentId,
+      team.appId ?? '',
+      team.usuarioId,
+      ...(team.miembros ?? []),
+    ]
+      .join(' ')
+      .toLowerCase()
+      .includes(normalizedQuery);
+  });
+
+  const mattinTeams = teams.filter((team) => team.agentBackend === 'mattin').length;
+  const localTeams = teams.length - mattinTeams;
+  const teamsWithMembers = teams.filter((team) => team.miembros.length > 0).length;
+
   const handleUpdated = (updated: TeamResponse) => {
     setTeams((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
   };
@@ -56,29 +79,103 @@ export function AdminTeamsSection() {
 
   if (isLoading) {
     return (
-      <section>
-        <h2 className="text-xl font-semibold mb-4 text-cyan-400">
-          {t('equipos', { n: '…' })}
-        </h2>
-        <p className="text-sm text-slate-500">{t('cargandoEquipos')}</p>
+      <section className="space-y-6">
+        <div className="grid gap-4 md:grid-cols-3">
+          {[0, 1, 2].map((index) => (
+            <div
+              key={index}
+              className="h-28 animate-pulse rounded-[26px] border"
+              style={{ borderColor: 'rgba(148, 163, 184, 0.12)', background: 'rgba(9, 17, 31, 0.72)' }}
+            />
+          ))}
+        </div>
+        <div
+          className="rounded-[28px] border p-6"
+          style={{ borderColor: 'rgba(148, 163, 184, 0.14)', background: 'rgba(9, 17, 31, 0.84)' }}
+        >
+          <p className="text-sm" style={{ color: '#94a3b8' }}>{t('cargandoEquipos')}</p>
+        </div>
       </section>
     );
   }
 
   return (
-    <section>
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-semibold text-cyan-400">
-          {t('equipos', { n: teams.length })}
-        </h2>
-        {!showCreateForm && (
-          <button
-            onClick={() => setShowCreateForm(true)}
-            className="px-3 py-1.5 rounded-md text-sm font-medium transition-colors bg-cyan-500 text-slate-900 hover:bg-cyan-400"
+    <section className="space-y-6">
+      <div className="grid gap-4 md:grid-cols-3">
+        <MetricCard
+          icon={<Users size={18} />}
+          label={t('teamsMetricTotal')}
+          value={String(teams.length)}
+          accent="#38bdf8"
+        />
+        <MetricCard
+          icon={<Bot size={18} />}
+          label={t('teamsMetricMattin')}
+          value={String(mattinTeams)}
+          accent="#34d399"
+          detail={t('teamsMetricMattinDetail', { count: localTeams })}
+        />
+        <MetricCard
+          icon={<Sparkles size={18} />}
+          label={t('teamsMetricMembers')}
+          value={String(teamsWithMembers)}
+          accent="#fbbf24"
+          detail={t('teamsMetricLocalDetail', { count: localTeams })}
+        />
+      </div>
+
+      <div
+        className="rounded-[28px] border p-5 sm:p-6"
+        style={{ borderColor: 'rgba(148, 163, 184, 0.14)', background: 'rgba(9, 17, 31, 0.84)' }}
+      >
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-[0.24em]" style={{ color: '#94a3b8' }}>
+              {t('gestionEquiposSectionEyebrow')}
+            </p>
+            <h2 className="text-2xl font-semibold" style={{ color: '#f8fafc' }}>
+              {t('equipos', { n: teams.length })}
+            </h2>
+            <p className="max-w-2xl text-sm leading-6" style={{ color: '#94a3b8' }}>
+              {t('gestionEquiposDesc')}
+            </p>
+          </div>
+
+          {!showCreateForm && (
+            <button
+              onClick={() => setShowCreateForm(true)}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold transition"
+              style={{ background: '#f59e0b', color: '#111827', boxShadow: '0 14px 30px rgba(245,158,11,0.18)' }}
+            >
+              <ShieldPlus size={16} />
+              {t('crearEquipo')}
+            </button>
+          )}
+        </div>
+
+        <div className="mt-5 flex flex-col gap-3 lg:flex-row">
+          <label
+            className="flex flex-1 items-center gap-3 rounded-2xl border px-4 py-3"
+            style={{ borderColor: 'rgba(148, 163, 184, 0.18)', background: 'rgba(15, 23, 42, 0.72)' }}
           >
-            {t('crearEquipo')}
-          </button>
-        )}
+            <Search size={16} style={{ color: '#7dd3fc' }} />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder={t('buscarEquipoPlaceholder')}
+              className="w-full bg-transparent text-sm outline-none placeholder:text-slate-500"
+              style={{ color: '#f8fafc' }}
+            />
+          </label>
+
+          <div
+            className="inline-flex items-center gap-2 rounded-2xl border px-4 py-3 text-sm"
+            style={{ borderColor: 'rgba(148, 163, 184, 0.18)', background: 'rgba(15, 23, 42, 0.72)', color: '#94a3b8' }}
+          >
+            <Filter size={16} />
+            {normalizedQuery ? t('resultadosFiltrados', { count: filteredTeams.length }) : t('sinFiltroActivo')}
+          </div>
+        </div>
       </div>
 
       {showCreateForm && (
@@ -90,52 +187,99 @@ export function AdminTeamsSection() {
 
       {fetchError && (
         <div
-          className="px-4 py-3 rounded-md text-sm mb-4 bg-red-900/40 text-red-300 border border-red-500/30"
+          className="rounded-2xl border px-4 py-3 text-sm"
+          style={{ borderColor: 'rgba(248,113,113,0.28)', background: 'rgba(127,29,29,0.28)', color: '#fecaca' }}
         >
           {fetchError}
         </div>
       )}
 
       {teams.length === 0 ? (
-        <p className="text-sm text-slate-500">
-          {t('equiposSinRegistrar')}
-        </p>
+        <div
+          className="rounded-[28px] border px-6 py-12 text-center"
+          style={{ borderColor: 'rgba(148, 163, 184, 0.14)', background: 'rgba(9, 17, 31, 0.84)' }}
+        >
+          <div
+            className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl"
+            style={{ background: 'rgba(56,189,248,0.12)', color: '#38bdf8' }}
+          >
+            <Users size={24} />
+          </div>
+          <h3 className="mt-4 text-xl font-semibold" style={{ color: '#f8fafc' }}>
+            {t('equiposSinRegistrar')}
+          </h3>
+          <p className="mx-auto mt-2 max-w-xl text-sm leading-6" style={{ color: '#94a3b8' }}>
+            {t('equiposEmptyDesc')}
+          </p>
+        </div>
+      ) : filteredTeams.length === 0 ? (
+        <div
+          className="rounded-[28px] border px-6 py-10 text-center"
+          style={{ borderColor: 'rgba(148, 163, 184, 0.14)', background: 'rgba(9, 17, 31, 0.84)' }}
+        >
+          <p className="text-base font-semibold" style={{ color: '#f8fafc' }}>
+            {t('sinResultadosBusqueda')}
+          </p>
+          <p className="mt-2 text-sm" style={{ color: '#94a3b8' }}>
+            {t('sinResultadosBusquedaDesc')}
+          </p>
+        </div>
       ) : (
-        <div className="rounded-xl overflow-hidden bg-slate-800 border border-slate-700">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-900/50">
-              <tr className="border-b border-slate-700">
-                <th className="px-4 py-3 text-left w-12 text-slate-500">
-                  {t('avatar')}
-                </th>
-                <th className="px-4 py-3 text-left text-slate-500">
-                  {t('nombre')}
-                </th>
-                <th className="px-4 py-3 text-left text-slate-500">
-                  {t('agentId')}
-                </th>
-                <th className="px-4 py-3 text-left text-slate-500">
-                  {t('estado')}
-                </th>
-                <th className="px-4 py-3 text-left text-slate-500">
-                  {t('acciones')}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {teams.map((team) => (
-                <EditTeamRow
-                  key={team.id}
-                  team={team}
-                  statusColors={STATUS_COLORS}
-                  onUpdated={handleUpdated}
-                  onDeleted={() => handleDeleted(team.id)}
-                />
-              ))}
-            </tbody>
-          </table>
+        <div className="grid gap-5 xl:grid-cols-2">
+          {filteredTeams.map((team) => (
+            <EditTeamRow
+              key={team.id}
+              team={team}
+              statusColors={STATUS_COLORS}
+              onUpdated={handleUpdated}
+              onDeleted={() => handleDeleted(team.id)}
+            />
+          ))}
         </div>
       )}
     </section>
+  );
+}
+
+function MetricCard({
+  icon,
+  label,
+  value,
+  accent,
+  detail,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: string;
+  accent: string;
+  detail?: string;
+}) {
+  return (
+    <div
+      className="rounded-[26px] border p-5"
+      style={{ borderColor: 'rgba(148, 163, 184, 0.14)', background: 'rgba(9, 17, 31, 0.84)' }}
+    >
+      <div className="flex items-center gap-3">
+        <div
+          className="flex h-11 w-11 items-center justify-center rounded-2xl"
+          style={{ background: `${accent}1f`, color: accent }}
+        >
+          {icon}
+        </div>
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: '#94a3b8' }}>
+            {label}
+          </p>
+          <p className="mt-1 text-2xl font-semibold" style={{ color: '#f8fafc' }}>
+            {value}
+          </p>
+        </div>
+      </div>
+      {detail ? (
+        <p className="mt-3 text-sm" style={{ color: '#94a3b8' }}>
+          {detail}
+        </p>
+      ) : null}
+    </div>
   );
 }

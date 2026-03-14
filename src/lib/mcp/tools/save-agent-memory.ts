@@ -8,8 +8,8 @@ export const saveAgentMemoryTool = {
     game_id: z.string().describe('ID de la partida'),
     team_id: z.string().describe('ID del equipo propietario de la memoria'),
     memory: z
-      .record(z.unknown())
-      .describe('Objeto JSON con el estado de deducción persistente del agente'),
+      .union([z.string(), z.record(z.unknown())])
+      .describe('Estado de deducción del agente — objeto JSON o string JSON serializado'),
   },
 
   handler: async ({
@@ -19,10 +19,21 @@ export const saveAgentMemoryTool = {
   }: {
     game_id: string;
     team_id: string;
-    memory: Record<string, unknown>;
+    memory: string | Record<string, unknown>;
   }) => {
     const now = new Date().toISOString();
-    const memoryJson = JSON.stringify(memory);
+    // Accept both a pre-parsed object and a raw JSON string
+    let memoryJson: string;
+    if (typeof memory === 'string') {
+      try {
+        JSON.parse(memory);
+        memoryJson = memory;
+      } catch {
+        memoryJson = JSON.stringify({ raw: memory });
+      }
+    } else {
+      memoryJson = JSON.stringify(memory);
+    }
 
     const existing = await db
       .select({ gameId: agentMemories.gameId })

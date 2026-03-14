@@ -116,7 +116,9 @@ export interface TurnMicroEventUI {
     | 'turn:agent_invoked'
     | 'turn:agent_responded'
     | 'turn:refutation_requested'
-    | 'turn:refutation_received';
+    | 'turn:refutation_received'
+    | 'warning:issued'
+    | 'warning:agent_eliminated';
   equipoId?: string;
   equipoNombre?: string;
   equipoSugeridor?: string;
@@ -126,6 +128,9 @@ export interface TurnMicroEventUI {
   cartaMostrada?: string;
   sugerencia?: SugerenciaComboUI;
   durationMs?: number;
+  warnings?: number;
+  reason?: string;
+  equiposConCartasNuevas?: string[];
   /** G004: spectator-facing comment from the agent */
   spectatorComment?: string;
   ts: number;

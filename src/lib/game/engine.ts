@@ -76,6 +76,8 @@ export function initGame(equipoIds: string[], seed?: number): GameState {
     orden: i,
     cartas: [],
     eliminado: false,
+    eliminacionRazon: null,
+    warnings: 0,
     puntos: 0,
     turnosJugados: 0,
   }));
@@ -98,13 +100,23 @@ export function initGame(equipoIds: string[], seed?: number): GameState {
 }
 
 // --- Scoring constants ---
-const EVT_WIN_POINTS = 1_000;
-const EVT_SURVIVE_POINTS = 200;
-const EVT_SUGGESTION_POINTS = 10;
-const EVT_SUGGESTION_CAP = 5;
-const EVT_REFUTATION_POINTS = 15;
-const EVT_WRONG_ACCUSATION_POINTS = -150;
-const EVT_PASS_POINTS = -5;
+export const EVT_WIN_POINTS = 1_000;
+export const EVT_SURVIVE_POINTS = 200;
+export const EVT_SUGGESTION_POINTS = 10;
+export const EVT_SUGGESTION_CAP = 5;
+export const EVT_REFUTATION_POINTS = 5;        // half of EVT_SUGGESTION_POINTS
+export const EVT_WRONG_ACCUSATION_POINTS = -150;
+export const EVT_PASS_POINTS = -5;
+export const EVT_INVALID_CARD_POINTS = -30;
+export const EVT_REDUNDANT_SUGGESTION_POINTS = -20;
+export const EVT_FALSE_CANNOT_REFUTE_POINTS = -20;  // claimed cannot_refute but had a matching card
+export const EVT_INVALID_FORMAT_POINTS = -25;  // coordinator-level, not engine action
+export const EVT_TIMEOUT_POINTS = -20;         // coordinator-level, not engine action
+// G006 — warnings system
+export const EVT_WRONG_REFUTATION_POINTS = -30; // coordinator-level: refutador mostró invalid card
+export const EVT_COMM_ERROR_POINTS = -20;      // communication error (agent invocation failed)
+export const EVT_WARNING_POINTS = 0;            // informational event (0 pts)
+export const EVT_WARNING_ELIMINATION_POINTS = -50; // penalty upon elimination by warnings
 
 /** Returns the efficiency bonus for a winning team based on own turns played. */
 export function calcEfficiencyBonus(turnosJugados: number): number {
@@ -137,7 +149,7 @@ export function validateSuggestion(
       {
         equipoId: action.equipoId,
         type: 'EVT_INVALID_CARD',
-        points: -30,
+        points: EVT_INVALID_CARD_POINTS,
         turno,
         meta: {
           sospechoso: action.sospechoso,
@@ -163,7 +175,7 @@ export function validateSuggestion(
       {
         equipoId: action.equipoId,
         type: 'EVT_REDUNDANT_SUGGESTION',
-        points: -20,
+        points: EVT_REDUNDANT_SUGGESTION_POINTS,
         turno,
         meta: {
           sospechoso: action.sospechoso,
@@ -206,6 +218,11 @@ function countValidSuggestionsInHistory(historial: ActionRecord[], equipoId: str
 export function applyAction(state: GameState, action: GameAction): ApplyActionResult {
   if (state.estado === 'finalizada') return { state, scoreEvents: [] };
 
+  // warning_elimination is not a player action — skip turn validity check
+  if (action.type === 'warning_elimination') {
+    return applyWarningElimination(state, action.equipoId);
+  }
+
   const currentEquipo = getEquipoEnTurno(state);
   if (!currentEquipo || currentEquipo.equipoId !== action.equipoId) {
     throw new Error('No es el turno de este equipo');
@@ -221,6 +238,97 @@ export function applyAction(state: GameState, action: GameAction): ApplyActionRe
     default:
       throw new Error('Acción desconocida');
   }
+}
+
+// --- G006: Warning elimination ---
+
+/**
+ * Eliminates a team that has accumulated 3 warnings and redistributes its
+ * cards among remaining active teams via round-robin.
+ *
+ * Pure function — no I/O. Deterministic given the GameState.
+ */
+export function applyWarningElimination(
+  state: GameState,
+  equipoId: string,
+): ApplyActionResult {
+  const equipo = state.equipos.find((e) => e.equipoId === equipoId);
+  if (!equipo || equipo.eliminado) {
+    throw new Error(
+      `applyWarningElimination: equipo ${equipoId} no encontrado o ya eliminado`,
+    );
+  }
+
+  const cartasEliminado = [...equipo.cartas];
+  const turno = state.turnoActual;
+
+  // Active teams sorted by orden; start after the eliminated team
+  const allActive = state.equipos
+    .filter((e) => !e.eliminado)
+    .sort((a, b) => a.orden - b.orden);
+  const elimIdx = allActive.findIndex((e) => e.equipoId === equipoId);
+  const equiposActivos = [
+    ...allActive.slice(elimIdx + 1),
+    ...allActive.slice(0, elimIdx),
+  ];
+
+  // Round-robin redistribution
+  const redistribucion: { equipoId: string; cartas: Carta[] }[] =
+    equiposActivos.map((e) => ({ equipoId: e.equipoId, cartas: [] }));
+
+  cartasEliminado.forEach((carta, i) => {
+    if (redistribucion.length > 0) {
+      redistribucion[i % redistribucion.length].cartas.push(carta);
+    }
+  });
+
+  // Build updated equipo list
+  const newEquipos = state.equipos.map((e) => {
+    if (e.equipoId === equipoId) {
+      return {
+        ...e,
+        eliminado: true,
+        eliminacionRazon: 'warnings' as const,
+        cartas: [],
+      };
+    }
+    const recv = redistribucion.find((r) => r.equipoId === e.equipoId);
+    return recv && recv.cartas.length > 0
+      ? { ...e, cartas: [...e.cartas, ...recv.cartas] }
+      : e;
+  });
+
+  const activeAfter = newEquipos.filter((e) => !e.eliminado);
+  const nuevoEstado: GameState['estado'] =
+    activeAfter.length === 0 ? 'finalizada' : state.estado;
+
+  return {
+    state: {
+      ...state,
+      estado: nuevoEstado,
+      equipos: newEquipos,
+      historial: [
+        ...state.historial,
+        {
+          turno,
+          equipoId,
+          action: { type: 'warning_elimination', equipoId },
+          result: null,
+          timestamp: Date.now(),
+        },
+      ],
+    },
+    scoreEvents: [
+      {
+        equipoId,
+        type: 'EVT_WARNING_ELIMINATION' as const,
+        points: EVT_WARNING_ELIMINATION_POINTS,
+        turno,
+        meta: { cartasRepartidas: cartasEliminado.length },
+      },
+    ],
+    warningEliminationResult: { equipoId, redistribucion },
+  };
 }
 
 function incrementTurnosJugados(equipos: EquipoState[], equipoId: string): EquipoState[] {
@@ -540,6 +648,8 @@ export function getGameStateView(state: GameState, requestingTeamId: string): Ga
       numCartas: e.cartas.length, // Public: always exposed
       esPropio: e.equipoId === requestingTeamId,
       eliminado: e.eliminado,
+      eliminadoPorWarnings: e.eliminacionRazon === 'warnings', // G006
+      warnings: e.warnings,                                    // G006
       puntos: e.puntos,
       turnosJugados: e.turnosJugados, // Public: always exposed
     })),
@@ -582,5 +692,8 @@ export function getGameStateView(state: GameState, requestingTeamId: string): Ga
       return base;
     }),
     esElTurnoDeEquipo: currentEquipo?.equipoId === requestingTeamId,
+    sospechosos: SOSPECHOSOS,
+    armas: ARMAS,
+    habitaciones: HABITACIONES,
   };
 }

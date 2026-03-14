@@ -182,6 +182,7 @@ export async function computeRoundResults(
   const results: { teamId: TeamId; gameId: GameId; score: number; won: boolean }[] = [];
 
   for (const rg of roundGames) {
+    if (!rg.gameId) continue;
     const gameId = rg.gameId;
     const teamScores = await db
       .select({ equipoId: partidaEquipos.equipoId, puntos: partidaEquipos.puntos })
@@ -218,7 +219,10 @@ export async function checkRoundComplete(roundId: string): Promise<{
 
   if (roundGames.length === 0) return { complete: true, unfinishedGameIds: [] };
 
-  const gameIds = roundGames.map((rg) => rg.gameId);
+  const gameIds = roundGames
+    .map((rg) => rg.gameId)
+    .filter((gid): gid is string => !!gid);
+
   const games = await db
     .select({ id: partidas.id, estado: partidas.estado })
     .from(partidas)

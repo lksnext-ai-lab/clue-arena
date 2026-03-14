@@ -18,12 +18,15 @@ interface TrainingDeductionBoardProps {
   /** [realEquipoId, 'bot-1', 'bot-2', …] */
   equipoIds: string[];
   realEquipoId: string;
+  botHands: Record<string, string[]>;
+  sobre: { sospechoso: string; arma: string; habitacion: string } | null;
 }
 
 interface EquipoCol {
   id: string;
   label: string;
   cards: Set<string>;
+  refutedCards: Set<string>;
 }
 
 const CATEGORY_LABELS: Record<CardCategory, string> = {
@@ -149,8 +152,25 @@ function adaptTurns(turns: TrainingTurnResponse[], realEquipoId: string): TurnRe
 // Component
 // ---------------------------------------------------------------------------
 
-export function TrainingDeductionBoard({ turns, equipoIds, realEquipoId }: TrainingDeductionBoardProps) {
-  // Real team's hand cards from the latest gameStateView
+export function TrainingDeductionBoard({
+  turns,
+  equipoIds,
+  realEquipoId,
+  botHands,
+  sobre,
+}: TrainingDeductionBoardProps) {
+  const refutedCardsByTeam = useMemo(() => {
+    const acc = new Map<string, Set<string>>();
+    for (const turn of turns) {
+      if (!turn.refutacion?.refutadaPor || !turn.refutacion.cartaMostrada) continue;
+      const current = acc.get(turn.refutacion.refutadaPor) ?? new Set<string>();
+      current.add(turn.refutacion.cartaMostrada);
+      acc.set(turn.refutacion.refutadaPor, current);
+    }
+    return acc;
+  }, [turns]);
+
+  // Real team's hand cards from the latest gameStateView + bot hands from replayed server state
   const equipoCols = useMemo<EquipoCol[]>(() => {
     const latestViewTurn = [...turns]
       .reverse()
@@ -161,10 +181,11 @@ export function TrainingDeductionBoard({ turns, equipoIds, realEquipoId }: Train
     return equipoIds.map((id) => ({
       id,
       label: teamLabel(id, realEquipoId),
-      cards: id === realEquipoId ? ownCards : new Set(),
+      cards: id === realEquipoId ? ownCards : new Set(botHands[id] ?? []),
+      refutedCards: refutedCardsByTeam.get(id) ?? new Set<string>(),
     }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [equipoIds, realEquipoId, JSON.stringify(turns.map((t) => t.id))]);
+  }, [botHands, equipoIds, realEquipoId, refutedCardsByTeam, JSON.stringify(turns.map((t) => t.id))]);
 
   const board = useMemo(
     () => buildDeductionBoard(adaptTurns(turns, realEquipoId), equipoIds),
@@ -182,6 +203,12 @@ export function TrainingDeductionBoard({ turns, equipoIds, realEquipoId }: Train
   );
 
   const hasAnyHandCards = equipoCols.some((e) => e.cards.size > 0);
+  const hasAnyRefutedCards = equipoCols.some((e) => e.refutedCards.size > 0);
+  const sobreCards = new Set(
+    sobre
+      ? [sobre.sospechoso, sobre.arma, sobre.habitacion]
+      : [],
+  );
 
   return (
     <div className="rounded-xl border border-slate-700 bg-slate-800 p-4 overflow-x-auto">
@@ -214,45 +241,87 @@ export function TrainingDeductionBoard({ turns, equipoIds, realEquipoId }: Train
                 </td>
               </tr>
               {cards.map((card) => (
-                <tr key={card} className="border-t border-slate-700/40">
-                  <td className="py-1 pr-4 text-slate-400 whitespace-nowrap">{card}</td>
+                <tr
+                  key={card}
+                  className={cn(
+                    'border-t border-slate-700/40',
+                    sobreCards.has(card) && 'bg-amber-400/5',
+                  )}
+                >
+                  <td
+                    className={cn(
+                      'py-1 pr-4 whitespace-nowrap',
+                      sobreCards.has(card)
+                        ? 'border-y border-amber-400/50 font-semibold text-amber-200'
+                        : 'text-slate-400',
+                    )}
+                  >
+                    {card}
+                  </td>
                   {equipoCols.map((e) => {
                     const inHand = e.cards.has(card);
+                    const refutedCard = e.refutedCards.has(card);
                     const cell = board.get(boardKey(e.id, card));
                     const seen = cell && cell.turnos.length > 0;
                     const refuted = seen && cell!.turnosRefutados.length > 0;
-                    const tooltipText = inHand
-                      ? 'En tu mano'
-                      : seen
-                      ? cell!.turnos
+                    const tooltipParts = [];
+                    if (inHand) {
+                      tooltipParts.push(
+                        e.id === realEquipoId ? 'En tu mano' : 'En la mano del bot',
+                      );
+                    }
+                    if (refutedCard) {
+                      tooltipParts.push('Carta mostrada al refutar');
+                    }
+                    if (seen) {
+                      tooltipParts.push(
+                        cell!.turnos
                           .map((t) => (cell!.turnosRefutados.includes(t) ? `T${t}↩` : `T${t}`))
-                          .join(', ')
+                          .join(', '),
+                      );
+                    }
+                    const tooltipText = tooltipParts.length > 0
+                      ? tooltipParts.join(' · ')
                       : '';
-                    return (
-                      <td key={e.id} className="py-1 px-1 text-center">
-                        {inHand ? (
-                          <Tooltip text={tooltipText}>
-                            <span className="inline-block w-5 h-5 rounded leading-5 cursor-default select-none bg-red-500/20 text-red-400">
-                              ♦
-                            </span>
-                          </Tooltip>
-                        ) : seen ? (
-                          <Tooltip text={tooltipText}>
-                            <span
-                              className={cn(
-                                'inline-block w-5 h-5 rounded leading-5 cursor-default select-none',
-                                refuted
-                                  ? 'bg-orange-500/20 text-orange-300'
-                                  : 'bg-cyan-500/20 text-cyan-300',
-                              )}
-                            >
-                              ✦
-                            </span>
-                          </Tooltip>
-                        ) : (
-                          <span className="inline-block w-5 h-5 rounded bg-slate-700/50 text-slate-600 leading-5 select-none text-center">
-                            ·
+
+                    const cellContent = inHand ? (
+                      <span className="relative inline-flex h-5 w-5 items-center justify-center rounded bg-red-500/20 text-red-400 leading-5 cursor-default select-none">
+                        ♦
+                        {refutedCard && (
+                          <span className="absolute -right-1 -top-1 inline-flex h-3.5 w-3.5 items-center justify-center rounded-full bg-amber-400 text-[9px] font-bold text-slate-950">
+                            ●
                           </span>
+                        )}
+                      </span>
+                    ) : seen ? (
+                      <span
+                        className={cn(
+                          'inline-block w-5 h-5 rounded leading-5 cursor-default select-none',
+                          refuted
+                            ? 'bg-orange-500/20 text-orange-300'
+                            : 'bg-cyan-500/20 text-cyan-300',
+                        )}
+                      >
+                        ✦
+                      </span>
+                    ) : (
+                      <span className="inline-block w-5 h-5 rounded bg-slate-700/50 text-slate-600 leading-5 select-none text-center">
+                        ·
+                      </span>
+                    );
+
+                    return (
+                      <td
+                        key={e.id}
+                        className={cn(
+                          'py-1 px-1 text-center',
+                          sobreCards.has(card) && 'border-y border-amber-400/50',
+                        )}
+                      >
+                        {tooltipText ? (
+                          <Tooltip text={tooltipText}>{cellContent}</Tooltip>
+                        ) : (
+                          cellContent
                         )}
                       </td>
                     );
@@ -281,7 +350,19 @@ export function TrainingDeductionBoard({ turns, equipoIds, realEquipoId }: Train
         {hasAnyHandCards && (
           <span className="flex items-center gap-1">
             <span className="inline-block w-4 h-4 rounded bg-red-500/20 text-red-400 leading-4 text-center">♦</span>
-            En tu mano
+            En mano
+          </span>
+        )}
+        {hasAnyRefutedCards && (
+          <span className="flex items-center gap-1">
+            <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-amber-400 text-[9px] font-bold text-slate-950">●</span>
+            Carta mostrada al refutar
+          </span>
+        )}
+        {sobre && (
+          <span className="flex items-center gap-1 text-amber-300">
+            <span className="inline-block h-4 w-4 rounded border border-amber-400/60 bg-amber-400/10" />
+            Carta del sobre
           </span>
         )}
       </div>

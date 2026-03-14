@@ -96,6 +96,9 @@ export async function POST(
   const roundStandings: { teamId: TeamId; score: number }[] = [];
 
   for (const rg of roundGames) {
+    // rg.gameId can be null for bye entries
+    if (!rg.gameId) continue;
+
     const teamScores = await db
       .select({ equipoId: partidaEquipos.equipoId, puntos: partidaEquipos.puntos })
       .from(partidaEquipos)
@@ -149,7 +152,9 @@ export async function POST(
     // Collect teams that actually played in this round
     const playingTeams: TeamId[] = [];
     for (const rg of roundGames) {
-      const ts = await db.select({ equipoId: partidaEquipos.equipoId }).from(partidaEquipos).where(eq(partidaEquipos.partidaId, rg.gameId)).all();
+      if (!rg.gameId) continue;
+      const gameId = rg.gameId;
+      const ts = await db.select({ equipoId: partidaEquipos.equipoId }).from(partidaEquipos).where(eq(partidaEquipos.partidaId, gameId)).all();
       playingTeams.push(...ts.map((row) => row.equipoId as TeamId));
     }
 
@@ -240,6 +245,7 @@ export async function POST(
     // Playoffs bracket advance
     const playingInRound: TeamId[] = [];
     for (const rg of roundGames) {
+      if (!rg.gameId) continue;
       const ts = await db.select({ equipoId: partidaEquipos.equipoId }).from(partidaEquipos).where(eq(partidaEquipos.partidaId, rg.gameId)).all();
       playingInRound.push(...ts.map((row) => row.equipoId as TeamId));
     }

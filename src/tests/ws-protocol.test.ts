@@ -39,6 +39,40 @@ describe('ServerMessageSchema', () => {
     expect(ServerMessageSchema.parse({ type: 'subscribed', gameId: 'g1' }).type).toBe('subscribed');
   });
 
+  it('parses turn:agent_responded with communication error', () => {
+    const msg = {
+      type: 'turn:agent_responded',
+      gameId: 'g1',
+      turnoId: 't1',
+      turnoNumero: 1,
+      equipoId: 'eq1',
+      equipoNombre: 'Equipo 1',
+      accion: 'error_comunicacion',
+      durationMs: 250,
+      ts: 1000,
+    };
+    expect(ServerMessageSchema.parse(msg).type).toBe('turn:agent_responded');
+  });
+
+  it('parses warning websocket events', () => {
+    expect(ServerMessageSchema.parse({
+      type: 'warning:issued',
+      gameId: 'g1',
+      equipoId: 'eq1',
+      warnings: 2,
+      reason: 'EVT_COMM_ERROR',
+      ts: 1000,
+    }).type).toBe('warning:issued');
+
+    expect(ServerMessageSchema.parse({
+      type: 'warning:agent_eliminated',
+      gameId: 'g1',
+      equipoId: 'eq1',
+      equiposConCartasNuevas: ['eq2'],
+      ts: 1000,
+    }).type).toBe('warning:agent_eliminated');
+  });
+
   it('parses an error message', () => {
     const msg = { type: 'error', code: 'UNAUTHORIZED', message: 'Sin sesión válida' };
     expect(ServerMessageSchema.parse(msg).type).toBe('error');

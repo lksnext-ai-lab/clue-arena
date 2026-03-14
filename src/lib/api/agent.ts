@@ -21,13 +21,62 @@ function resolveBackendName(): 'mattin' | 'local' {
   return 'mattin';
 }
 
+function getErrorCause(err: unknown): { message?: string; code?: string } | null {
+  if (
+    typeof err !== 'object' ||
+    err === null ||
+    !('cause' in err) ||
+    typeof (err as { cause?: unknown }).cause !== 'object' ||
+    (err as { cause?: unknown }).cause === null
+  ) {
+    return null;
+  }
+
+  return (err as { cause: { message?: string; code?: string } }).cause;
+}
+
+function errorMessageIncludes(err: Error, pattern: RegExp): boolean {
+  if (pattern.test(err.message)) return true;
+
+  const cause = getErrorCause(err);
+  if (cause?.message && pattern.test(cause.message)) return true;
+  if (cause?.code && pattern.test(cause.code)) return true;
+
+  return false;
+}
+
+function classifyInvocationStatus(err: unknown): 'timeout' | 'error' {
+  if (
+    err instanceof Error &&
+    (
+      err.name === 'AbortError' ||
+      err.name === 'TimeoutError' ||
+      errorMessageIncludes(err, /timeout|timed out/i)
+    )
+  ) {
+    return 'timeout';
+  }
+
+  return 'error';
+}
+
+function formatInvocationError(err: unknown): string {
+  if (!(err instanceof Error)) return String(err);
+
+  const cause = getErrorCause(err);
+  const causeParts = [cause?.code, cause?.message].filter(Boolean);
+  if (causeParts.length === 0) return err.message;
+
+  return `${err.message} (${causeParts.join(': ')})`;
+}
+
 export async function invokeAgent(
   request: AgentRequest,
   context: AgentInvocationContext,
 ): Promise<{ response: AgentResponse; invocacionId: string }> {
   const invocacionId = crypto.randomUUID();
   const tsStart = Date.now();
-  const backendName = resolveBackendName();
+  const backendName = context.agentBackend ?? resolveBackendName();
 
   // ── Emit invocation start ─────────────────────────────────────────────────
   agentLog.info({
@@ -51,17 +100,23 @@ export async function invokeAgent(
       response = await invokeLocal(request, { invocacionId, turnoId: context.turnoId });
     } else {
       const { invokeAgent: invokeMattin } = await import('./mattin');
-      response = await invokeMattin(request, { invocacionId, turnoId: context.turnoId });
+      response = await invokeMattin(request, {
+        invocacionId,
+        turnoId: context.turnoId,
+        agentId: context.mattinAgentId,
+        appId: context.mattinAppId,
+        apiKey: context.mattinApiKey,
+      });
     }
     estado = 'completada';
     return { response, invocacionId };
   } catch (err) {
-    errorMessage = err instanceof Error ? err.message : String(err);
-    estado = 'error';
+    errorMessage = formatInvocationError(err);
+    estado = classifyInvocationStatus(err);
     throw err;
   } finally {
     // ── Emit invocation complete (always, even on error) ──────────────────
-    agentLog.info({
+    const logPayload = {
       event: 'agent_invocation_complete',
       invocacionId,
       gameId: request.gameId,
@@ -73,6 +128,14 @@ export async function invokeAgent(
       validationError: null,
       errorMessage,
       actionType: response?.action?.type ?? null,
-    });
+    };
+
+    if (estado === 'completada') {
+      agentLog.info(logPayload);
+    } else if (estado === 'timeout') {
+      agentLog.warn(logPayload);
+    } else {
+      agentLog.error(logPayload);
+    }
   }
 }
