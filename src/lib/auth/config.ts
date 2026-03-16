@@ -5,6 +5,7 @@ import { verifyFirebaseIdToken } from './firebase-admin';
 import { ensureAppAuthUser, getAppAuthUserByEmail } from './user-profile';
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  trustHost: true,
   providers: [
     Credentials({
       id: FIREBASE_AUTH_PROVIDER_ID,

@@ -7,6 +7,7 @@ import Credentials from 'next-auth/providers/credentials';
 import { FIREBASE_AUTH_PROVIDER_ID, applyAppUserToToken, applyTokenToSession } from './auth-shared';
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  trustHost: true,
   providers: [
     Credentials({
       id: FIREBASE_AUTH_PROVIDER_ID,
