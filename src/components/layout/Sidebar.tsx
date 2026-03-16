@@ -27,7 +27,7 @@ const ACCENT_BORDER = 'rgba(34,211,238,0.25)';
 const TEXT_MUTED = '#64748b';
 const TEXT_ACTIVE = '#f1f5f9';
 
-type NavKey = 'dashboard' | 'miEquipo' | 'admin' | 'arena' | 'juego' | 'ranking' | 'instrucciones' | 'entrenamiento' | 'perfil' | 'equipos' | 'partidas' | 'torneos';
+type NavKey = 'dashboard' | 'miEquipo' | 'admin' | 'arena' | 'juego' | 'ranking' | 'instrucciones' | 'entrenamiento' | 'perfil' | 'equipos' | 'partidas' | 'torneos' | 'usuarios';
 
 interface NavItem {
   href: string;
@@ -52,6 +52,7 @@ const ALL_NAV_ITEMS: NavItem[] = [
   // Admin-specific items
   { href: '/admin',           Icon: LayoutDashboard, labelKey: 'admin',     roles: ['admin'] },
   { href: '/admin/equipos',   Icon: Users,           labelKey: 'equipos',   roles: ['admin'] },
+  { href: '/admin/users',     Icon: User,            labelKey: 'usuarios',  roles: ['admin'] },
   { href: '/admin/partidas',  Icon: Swords,          labelKey: 'partidas',  roles: ['admin'] },
   { href: '/admin/torneos',   Icon: Medal,           labelKey: 'torneos',   roles: ['admin'] },
 ];

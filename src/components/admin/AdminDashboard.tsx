@@ -771,13 +771,22 @@ export function AdminDashboard({
                 Gestiona disponibilidad, ownership y configuracion de agentes sin salir del panel principal.
               </p>
             </div>
-            <Link
-              href="/admin/equipos"
-              className="inline-flex items-center gap-2 self-start rounded-full border border-white/12 bg-white/[0.05] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-white/[0.09]"
-            >
-              Abrir modulo
-              <ArrowUpRight className="h-4 w-4" />
-            </Link>
+            <div className="flex flex-wrap gap-3">
+              <Link
+                href="/admin/users"
+                className="inline-flex items-center gap-2 self-start rounded-full border border-white/12 bg-white/[0.05] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-white/[0.09]"
+              >
+                Gestion de usuarios
+                <ArrowUpRight className="h-4 w-4" />
+              </Link>
+              <Link
+                href="/admin/equipos"
+                className="inline-flex items-center gap-2 self-start rounded-full border border-white/12 bg-white/[0.05] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-white/[0.09]"
+              >
+                Abrir modulo
+                <ArrowUpRight className="h-4 w-4" />
+              </Link>
+            </div>
           </div>
 
           <AdminTeamsSection initialTeams={teams} />

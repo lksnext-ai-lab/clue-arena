@@ -25,7 +25,8 @@
     "instrucciones": "Agenteak",
     "creditos": "Kredituak",
     "perfil": "Profila",
-    "salir": "Irten"
+    "salir": "Irten",
+    "usuarios": "Erabiltzaileak"
   },
   "auth": {
     "eyebrow": "",
@@ -84,7 +85,8 @@
     "adminTorneos": "Txapelketen Kudeaketa",
     "adminTorneoDetalle": "Txapelketa",
     "nuevoTorneo": "Txapelketa Berria",
-    "landing": "Clue Arenaren hasiera"
+    "landing": "Clue Arenaren hasiera",
+    "adminUsers": "Erabiltzaileen Kudeaketa"
   },
   "arena": {
     "hero": {
@@ -1060,7 +1062,47 @@
     "status": {
       "activo": "Aktibo",
       "inactivo": "Inaktibo"
-    }
+    },
+    "gestionUsuarios": "Erabiltzaileen Kudeaketa",
+    "gestionUsuariosEyebrow": "Sarbide kontrola",
+    "gestionUsuariosHeroDesc": "Ikusi plataformara nor sartu den, egokitu pertsona bakoitzaren rola eta mantendu administrazio-sarbidea kontrolpean paneletik irten gabe.",
+    "usuariosSectionEyebrow": "Baimenak eta sarbidea",
+    "usuariosMetricTotal": "Erregistratutako erabiltzaileak",
+    "usuariosMetricAdmins": "Admin aktiboak",
+    "usuariosMetricEquipos": "Taldeko erabiltzaileak",
+    "usuariosMetricEspectadores": "Ikusleak",
+    "usuariosCount": "{count, plural, one {# erabiltzaile} other {# erabiltzaile}}",
+    "usuariosDesc": "Iragazi rolka, ikusi erabiltzaile bakoitzak zer talde duen lotuta eta egokitu baimenak datu-basea eskuz ukitu gabe.",
+    "buscarUsuarioPlaceholder": "Bilatu izenaren, emailaren edo taldearen arabera",
+    "usuariosRoleFilterAll": "Rol guztiak",
+    "usuariosRoleFilterAdmin": "Adminak bakarrik",
+    "usuariosRoleFilterEquipo": "Taldea bakarrik",
+    "usuariosRoleFilterEspectador": "Ikusleak bakarrik",
+    "usuariosNoRegistrados": "Ez dago erabiltzaile erregistraturik",
+    "usuariosEmptyDesc": "Erabiltzaileak hemen agertuko dira plataformara lehen aldiz sartzen direnean.",
+    "usuariosNoResultados": "Ez dago iragazkiarekin bat datorren erabiltzailerik",
+    "usuariosNoResultadosDesc": "Saiatu beste izen edo email batekin, edo aldatu rol-iragazkia zerrenda zabaltzeko.",
+    "usuariosColNombre": "Erabiltzailea",
+    "usuariosColRol": "Rola",
+    "usuariosColEquipo": "Taldea",
+    "usuariosColAlta": "Alta",
+    "usuariosColAcciones": "Ekintzak",
+    "usuarioSinEquipo": "Talderik gabe",
+    "usuarioSesionActual": "Zure saioa",
+    "usuarioNoEditable": "Ezin duzu zure rola aldatu",
+    "usuarioNoEliminable": "Ezin duzu zure erabiltzailea ikuspegi honetatik ezabatu",
+    "usuarioDeleteBlockedHint": "Erabiltzaile hau oraindik {equipo} taldeari lotuta dago. Ezabatu taldea lehenago.",
+    "usuarioEliminar": "Ezabatu",
+    "usuarioEliminarConfirm": "{nombre} ezabatu? Ekintza hau ezin da desegin.",
+    "usuarioEliminando": "Ezabatzen...",
+    "usuarioRolActualizado": "{nombre} erabiltzailearen baimenak eguneratu dira.",
+    "usuarioEliminado": "{nombre} ondo ezabatu da.",
+    "usuarioErrorCarga": "Errorea erabiltzaileak kargatzean",
+    "usuarioErrorActualizar": "Ezin izan da erabiltzailea eguneratu",
+    "usuarioErrorEliminar": "Ezin izan da erabiltzailea ezabatu",
+    "userRoleAdmin": "Admin",
+    "userRoleEquipo": "Taldea",
+    "userRoleEspectador": "Ikuslea"
   },
   "juego": {
     "titulo": "Jokoa",

@@ -57,7 +57,14 @@ export interface UserResponse {
   id: string;
   nombre: string;
   email: string;
-  rol: string;
+  rol: UserRole;
+  createdAt: string;
+  equipo: { id: string; nombre: string; agentId: string } | null;
+}
+
+export interface UpdateUserRequest {
+  nombre?: string;
+  rol?: UserRole;
 }
 
 // --- Games ---

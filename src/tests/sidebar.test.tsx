@@ -50,4 +50,16 @@ describe('Sidebar', () => {
 
     expect(screen.queryByText('entrenamiento')).not.toBeInTheDocument();
   });
+
+  it('shows user management navigation for admins', () => {
+    useAppSessionMock.mockReturnValue({
+      rol: 'admin',
+      equipo: null,
+    });
+
+    render(<Sidebar />);
+
+    expect(screen.getByText('usuarios')).toBeInTheDocument();
+    expect(screen.getByText('equipos')).toBeInTheDocument();
+  });
 });

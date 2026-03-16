@@ -1,14 +1,15 @@
 import { NextResponse } from 'next/server';
 import { getAuthSession } from '@/lib/auth/session';
-import { db } from '@/lib/db';
-import { usuarios } from '@/lib/db/schema';
-import { asc } from 'drizzle-orm';
+import { listAdminUsers } from '@/lib/admin/users';
+import type { UserRole } from '@/types/domain';
+
+const VALID_ROLES = new Set<UserRole>(['admin', 'equipo', 'espectador']);
 
 /**
  * GET /api/admin/users
- * Admin-only: returns all registered users (id, nombre, email, rol).
+ * Admin-only: returns registered users, optionally filtered by role and search query.
  */
-export async function GET() {
+export async function GET(request: Request) {
   const session = await getAuthSession();
   if (!session?.user) {
     return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
@@ -17,16 +18,24 @@ export async function GET() {
     return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 });
   }
 
-  const rows = await db
-    .select({
-      id: usuarios.id,
-      nombre: usuarios.nombre,
-      email: usuarios.email,
-      rol: usuarios.rol,
-    })
-    .from(usuarios)
-    .orderBy(asc(usuarios.nombre))
-    .all();
+  const searchParams = new URL(request.url).searchParams;
+  const query = searchParams.get('q')?.trim().toLowerCase() ?? '';
+  const roleFilter = searchParams.get('rol');
 
-  return NextResponse.json({ users: rows });
+  let users = await listAdminUsers();
+
+  if (roleFilter && VALID_ROLES.has(roleFilter as UserRole)) {
+    users = users.filter((user) => user.rol === roleFilter);
+  }
+
+  if (query) {
+    users = users.filter((user) =>
+      [user.nombre, user.email, user.equipo?.nombre ?? '', user.equipo?.agentId ?? '']
+        .join(' ')
+        .toLowerCase()
+        .includes(query)
+    );
+  }
+
+  return NextResponse.json({ users });
 }

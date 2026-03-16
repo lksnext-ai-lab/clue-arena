@@ -33,6 +33,7 @@ function getPageTitle(pathname: string, t: (key: string) => string): string {
   if (pathname.startsWith('/admin/partidas/nueva')) return t('nuevaPartida');
   if (pathname.startsWith('/admin/partidas/')) return t('adminPartidaDetalle');
   if (pathname.startsWith('/admin/partidas')) return t('adminPartidas');
+  if (pathname.startsWith('/admin/users')) return t('adminUsers');
   if (pathname.startsWith('/admin/equipos')) return t('adminEquipos');
   if (pathname.startsWith('/admin')) return t('admin');
   if (pathname.startsWith('/equipo/entrenamiento')) return t('entrenamiento');

@@ -25,7 +25,8 @@
     "instrucciones": "Agentes",
     "creditos": "Creditos",
     "perfil": "Perfil",
-    "salir": "Salir"
+    "salir": "Salir",
+    "usuarios": "Usuarios"
   },
   "auth": {
     "eyebrow": "",
@@ -84,7 +85,8 @@
     "adminTorneos": "Gestión de Torneos",
     "adminTorneoDetalle": "Torneo",
     "nuevoTorneo": "Nuevo Torneo",
-    "landing": "Inicio de Clue Arena"
+    "landing": "Inicio de Clue Arena",
+    "adminUsers": "Gestión de Usuarios"
   },
   "arena": {
     "hero": {
@@ -1060,7 +1062,47 @@
     "editorSinSeleccionTitle": "Selecciona un equipo para editar",
     "editorSinSeleccionDesc": "Elige una tarjeta del listado para abrir aquí su formulario completo de identidad, agente, propietario y miembros.",
     "equipoSeleccionado": "Equipo seleccionado",
-    "guardandoCambios": "Guardando..."
+    "guardandoCambios": "Guardando...",
+    "gestionUsuarios": "Gestión de Usuarios",
+    "gestionUsuariosEyebrow": "Control de acceso",
+    "gestionUsuariosHeroDesc": "Consulta quién ha accedido a la plataforma, ajusta el rol de cada persona y mantén el acceso administrativo bajo control sin salir del panel.",
+    "usuariosSectionEyebrow": "Permisos y acceso",
+    "usuariosMetricTotal": "Usuarios registrados",
+    "usuariosMetricAdmins": "Admins activos",
+    "usuariosMetricEquipos": "Usuarios de equipo",
+    "usuariosMetricEspectadores": "Espectadores",
+    "usuariosCount": "{count, plural, one {# usuario} other {# usuarios}}",
+    "usuariosDesc": "Filtra por rol, revisa qué equipo tiene asignado cada usuario y ajusta permisos sin tocar la base de datos a mano.",
+    "buscarUsuarioPlaceholder": "Buscar por nombre, email o equipo",
+    "usuariosRoleFilterAll": "Todos los roles",
+    "usuariosRoleFilterAdmin": "Solo admins",
+    "usuariosRoleFilterEquipo": "Solo equipo",
+    "usuariosRoleFilterEspectador": "Solo espectadores",
+    "usuariosNoRegistrados": "No hay usuarios registrados",
+    "usuariosEmptyDesc": "Los usuarios aparecerán aquí en cuanto accedan por primera vez a la plataforma.",
+    "usuariosNoResultados": "No hay usuarios que coincidan con el filtro",
+    "usuariosNoResultadosDesc": "Prueba con otro nombre, email o cambia el filtro de rol para ampliar el listado.",
+    "usuariosColNombre": "Usuario",
+    "usuariosColRol": "Rol",
+    "usuariosColEquipo": "Equipo",
+    "usuariosColAlta": "Alta",
+    "usuariosColAcciones": "Acciones",
+    "usuarioSinEquipo": "Sin equipo",
+    "usuarioSesionActual": "Tu sesión",
+    "usuarioNoEditable": "No puedes cambiar tu propio rol",
+    "usuarioNoEliminable": "No puedes eliminar tu propio usuario desde esta vista",
+    "usuarioDeleteBlockedHint": "Este usuario sigue vinculado al equipo {equipo}. Elimina el equipo primero.",
+    "usuarioEliminar": "Eliminar",
+    "usuarioEliminarConfirm": "¿Eliminar a {nombre}? Esta acción no se puede deshacer.",
+    "usuarioEliminando": "Eliminando...",
+    "usuarioRolActualizado": "Permisos actualizados para {nombre}.",
+    "usuarioEliminado": "{nombre} se ha eliminado correctamente.",
+    "usuarioErrorCarga": "Error al cargar los usuarios",
+    "usuarioErrorActualizar": "No se ha podido actualizar el usuario",
+    "usuarioErrorEliminar": "No se ha podido eliminar el usuario",
+    "userRoleAdmin": "Admin",
+    "userRoleEquipo": "Equipo",
+    "userRoleEspectador": "Espectador"
   },
   "juego": {
     "titulo": "El Juego",
