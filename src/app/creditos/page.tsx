@@ -68,7 +68,7 @@ export default function CreditosPage() {
       <div className="mx-auto max-w-[1380px]">
         <section className="grid gap-3 lg:grid-cols-12">
             <ComicPanel
-              image="/fondo-inicio.png"
+              image="/fondo-inicio.webp"
               className="min-h-[320px] lg:col-span-4 lg:col-start-1 lg:row-start-1 lg:min-h-[360px]"
               imageClassName="bg-center"
             >
@@ -82,7 +82,7 @@ export default function CreditosPage() {
             </ComicPanel>
 
             <ComicPanel
-              image="/fondo-train.png"
+              image="/fondo-train.webp"
               className="min-h-[320px] lg:col-span-4 lg:col-start-5 lg:row-start-1 lg:min-h-[360px]"
               imageClassName="bg-center"
             >
@@ -94,7 +94,7 @@ export default function CreditosPage() {
             </ComicPanel>
 
             <ComicPanel
-              image="/fondo-partida.png"
+              image="/fondo-partida.webp"
               className="min-h-[360px] lg:col-span-6 lg:col-start-1 lg:row-start-2 lg:min-h-[420px]"
               imageClassName="bg-center"
             >
@@ -106,7 +106,7 @@ export default function CreditosPage() {
             </ComicPanel>
 
             <ComicPanel
-              image="/fondo-torneo.png"
+              image="/fondo-torneo.webp"
               className="min-h-[360px] lg:col-span-6 lg:col-start-7 lg:row-start-2 lg:min-h-[420px]"
               imageClassName="bg-center"
             >
@@ -123,7 +123,7 @@ export default function CreditosPage() {
             </ComicPanel>
 
             <ComicPanel
-              image="/fondo-ranking.png"
+              image="/fondo-ranking.webp"
               className="min-h-[320px] lg:col-span-4 lg:col-start-9 lg:row-start-1 lg:min-h-[360px]"
               imageClassName="bg-center"
             >

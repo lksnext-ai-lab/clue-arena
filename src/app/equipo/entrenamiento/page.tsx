@@ -147,7 +147,7 @@ export default async function EntrenamientoPage() {
 
   return (
     <div className="relative isolate overflow-hidden">
-      <div className="absolute inset-0 -z-10 bg-[url('/fondo-train.png')] bg-cover bg-center bg-no-repeat opacity-30" />
+      <div className="absolute inset-0 -z-10 bg-[url('/fondo-train.webp')] bg-cover bg-center bg-no-repeat opacity-30" />
       <div className="absolute inset-0 -z-10 bg-[linear-gradient(180deg,rgba(2,6,23,0.72),rgba(2,6,23,0.88))]" />
       <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.14),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(251,191,36,0.12),transparent_24%)]" />
 

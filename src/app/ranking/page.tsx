@@ -332,7 +332,7 @@ export default function RankingPage() {
       <div className="pointer-events-none absolute inset-0">
         <div
           className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-40"
-          style={{ backgroundImage: "url('/fondo-ranking.png')" }}
+          style={{ backgroundImage: "url('/fondo-ranking.webp')" }}
         />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(251,191,36,0.12),transparent_28%),radial-gradient(circle_at_top_right,rgba(34,211,238,0.14),transparent_26%),linear-gradient(180deg,rgba(8,17,30,0.4)_0%,rgba(8,17,30,0.72)_36%,rgba(8,17,30,0.92)_100%)]" />
       </div>

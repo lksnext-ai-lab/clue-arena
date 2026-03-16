@@ -61,7 +61,7 @@ export default async function LandingPage() {
       <div className="pointer-events-none absolute inset-0">
         <div
           className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-55"
-          style={{ backgroundImage: "url('/fondo-inicio.png')" }}
+          style={{ backgroundImage: "url('/fondo-inicio.webp')" }}
         />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(34,211,238,0.18),_transparent_30%),radial-gradient(circle_at_78%_12%,_rgba(251,191,36,0.16),_transparent_22%),radial-gradient(circle_at_72%_62%,_rgba(248,113,113,0.14),_transparent_24%),linear-gradient(180deg,_rgba(8,17,31,0.32)_0%,_rgba(7,17,31,0.62)_48%,_rgba(5,11,20,0.86)_100%)]" />
         <div className="absolute inset-x-0 top-0 h-[640px] bg-[linear-gradient(to_bottom,_rgba(8,17,31,0.04),_rgba(8,17,31,0.72))]" />

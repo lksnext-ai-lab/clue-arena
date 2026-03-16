@@ -169,7 +169,7 @@ export default async function AdminTorneosPage() {
 
   return (
     <div className="relative isolate min-h-screen overflow-x-hidden px-4 py-6 text-slate-100 sm:px-6 lg:px-8">
-      <div className="absolute inset-0 -z-30 bg-[url('/fondo-torneo.png')] bg-cover bg-center bg-no-repeat" />
+      <div className="absolute inset-0 -z-30 bg-[url('/fondo-torneo.webp')] bg-cover bg-center bg-no-repeat" />
       <div className="absolute inset-0 -z-20 bg-[linear-gradient(180deg,rgba(3,7,18,0.84)_0%,rgba(2,6,23,0.92)_45%,rgba(2,6,23,0.97)_100%)]" />
       <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top,rgba(34,197,94,0.16),transparent_28%)]" />
 

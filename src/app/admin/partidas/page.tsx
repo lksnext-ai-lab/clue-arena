@@ -95,7 +95,7 @@ export default async function AdminPartidasPage() {
 
   return (
     <div className="relative isolate min-h-screen overflow-x-hidden px-6 py-6 text-slate-100">
-      <div className="absolute inset-0 -z-30 bg-[url('/fondo-partida.png')] bg-cover bg-center bg-no-repeat" />
+      <div className="absolute inset-0 -z-30 bg-[url('/fondo-partida.webp')] bg-cover bg-center bg-no-repeat" />
       <div className="absolute inset-0 -z-20 bg-[linear-gradient(180deg,rgba(2,6,23,0.82)_0%,rgba(2,6,23,0.9)_40%,rgba(2,6,23,0.97)_100%)]" />
       <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.16),transparent_32%)]" />
 

@@ -282,7 +282,7 @@ function GameSection({
         <>
           <div
             className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-35"
-            style={{ backgroundImage: "url('/fondo-inicio.png')" }}
+            style={{ backgroundImage: "url('/fondo-inicio.webp')" }}
           />
           <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(4,10,18,0.32),rgba(4,8,15,0.78))]" />
         </>

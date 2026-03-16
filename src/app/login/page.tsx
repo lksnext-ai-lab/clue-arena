@@ -41,7 +41,7 @@ export default async function LoginPage({ searchParams }: NextPageProps) {
       <div className="pointer-events-none absolute inset-0">
         <div
           className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-          style={{ backgroundImage: "url('/fondo-login.png')" }}
+          style={{ backgroundImage: "url('/fondo-login.webp')" }}
         />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(34,211,238,0.18),_transparent_30%),radial-gradient(circle_at_78%_14%,_rgba(251,191,36,0.14),_transparent_20%),radial-gradient(circle_at_50%_85%,_rgba(248,113,113,0.12),_transparent_24%),linear-gradient(180deg,_rgba(8,17,31,0.66)_0%,_rgba(5,11,20,0.88)_100%)]" />
         <div className="absolute left-1/2 top-24 h-72 w-72 -translate-x-1/2 rounded-full bg-cyan-400/10 blur-3xl" />
