@@ -168,15 +168,11 @@ export function attachWebSocketServer(httpServer: Server) {
   });
 
   wss.on('connection', async (ws: WebSocket, req: IncomingMessage) => {
-    // Validar sesión por cookie
+    // La arena es pública: permitimos conexiones anónimas para suscribirse
+    // al estado de una partida, pero mantenemos protegidas las
+    // notificaciones privadas de equipo.
     const session = await validateWsSession(req);
-    if (!session) {
-      send(ws, { type: 'error', code: 'UNAUTHORIZED', message: 'Sin sesión válida' });
-      ws.close(4001, 'Unauthorized');
-      return;
-    }
-
-    const userId = session.user.id;
+    const userId = session?.user.id ?? `anon:${req.socket.remoteAddress ?? 'unknown'}`;
 
     // Rate limiting: max conexiones por sesión
     const currentConns = connectionsByUser.get(userId) ?? 0;
@@ -248,6 +244,11 @@ export function attachWebSocketServer(httpServer: Server) {
           clearTimeout(subscribeTimeout);
           const { scope } = msg;
           const equipoId = typeof scope === 'object' && 'team' in scope ? scope.team : null;
+
+          if (!session?.user) {
+            send(ws, { type: 'error', code: 'UNAUTHORIZED', message: 'Sin sesión válida' });
+            return;
+          }
 
           // RBAC: si scope.team, verificar que la sesión pertenece al mismo equipo o es admin
           if (equipoId && session.user.rol !== 'admin' && session.user.equipo?.id !== equipoId) {

@@ -6,6 +6,7 @@ import { isAuthDisabled, DEV_COOKIE, DEV_USERS } from '@/lib/auth/dev';
 const PUBLIC_PATHS = [
   '/',
   '/acerca-del-juego',
+  '/arena',
   '/creditos',
   '/instrucciones',
   '/ranking',
