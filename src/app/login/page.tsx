@@ -1,14 +1,17 @@
 import Image from 'next/image';
-import { ArrowRight, BadgeCheck, Building2, LockKeyhole, Sparkles } from 'lucide-react';
+import { BadgeCheck, Building2, LockKeyhole, Sparkles } from 'lucide-react';
 import { getTranslations } from 'next-intl/server';
 import { redirect } from 'next/navigation';
-import { auth, signIn } from '@/lib/auth/config';
+import { auth } from '@/lib/auth/config';
 import { isAuthDisabled } from '@/lib/auth/dev';
+import { getFirebaseAuthOptions } from '@/lib/auth/firebase-auth-options';
+import { getDemoUsers } from '@/lib/auth/user-profile';
 import DevLoginButtons from './DevLoginButtons';
+import FirebaseLoginButton from './FirebaseLoginButton';
 
 /**
  * UI-001 — Login / Landing
- * Public page. Shows the OIDC login button.
+ * Public page. Shows the Firebase login button.
  * When DISABLE_AUTH=true, also shows dev role shortcuts.
  * If a session already exists, redirects to the callbackUrl or the default dashboard.
  */
@@ -27,6 +30,9 @@ export default async function LoginPage({ searchParams }: NextPageProps) {
   const t = await getTranslations('auth');
   const session = await auth();
   const floatingBadge = t('floatingBadge');
+  const authOptions = await getFirebaseAuthOptions();
+  const providerSummary = authOptions.map((option) => option.label).join(' · ');
+  const demoUsers = await getDemoUsers();
 
   const params = (await searchParams) ?? {};
   const callbackUrl = typeof params.callbackUrl === 'string' ? params.callbackUrl : undefined;
@@ -99,26 +105,24 @@ export default async function LoginPage({ searchParams }: NextPageProps) {
                     </div>
                     <div>
                       <p className="text-sm font-semibold text-white">{t('loginMethodTitle')}</p>
-                      <p className="text-sm text-slate-400">{t('loginMethodDesc')}</p>
+                      <p className="text-sm text-slate-400">{t('loginMethodDesc', { providers: providerSummary })}</p>
                     </div>
                   </div>
 
-                  <form
-                    className="mt-6"
-                    action={async () => {
-                      'use server';
-                      await signIn('microsoft-entra-id', { redirectTo: callbackUrl ?? '/' });
-                    }}
-                  >
-                    <button
-                      type="submit"
-                      className="group inline-flex w-full items-center justify-center gap-3 rounded-2xl border border-cyan-300/30 bg-cyan-300 px-5 py-4 text-sm font-semibold text-slate-950 shadow-[0_16px_35px_rgba(34,211,238,0.2)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-cyan-200"
-                    >
-                      <span>{t('iniciarSesionMicrosoft')}</span>
-                      <ArrowRight size={16} className="transition-transform duration-200 group-hover:translate-x-0.5" />
-                    </button>
-                  </form>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {authOptions.map((option) => (
+                      <span
+                        key={option.id}
+                        className="rounded-full border border-white/10 bg-white/6 px-3 py-1 text-xs font-medium text-slate-300"
+                      >
+                        {option.label}
+                      </span>
+                    ))}
+                  </div>
 
+                  <div className="mt-6">
+                    <FirebaseLoginButton callbackUrl={callbackUrl} options={authOptions} demoUsers={demoUsers} />
+                  </div>
                 </div>
 
                 {devMode && <DevLoginButtons />}

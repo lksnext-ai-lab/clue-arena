@@ -1,78 +1,59 @@
 import NextAuth from 'next-auth';
-import MicrosoftEntraID from 'next-auth/providers/microsoft-entra-id';
-import { db } from '@/lib/db';
-import { usuarios } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
-import { v4 as uuidv4 } from 'uuid';
-
-declare module 'next-auth' {
-  interface Session {
-    user: {
-      id: string;
-      name: string;
-      email: string;
-      rol: 'admin' | 'equipo' | 'espectador' | null;
-      equipo: { id: string; nombre: string; agentId: string } | null;
-    };
-  }
-}
+import Credentials from 'next-auth/providers/credentials';
+import { FIREBASE_AUTH_PROVIDER_ID, applyAppUserToToken, applyTokenToSession } from './auth-shared';
+import { verifyFirebaseIdToken } from './firebase-admin';
+import { ensureAppAuthUser, getAppAuthUserByEmail } from './user-profile';
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [
-    MicrosoftEntraID({
-      clientId: process.env.ENTRA_CLIENT_ID!,
-      clientSecret: process.env.ENTRA_CLIENT_SECRET!,
-      issuer: `https://login.microsoftonline.com/${process.env.ENTRA_TENANT_ID}/v2.0`,
+    Credentials({
+      id: FIREBASE_AUTH_PROVIDER_ID,
+      name: 'Firebase',
+      credentials: {
+        idToken: { label: 'Firebase ID token', type: 'text' },
+      },
+      async authorize(credentials) {
+        const idToken = credentials?.idToken;
+        if (typeof idToken !== 'string' || idToken.length === 0) {
+          return null;
+        }
+
+        try {
+          const decodedToken = await verifyFirebaseIdToken(idToken);
+          const email = decodedToken.email?.trim().toLowerCase();
+
+          if (!decodedToken.email_verified || !email) {
+            return null;
+          }
+
+          return ensureAppAuthUser({
+            email,
+            name: decodedToken.name ?? decodedToken.email ?? email,
+          });
+        } catch (error) {
+          console.error('> [auth] Firebase sign-in failed:', error);
+          return null;
+        }
+      },
     }),
   ],
   callbacks: {
-    async signIn({ user }) {
-      if (!user.email) return false;
-
-      // Upsert usuario en BD local en primer login
-      const existing = await db
-        .select()
-        .from(usuarios)
-        .where(eq(usuarios.email, user.email))
-        .get();
-
-      if (!existing) {
-        const bootstrapEmail = process.env.BOOTSTRAP_ADMIN_EMAIL?.toLowerCase().trim();
-        const isBootstrapAdmin =
-          Boolean(bootstrapEmail) && user.email.toLowerCase() === bootstrapEmail;
-
-        await db
-          .insert(usuarios)
-          .values({
-            id: uuidv4(),
-            email: user.email,
-            nombre: user.name ?? user.email,
-            rol: isBootstrapAdmin ? 'admin' : 'espectador',
-            createdAt: new Date(),
-          })
-          .onConflictDoNothing();
+    async jwt({ token, user }) {
+      if (user) {
+        return applyAppUserToToken(token, user);
       }
 
-      return true;
+      if (typeof token.email === 'string' && token.email.length > 0) {
+        const appUser = await getAppAuthUserByEmail(token.email);
+        if (appUser) {
+          return applyAppUserToToken(token, appUser);
+        }
+      }
+
+      return token;
     },
-    async session({ session, token: _token }) {
-      if (!session.user?.email) return session;
-
-      // Enriquecer sesión con rol y equipo desde BD
-      const dbUser = await db
-        .select()
-        .from(usuarios)
-        .where(eq(usuarios.email, session.user.email))
-        .get();
-
-      if (dbUser) {
-        session.user.id = dbUser.id;
-        session.user.rol = dbUser.rol;
-        // equipo se resuelve en el callback session si es necesario
-        session.user.equipo = null;
-      }
-
-      return session;
+    async session({ session, token }) {
+      return applyTokenToSession(session, token);
     },
   },
   session: { strategy: 'jwt' },

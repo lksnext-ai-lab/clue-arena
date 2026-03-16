@@ -1,15 +1,12 @@
 import { getWsUrl } from '@/lib/utils/useGameSocket';
 
 type WindowLike = {
-  location: {
-    protocol: string;
-    host: string;
-  };
+  location: Pick<Location, 'protocol' | 'host'>;
 };
 
 describe('getWsUrl', () => {
   const originalEnv = process.env;
-  const globalWithWindow = globalThis as typeof globalThis & { window?: WindowLike };
+  const globalWithWindow = globalThis as unknown as { window?: WindowLike };
 
   beforeEach(() => {
     // Vitest provides vi global instead of jest
@@ -29,7 +26,7 @@ describe('getWsUrl', () => {
 
   test('falls back to window.location when env var missing', () => {
     delete process.env.NEXT_PUBLIC_WS_URL;
-    delete globalWithWindow.window;
+    globalWithWindow.window = undefined;
     globalWithWindow.window = { location: { protocol: 'https:', host: 'foo.bar' } };
     const url = getWsUrl();
     expect(url).toBe('wss://foo.bar/api/ws');
@@ -37,7 +34,7 @@ describe('getWsUrl', () => {
 
   test('returns dev default on server without window', () => {
     delete process.env.NEXT_PUBLIC_WS_URL;
-    delete globalWithWindow.window;
+    globalWithWindow.window = undefined;
     const url = getWsUrl();
     expect(url).toBe('ws://localhost:3000/api/ws');
   });

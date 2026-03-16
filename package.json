@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "DISABLE_AUTH=true tsx src/server.ts",
-    "dev:turbo": "DISABLE_AUTH=true next dev --turbopack",
+    "dev": "tsx src/server.ts",
+    "dev:turbo": "next dev --turbopack",
     "build": "next build",
     "start": "NODE_ENV=production node --import tsx src/server.ts",
     "start:dev": "NODE_ENV=production DISABLE_AUTH=true  node --import tsx src/server.ts",
@@ -41,6 +41,7 @@
     "clsx": "^2.1.1",
     "drizzle-orm": "^0.39.3",
     "firebase": "^12.10.0",
+    "firebase-admin": "^13.7.0",
     "genkit": "^1.16.1",
     "genkitx-ollama": "^1.16.1",
     "lucide-react": "^0.479.0",

@@ -3,16 +3,28 @@
  * Must NOT import any Node.js-only modules (no DB, no better-sqlite3).
  */
 import NextAuth from 'next-auth';
-import MicrosoftEntraID from 'next-auth/providers/microsoft-entra-id';
+import Credentials from 'next-auth/providers/credentials';
+import { FIREBASE_AUTH_PROVIDER_ID, applyAppUserToToken, applyTokenToSession } from './auth-shared';
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [
-    MicrosoftEntraID({
-      clientId: process.env.ENTRA_CLIENT_ID!,
-      clientSecret: process.env.ENTRA_CLIENT_SECRET!,
-      issuer: `https://login.microsoftonline.com/${process.env.ENTRA_TENANT_ID}/v2.0`,
+    Credentials({
+      id: FIREBASE_AUTH_PROVIDER_ID,
+      name: 'Firebase',
+      credentials: {
+        idToken: { label: 'Firebase ID token', type: 'text' },
+      },
+      authorize: async () => null,
     }),
   ],
+  callbacks: {
+    async jwt({ token, user }) {
+      return user ? applyAppUserToToken(token, user) : token;
+    },
+    async session({ session, token }) {
+      return applyTokenToSession(session, token);
+    },
+  },
   session: { strategy: 'jwt' },
   pages: {
     signIn: '/login',
