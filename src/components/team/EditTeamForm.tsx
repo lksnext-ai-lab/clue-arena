@@ -28,6 +28,8 @@ const sharedInputStyle = {
 export function EditTeamForm({ team, onSaved, onCancel, onPreviewChange }: EditTeamFormProps) {
   const t = useTranslations('equipo');
   const [serverError, setServerError] = useState<string | null>(null);
+  const [testMessage, setTestMessage] = useState<string | null>(null);
+  const [isTestingMattin, setIsTestingMattin] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(team.avatarUrl ?? null);
   const [avatarLoading, setAvatarLoading] = useState(false);
   const [avatarError, setAvatarError] = useState<string | null>(null);
@@ -38,6 +40,7 @@ export function EditTeamForm({ team, onSaved, onCancel, onPreviewChange }: EditT
     handleSubmit,
     watch,
     setValue,
+    trigger,
     formState: { errors, isSubmitting },
   } = useForm<TeamMemberUpdateInput>({
     resolver: zodResolver(TeamMemberUpdateSchema),
@@ -52,15 +55,50 @@ export function EditTeamForm({ team, onSaved, onCancel, onPreviewChange }: EditT
   });
 
   const agentBackend = watch('agentBackend');
+  const agentId = watch('agentId');
+  const appId = watch('appId');
+  const mattinApiKey = watch('mattinApiKey');
+  const agentBackendDescription = agentBackend === 'local' ? t('editLocalBackendValue') : t('agentSectionDesc');
 
   useEffect(() => {
     if (agentBackend === 'local') {
       setValue('appId', '');
       setValue('mattinApiKey', undefined);
+      setTestMessage(null);
     }
   }, [agentBackend, setValue]);
 
   const cleanAvatarUrl = (url: string | null) => (url ? url.split('?')[0] ?? url : null);
+
+  const handleMattinCheck = async () => {
+    setTestMessage(null);
+    const isValid = await trigger(['agentId', 'appId', 'mattinApiKey']);
+    if (!isValid) return;
+
+    setIsTestingMattin(true);
+    try {
+      const result = await apiFetch<MattinCheckResponse>('/teams/check-mattin', {
+        method: 'POST',
+        body: JSON.stringify({
+          agentId,
+          appId,
+          mattinApiKey,
+        }),
+      });
+      setTestMessage(result.reachable ? t('mattinCheckOk') : result.error || t('mattinCheckError'));
+    } catch (err: unknown) {
+      let message = err instanceof Error ? err.message : t('mattinCheckError');
+      try {
+        const body = JSON.parse(message);
+        message = body?.error || t('mattinCheckError');
+      } catch {
+        // no-op
+      }
+      setTestMessage(message);
+    } finally {
+      setIsTestingMattin(false);
+    }
+  };
 
   const handleGenerateAvatar = async () => {
     setAvatarLoading(true);
@@ -119,11 +157,17 @@ export function EditTeamForm({ team, onSaved, onCancel, onPreviewChange }: EditT
       });
       onSaved({ ...updated, avatarUrl: cleanAvatarUrl(avatarUrl) });
     } catch (err: unknown) {
-      if (err && typeof err === 'object' && 'code' in err && (err as { code: string }).code === 'NOMBRE_DUPLICADO') {
-        setServerError(t('editNombreDuplicado'));
-      } else {
-        setServerError(t('editError'));
+      const message = err instanceof Error ? err.message : '';
+      try {
+        const body = JSON.parse(message || '{}');
+        if (body?.code === 'NOMBRE_DUPLICADO') {
+          setServerError(t('editNombreDuplicado'));
+          return;
+        }
+      } catch {
+        // fall through to generic error
       }
+      setServerError(t('editError'));
     }
   };
 
@@ -270,7 +314,7 @@ export function EditTeamForm({ team, onSaved, onCancel, onPreviewChange }: EditT
                     {t('agentSectionTitle')}
                   </p>
                   <p className="mt-1 text-sm leading-6" style={{ color: '#94a3b8' }}>
-                    {t('agentSectionDesc')}
+                    {agentBackendDescription}
                   </p>
                 </div>
                 <div
@@ -295,15 +339,17 @@ export function EditTeamForm({ team, onSaved, onCancel, onPreviewChange }: EditT
             </FieldBlock>
 
             <div className="grid gap-4 lg:grid-cols-2">
-              <FieldBlock label={t('agentIdLabel')} hint={t('agentIdDesc')}>
-                <input
-                  {...register('agentId')}
-                  className="w-full rounded-2xl px-4 py-3 text-sm font-mono outline-none transition focus:ring-2 focus:ring-amber-400/30"
-                  style={sharedInputStyle}
-                  placeholder={t('agentIdPlaceholder')}
-                />
-                {errors.agentId && <FieldError message={errors.agentId.message} />}
-              </FieldBlock>
+              {agentBackend === 'mattin' ? (
+                <FieldBlock label={t('agentIdLabel')} hint={t('agentIdDesc')}>
+                  <input
+                    {...register('agentId')}
+                    className="w-full rounded-2xl px-4 py-3 text-sm font-mono outline-none transition focus:ring-2 focus:ring-amber-400/30"
+                    style={sharedInputStyle}
+                    placeholder={t('agentIdPlaceholder')}
+                  />
+                  {errors.agentId && <FieldError message={errors.agentId.message} />}
+                </FieldBlock>
+              ) : null}
 
               {agentBackend === 'mattin' ? (
                 <FieldBlock label={t('appIdLabel')} hint={t('appIdDesc')}>
@@ -315,60 +361,91 @@ export function EditTeamForm({ team, onSaved, onCancel, onPreviewChange }: EditT
                   />
                   {errors.appId && <FieldError message={errors.appId.message} />}
                 </FieldBlock>
-              ) : (
-                <FieldBlock label={t('appIdLabel')} hint={t('editLocalBackendNote')}>
+              ) : null}
+            </div>
+
+            {agentBackend === 'mattin' ? (
+              <>
+                <FieldBlock label={t('mattinApiKeyLabel')} hint={t('mattinApiKeyDesc')}>
+                  <div className="relative">
+                    <KeyRound
+                      size={16}
+                      className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2"
+                      style={{ color: '#64748b' }}
+                    />
+                    <input
+                      {...register('mattinApiKey')}
+                      type="password"
+                      autoComplete="new-password"
+                      className="w-full rounded-2xl py-3 pl-11 pr-4 text-sm outline-none transition focus:ring-2 focus:ring-amber-400/30"
+                      style={sharedInputStyle}
+                      placeholder={team.hasMattinApiKey ? t('mattinApiKeyConfigured') : t('mattinApiKeyPlaceholder')}
+                    />
+                  </div>
+                  {errors.mattinApiKey && <FieldError message={errors.mattinApiKey.message} />}
+                </FieldBlock>
+
+                <div
+                  className="flex flex-col gap-3 rounded-3xl border px-4 py-4 sm:flex-row sm:items-center sm:justify-between"
+                  style={{ borderColor: 'rgba(52, 211, 153, 0.18)', background: 'rgba(8, 17, 29, 0.65)' }}
+                >
+                  <div>
+                    <p className="text-sm font-semibold" style={{ color: '#f8fafc' }}>
+                      {t('mattinCheckTitle')}
+                    </p>
+                    <p className="mt-1 text-sm leading-6" style={{ color: '#94a3b8' }}>
+                      {t('mattinCheckDesc')}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleMattinCheck}
+                    disabled={isTestingMattin || isSubmitting}
+                    className="inline-flex items-center justify-center rounded-2xl px-5 py-3 text-sm font-semibold whitespace-nowrap disabled:opacity-50 sm:self-start"
+                    style={{ background: '#0f766e', color: '#ecfeff' }}
+                  >
+                    {isTestingMattin ? t('mattinCheckLoading') : t('mattinCheckAction')}
+                  </button>
+                </div>
+
+                {testMessage ? (
                   <div
                     className="rounded-2xl border px-4 py-3 text-sm"
-                    style={{ borderColor: 'rgba(148, 163, 184, 0.16)', background: 'rgba(8, 17, 29, 0.72)', color: '#94a3b8' }}
+                    style={{
+                      borderColor: testMessage === t('mattinCheckOk') ? 'rgba(34,197,94,0.28)' : 'rgba(248,113,113,0.28)',
+                      background: testMessage === t('mattinCheckOk') ? 'rgba(20,83,45,0.35)' : 'rgba(127,29,29,0.35)',
+                      color: testMessage === t('mattinCheckOk') ? '#bbf7d0' : '#fecaca',
+                    }}
                   >
-                    {t('editLocalBackendValue')}
+                    {testMessage}
                   </div>
-                </FieldBlock>
-              )}
-            </div>
+                ) : null}
+              </>
+            ) : null}
 
-            {agentBackend === 'mattin' && (
-              <FieldBlock label={t('mattinApiKeyLabel')} hint={t('mattinApiKeyDesc')}>
-                <div className="relative">
-                  <KeyRound
-                    size={16}
-                    className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2"
-                    style={{ color: '#64748b' }}
-                  />
-                  <input
-                    {...register('mattinApiKey')}
-                    type="password"
-                    autoComplete="new-password"
-                    className="w-full rounded-2xl py-3 pl-11 pr-4 text-sm outline-none transition focus:ring-2 focus:ring-amber-400/30"
-                    style={sharedInputStyle}
-                    placeholder={team.hasMattinApiKey ? t('mattinApiKeyConfigured') : t('mattinApiKeyPlaceholder')}
-                  />
-                </div>
-                {errors.mattinApiKey && <FieldError message={errors.mattinApiKey.message} />}
-              </FieldBlock>
-            )}
-
-            <div
-              className="rounded-3xl border px-4 py-4"
-              style={{ borderColor: 'rgba(56,189,248,0.18)', background: 'rgba(8,17,29,0.62)' }}
-            >
-              <div className="flex items-start gap-3">
-                <div
-                  className="flex h-10 w-10 items-center justify-center rounded-2xl"
-                  style={{ background: 'rgba(56,189,248,0.12)', color: '#38bdf8' }}
-                >
-                  <Orbit size={18} />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold" style={{ color: '#f8fafc' }}>
-                    {t('editSecurityTitle')}
-                  </p>
-                  <p className="mt-1 text-sm leading-6" style={{ color: '#94a3b8' }}>
-                    {t('editSecurityDesc')}
-                  </p>
+            {agentBackend === 'mattin' ? (
+              <div
+                className="rounded-3xl border px-4 py-4"
+                style={{ borderColor: 'rgba(56,189,248,0.18)', background: 'rgba(8,17,29,0.62)' }}
+              >
+                <div className="flex items-start gap-3">
+                  <div
+                    className="flex h-10 w-10 items-center justify-center rounded-2xl"
+                    style={{ background: 'rgba(56,189,248,0.12)', color: '#38bdf8' }}
+                  >
+                    <Orbit size={18} />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold" style={{ color: '#f8fafc' }}>
+                      {t('editSecurityTitle')}
+                    </p>
+                    <p className="mt-1 text-sm leading-6" style={{ color: '#94a3b8' }}>
+                      {t('editSecurityDesc')}
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
+            ) : null}
           </div>
         </SectionCard>
       </div>
@@ -386,7 +463,7 @@ export function EditTeamForm({ team, onSaved, onCancel, onPreviewChange }: EditT
         </button>
         <button
           type="submit"
-          disabled={isSubmitting}
+          disabled={isSubmitting || avatarLoading}
           className="inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-semibold transition disabled:opacity-50"
           style={{ background: '#f59e0b', color: '#111827', boxShadow: '0 14px 30px rgba(245,158,11,0.22)' }}
         >
@@ -396,6 +473,12 @@ export function EditTeamForm({ team, onSaved, onCancel, onPreviewChange }: EditT
       </div>
     </form>
   );
+}
+
+interface MattinCheckResponse {
+  reachable: boolean;
+  response?: string;
+  error?: string;
 }
 
 function SectionCard({

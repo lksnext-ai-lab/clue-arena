@@ -1,5 +1,5 @@
-import { sqliteTable, text, integer, real, primaryKey, unique } from 'drizzle-orm/sqlite-core';
-import { relations } from 'drizzle-orm';
+import { sqliteTable, text, integer, real, primaryKey, unique, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import { relations, sql } from 'drizzle-orm';
 
 // --- usuarios ---
 export const usuarios = sqliteTable('usuarios', {
@@ -26,9 +26,9 @@ export const equipos = sqliteTable('equipos', {
   usuarioId: text('usuario_id')
     .references(() => usuarios.id)
     .notNull(),
-  estado: text('estado', { enum: ['registrado', 'activo', 'finalizado'] })
+  estado: text('estado', { enum: ['activo', 'inactivo'] })
     .notNull()
-    .default('registrado'),
+    .default('activo'),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 });
 
@@ -47,6 +47,8 @@ export const partidas = sqliteTable('partidas', {
     .default('manual'),
   turnoDelayMs: integer('turno_delay_ms').notNull().default(3000),
   autoRunActivoDesde: integer('auto_run_activo_desde', { mode: 'timestamp' }),
+  turnoEnProcesoToken: text('turno_en_proceso_token'),
+  turnoEnProcesoDesde: integer('turno_en_proceso_desde', { mode: 'timestamp' }),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
   startedAt: integer('started_at', { mode: 'timestamp' }),
   finishedAt: integer('finished_at', { mode: 'timestamp' }),
@@ -86,31 +88,38 @@ export const sobres = sqliteTable('sobres', {
 });
 
 // --- turnos ---
-export const turnos = sqliteTable('turnos', {
-  id: text('id').primaryKey(),
-  partidaId: text('partida_id')
-    .references(() => partidas.id)
-    .notNull(),
-  equipoId: text('equipo_id')
-    .references(() => equipos.id)
-    .notNull(),
-  numero: integer('numero').notNull(),
-  estado: text('estado', { enum: ['pendiente', 'en_curso', 'completado', 'interrumpido'] })
-    .notNull()
-    .default('pendiente'),
-  startedAt: integer('started_at', { mode: 'timestamp' }),
-  finishedAt: integer('finished_at', { mode: 'timestamp' }),
-  // F016: ms que tardó el agente activo en responder su acción de turno
-  agentDurationMs: integer('agent_duration_ms'),
-  // F016: ms que tardó el primer refutador exitoso en responder (null si no hubo refutación)
-  refutacionDurationMs: integer('refutacion_duration_ms'),
-  // G004: spectator comment from the active agent (optional, max 160 chars in practice)
-  agentSpectatorComment: text('agent_spectator_comment'),
-  // G004: spectator comment from the first successful refutador
-  refutadorSpectatorComment: text('refutador_spectator_comment'),
-  // Agent LLM reasoning text persisted for spectators/debug (truncated to 2000 chars)
-  agentReasoning: text('agent_reasoning'),
-});
+export const turnos = sqliteTable(
+  'turnos',
+  {
+    id: text('id').primaryKey(),
+    partidaId: text('partida_id')
+      .references(() => partidas.id)
+      .notNull(),
+    equipoId: text('equipo_id')
+      .references(() => equipos.id)
+      .notNull(),
+    numero: integer('numero').notNull(),
+    estado: text('estado', { enum: ['pendiente', 'en_curso', 'completado', 'interrumpido'] })
+      .notNull()
+      .default('pendiente'),
+    startedAt: integer('started_at', { mode: 'timestamp' }),
+    finishedAt: integer('finished_at', { mode: 'timestamp' }),
+    // F016: ms que tardó el agente activo en responder su acción de turno
+    agentDurationMs: integer('agent_duration_ms'),
+    // F016: ms que tardó el primer refutador exitoso en responder (null si no hubo refutación)
+    refutacionDurationMs: integer('refutacion_duration_ms'),
+    // G004: spectator comment from the active agent (optional, max 160 chars in practice)
+    agentSpectatorComment: text('agent_spectator_comment'),
+    // G004: spectator comment from the first successful refutador
+    refutadorSpectatorComment: text('refutador_spectator_comment'),
+    // Agent LLM reasoning text persisted for spectators/debug (truncated to 2000 chars)
+    agentReasoning: text('agent_reasoning'),
+  },
+  (t) => [
+    uniqueIndex('turnos_partida_numero_unique').on(t.partidaId, t.numero),
+    uniqueIndex('turnos_partida_en_curso_unique').on(t.partidaId).where(sql`${t.estado} = 'en_curso'`),
+  ],
+);
 
 // --- sugerencias ---
 export const sugerencias = sqliteTable('sugerencias', {
@@ -261,23 +270,31 @@ export const scoreEventsRelations = relations(scoreEvents, ({ one }) => ({
 }));
 
 // --- partidas_entrenamiento (F015) ---
-export const partidasEntrenamiento = sqliteTable('partidas_entrenamiento', {
-  id:         text('id').primaryKey(),                      // UUID v4
-  equipoId:   text('equipo_id')
-                .notNull()
-                .references(() => equipos.id),              // Owner of the session
-  estado:     text('estado', {
-                enum: ['en_curso', 'finalizada', 'abortada'],
-              }).notNull().default('en_curso'),
-  numBots:    integer('num_bots').notNull().default(2),     // 1–5 bot opponents
-  maxTurnos:  integer('max_turnos').notNull().default(50),  // Turn cap (5–200)
-  seed:       text('seed'),                                 // Reproducible seed (optional)
-  sobresJson: text('sobres_json'),                          // JSON envelope (visible when finished)
-  resultadoJson: text('resultado_json'),                    // Simulated score result JSON
-  motivoAbort:  text('motivo_abort'),                       // Abort reason if abortada
-  createdAt:  integer('created_at', { mode: 'timestamp' }).notNull(),
-  finishedAt: integer('finished_at', { mode: 'timestamp' }),
-});
+export const partidasEntrenamiento = sqliteTable(
+  'partidas_entrenamiento',
+  {
+    id:         text('id').primaryKey(),                      // UUID v4
+    equipoId:   text('equipo_id')
+                  .notNull()
+                  .references(() => equipos.id),              // Owner of the session
+    estado:     text('estado', {
+                  enum: ['en_curso', 'finalizada', 'abortada'],
+                }).notNull().default('en_curso'),
+    numBots:    integer('num_bots').notNull().default(2),     // 1–5 bot opponents
+    maxTurnos:  integer('max_turnos').notNull().default(50),  // Turn cap (5–200)
+    seed:       text('seed'),                                 // Reproducible seed (optional)
+    sobresJson: text('sobres_json'),                          // JSON envelope (visible when finished)
+    resultadoJson: text('resultado_json'),                    // Simulated score result JSON
+    motivoAbort:  text('motivo_abort'),                       // Abort reason if abortada
+    createdAt:  integer('created_at', { mode: 'timestamp' }).notNull(),
+    finishedAt: integer('finished_at', { mode: 'timestamp' }),
+  },
+  (t) => [
+    uniqueIndex('partidas_entrenamiento_equipo_activa_unique')
+      .on(t.equipoId)
+      .where(sql`${t.estado} = 'en_curso'`),
+  ],
+);
 
 // --- turnos_entrenamiento (F015) ---
 export const turnosEntrenamiento = sqliteTable('turnos_entrenamiento', {

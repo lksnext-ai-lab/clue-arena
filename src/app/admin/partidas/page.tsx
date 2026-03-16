@@ -94,127 +94,133 @@ export default async function AdminPartidasPage() {
   }));
 
   return (
-    <div className="mx-auto max-w-7xl space-y-8 p-6 text-slate-100">
-      <header className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.2),rgba(15,23,42,0.94)_45%,rgba(2,6,23,0.98)_100%)] px-6 py-7 shadow-[0_30px_80px_rgba(2,6,23,0.45)]">
-        <div className="absolute inset-y-0 right-0 hidden w-1/3 bg-[radial-gradient(circle_at_center,rgba(250,204,21,0.18),transparent_60%)] lg:block" />
-        <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-          <div className="max-w-3xl">
-            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-cyan-300">
-              {t('partidasEyebrow')}
-            </p>
-            <h1 className="mt-3 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
-              {t('gestionPartidas')}
-            </h1>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">
-              {t('partidasHeroDesc')}
-            </p>
+    <div className="relative isolate min-h-screen overflow-x-hidden px-6 py-6 text-slate-100">
+      <div className="absolute inset-0 -z-30 bg-[url('/fondo-partida.png')] bg-cover bg-center bg-no-repeat" />
+      <div className="absolute inset-0 -z-20 bg-[linear-gradient(180deg,rgba(2,6,23,0.82)_0%,rgba(2,6,23,0.9)_40%,rgba(2,6,23,0.97)_100%)]" />
+      <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.16),transparent_32%)]" />
+
+      <div className="mx-auto max-w-7xl space-y-8">
+        <header className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.2),rgba(15,23,42,0.94)_45%,rgba(2,6,23,0.98)_100%)] px-6 py-7 shadow-[0_30px_80px_rgba(2,6,23,0.45)]">
+          <div className="absolute inset-y-0 right-0 hidden w-1/3 bg-[radial-gradient(circle_at_center,rgba(250,204,21,0.18),transparent_60%)] lg:block" />
+          <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+            <div className="max-w-3xl">
+              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-cyan-300">
+                {t('partidasEyebrow')}
+              </p>
+              <h1 className="mt-3 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+                {t('gestionPartidas')}
+              </h1>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">
+                {t('partidasHeroDesc')}
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-3">
+              <Link
+                href="/admin/partidas/nueva"
+                className="inline-flex items-center gap-2 rounded-2xl bg-cyan-400 px-5 py-3 text-sm font-semibold text-slate-950 transition-transform duration-200 hover:-translate-y-0.5 hover:bg-cyan-300"
+              >
+                <Sparkles className="h-4 w-4" />
+                {t('crearPartida')}
+              </Link>
+              <Link
+                href="/admin"
+                className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-5 py-3 text-sm font-semibold text-slate-100 transition-colors hover:bg-white/[0.08]"
+              >
+                {t('partidasBackToPanel')}
+              </Link>
+            </div>
           </div>
 
-          <div className="flex flex-wrap gap-3">
+          <div className="relative mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+            <MetricCard icon={<Crosshair className="h-4 w-4" />} label={t('partidasMetricTotal')} value={games.length} hint={t('partidasMetricTotalHint')} />
+            <MetricCard icon={<PlayCircle className="h-4 w-4" />} label={t('partidasMetricActive')} value={activeGames.length} hint={activeGames.length > 0 ? t('partidasMetricActiveOn') : t('partidasMetricActiveOff')} accent="cyan" />
+            <MetricCard icon={<Clock3 className="h-4 w-4" />} label={t('partidasMetricPending')} value={pendingGames.length} hint={pendingGames.length > 0 ? t('partidasMetricPendingOn') : t('partidasMetricPendingOff')} />
+            <MetricCard icon={<Sparkles className="h-4 w-4" />} label={t('partidasMetricFinished')} value={finishedGames.length} hint={finishedGames.length > 0 ? t('partidasMetricFinishedOn') : t('partidasMetricFinishedOff')} />
+            <MetricCard icon={<Users className="h-4 w-4" />} label={t('partidasMetricTeams')} value={totalTeamsInGames} hint={t('partidasMetricTeamsHint')} />
+          </div>
+        </header>
+
+        {games.length === 0 ? (
+          <section className="rounded-[2rem] border border-dashed border-white/10 bg-white/[0.03] px-6 py-12 text-center shadow-[0_20px_60px_rgba(2,6,23,0.35)]">
+            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-400">
+              {t('partidasEmptyEyebrow')}
+            </p>
+            <h2 className="mt-3 text-2xl font-semibold text-white">{t('sinPartidas')}</h2>
+            <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-slate-400">
+              {t('partidasEmptyDesc')}
+            </p>
             <Link
               href="/admin/partidas/nueva"
-              className="inline-flex items-center gap-2 rounded-2xl bg-cyan-400 px-5 py-3 text-sm font-semibold text-slate-950 transition-transform duration-200 hover:-translate-y-0.5 hover:bg-cyan-300"
+              className="mt-6 inline-flex items-center gap-2 rounded-2xl bg-cyan-400 px-5 py-3 text-sm font-semibold text-slate-950 transition-colors hover:bg-cyan-300"
             >
-              <Sparkles className="h-4 w-4" />
               {t('crearPartida')}
+              <ArrowRight className="h-4 w-4" />
             </Link>
-            <Link
-              href="/admin"
-              className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-5 py-3 text-sm font-semibold text-slate-100 transition-colors hover:bg-white/[0.08]"
-            >
-              {t('partidasBackToPanel')}
-            </Link>
-          </div>
-        </div>
-
-        <div className="relative mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-          <MetricCard icon={<Crosshair className="h-4 w-4" />} label={t('partidasMetricTotal')} value={games.length} hint={t('partidasMetricTotalHint')} />
-          <MetricCard icon={<PlayCircle className="h-4 w-4" />} label={t('partidasMetricActive')} value={activeGames.length} hint={activeGames.length > 0 ? t('partidasMetricActiveOn') : t('partidasMetricActiveOff')} accent="cyan" />
-          <MetricCard icon={<Clock3 className="h-4 w-4" />} label={t('partidasMetricPending')} value={pendingGames.length} hint={pendingGames.length > 0 ? t('partidasMetricPendingOn') : t('partidasMetricPendingOff')} />
-          <MetricCard icon={<Sparkles className="h-4 w-4" />} label={t('partidasMetricFinished')} value={finishedGames.length} hint={finishedGames.length > 0 ? t('partidasMetricFinishedOn') : t('partidasMetricFinishedOff')} />
-          <MetricCard icon={<Users className="h-4 w-4" />} label={t('partidasMetricTeams')} value={totalTeamsInGames} hint={t('partidasMetricTeamsHint')} />
-        </div>
-      </header>
-
-      {games.length === 0 ? (
-        <section className="rounded-[2rem] border border-dashed border-white/10 bg-white/[0.03] px-6 py-12 text-center shadow-[0_20px_60px_rgba(2,6,23,0.35)]">
-          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-400">
-            {t('partidasEmptyEyebrow')}
-          </p>
-          <h2 className="mt-3 text-2xl font-semibold text-white">{t('sinPartidas')}</h2>
-          <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-slate-400">
-            {t('partidasEmptyDesc')}
-          </p>
-          <Link
-            href="/admin/partidas/nueva"
-            className="mt-6 inline-flex items-center gap-2 rounded-2xl bg-cyan-400 px-5 py-3 text-sm font-semibold text-slate-950 transition-colors hover:bg-cyan-300"
-          >
-            {t('crearPartida')}
-            <ArrowRight className="h-4 w-4" />
-          </Link>
-        </section>
-      ) : (
-        <>
-          {activeGames.length > 0 && (
-            <section className="rounded-[2rem] border border-emerald-400/15 bg-[linear-gradient(135deg,rgba(6,95,70,0.28),rgba(15,23,42,0.92))] p-6 shadow-[0_24px_70px_rgba(4,120,87,0.14)]">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                <div className="max-w-2xl">
-                  <p className="text-xs font-semibold uppercase tracking-[0.26em] text-emerald-200/80">
-                    {t('partidasLiveEyebrow')}
-                  </p>
-                  <h2 className="mt-2 text-2xl font-semibold text-white">
-                    {t('partidasLiveTitle')}
-                  </h2>
-                  <p className="mt-2 text-sm leading-6 text-emerald-50/75">
-                    {t('partidasLiveDesc', { count: activeGames.length })}
+          </section>
+        ) : (
+          <>
+            {activeGames.length > 0 && (
+              <section className="rounded-[2rem] border border-emerald-400/15 bg-[linear-gradient(135deg,rgba(6,95,70,0.28),rgba(15,23,42,0.92))] p-6 shadow-[0_24px_70px_rgba(4,120,87,0.14)]">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                  <div className="max-w-2xl">
+                    <p className="text-xs font-semibold uppercase tracking-[0.26em] text-emerald-200/80">
+                      {t('partidasLiveEyebrow')}
+                    </p>
+                    <h2 className="mt-2 text-2xl font-semibold text-white">
+                      {t('partidasLiveTitle')}
+                    </h2>
+                    <p className="mt-2 text-sm leading-6 text-emerald-50/75">
+                      {t('partidasLiveDesc', { count: activeGames.length })}
+                    </p>
+                  </div>
+                  <p className="text-sm text-emerald-100/70">
+                    {t('partidasLiveHint')}
                   </p>
                 </div>
-                <p className="text-sm text-emerald-100/70">
-                  {t('partidasLiveHint')}
-                </p>
-              </div>
 
-              <div className="mt-5 grid gap-4 xl:grid-cols-2">
-                {activeGames.slice(0, 2).map((game) => (
-                  <GameCard key={game.id} game={game} t={t} spotlight />
-                ))}
-              </div>
-            </section>
-          )}
-
-          <div className="space-y-8">
-            {sections.map((section) => (
-              <section key={section.status} className="space-y-4">
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-                  <div>
-                    <h2 className="text-2xl font-semibold text-white">{section.title}</h2>
-                    <p className="mt-1 text-sm text-slate-400">{section.description}</p>
-                  </div>
-                  <Badge variant="outline" className="w-fit border-white/10 bg-white/[0.03] px-3 py-1 text-slate-300">
-                    {t('partidasCount', { count: section.items.length })}
-                  </Badge>
+                <div className="mt-5 grid gap-4 xl:grid-cols-2">
+                  {activeGames.slice(0, 2).map((game) => (
+                    <GameCard key={game.id} game={game} t={t} spotlight />
+                  ))}
                 </div>
-
-                {section.items.length === 0 ? (
-                  <div className="rounded-[1.75rem] border border-dashed border-white/10 bg-white/[0.02] px-5 py-6 text-sm text-slate-500">
-                    {section.status === 'en_curso'
-                      ? t('partidasSectionActiveEmpty')
-                      : section.status === 'pendiente'
-                        ? t('partidasSectionPendingEmpty')
-                        : t('partidasSectionFinishedEmpty')}
-                  </div>
-                ) : (
-                  <div className="grid gap-4 xl:grid-cols-2">
-                    {section.items.map((game) => (
-                      <GameCard key={game.id} game={game} t={t} />
-                    ))}
-                  </div>
-                )}
               </section>
-            ))}
-          </div>
-        </>
-      )}
+            )}
+
+            <div className="space-y-8">
+              {sections.map((section) => (
+                <section key={section.status} className="space-y-4">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                    <div>
+                      <h2 className="text-2xl font-semibold text-white">{section.title}</h2>
+                      <p className="mt-1 text-sm text-slate-400">{section.description}</p>
+                    </div>
+                    <Badge variant="outline" className="w-fit border-white/10 bg-white/[0.03] px-3 py-1 text-slate-300">
+                      {t('partidasCount', { count: section.items.length })}
+                    </Badge>
+                  </div>
+
+                  {section.items.length === 0 ? (
+                    <div className="rounded-[1.75rem] border border-dashed border-white/10 bg-white/[0.02] px-5 py-6 text-sm text-slate-500">
+                      {section.status === 'en_curso'
+                        ? t('partidasSectionActiveEmpty')
+                        : section.status === 'pendiente'
+                          ? t('partidasSectionPendingEmpty')
+                          : t('partidasSectionFinishedEmpty')}
+                    </div>
+                  ) : (
+                    <div className="grid gap-4 xl:grid-cols-2">
+                      {section.items.map((game) => (
+                        <GameCard key={game.id} game={game} t={t} />
+                      ))}
+                    </div>
+                  )}
+                </section>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }

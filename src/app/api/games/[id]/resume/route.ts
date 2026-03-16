@@ -15,8 +15,9 @@ import { z } from 'zod';
 import { getAuthSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { partidas, partidaEquipos } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { gameRunner } from '@/lib/game/runner';
+import { toSqliteConflictError } from '@/lib/db/sqlite-errors';
 import { gameEventEmitter } from '@/lib/ws/GameEventEmitter';
 
 const ResumeBodySchema = z.object({
@@ -44,44 +45,105 @@ export async function POST(
     // Body is optional
   }
 
-  const partida = await db
-    .select()
-    .from(partidas)
-    .where(eq(partidas.id, id))
-    .get();
+  let result:
+    | { kind: 'started'; delay: number }
+    | { kind: 'not_found' }
+    | { kind: 'invalid_state' }
+    | { kind: 'invalid_mode'; modo: string }
+    | { kind: 'conflict' };
 
-  if (!partida) {
+  try {
+    result = db.transaction((tx) => {
+      const partida = tx
+        .select()
+        .from(partidas)
+        .where(eq(partidas.id, id))
+        .get();
+
+      if (!partida) {
+        return { kind: 'not_found' } as const;
+      }
+      if (partida.estado !== 'en_curso') {
+        return { kind: 'invalid_state' } as const;
+      }
+      if (partida.modoEjecucion !== 'pausado') {
+        return { kind: 'invalid_mode', modo: partida.modoEjecucion } as const;
+      }
+
+      const delay = turnoDelayMs ?? partida.turnoDelayMs;
+      const updateResult = tx
+        .update(partidas)
+        .set({
+          modoEjecucion: 'auto',
+          turnoDelayMs: delay,
+          autoRunActivoDesde: new Date(),
+        })
+        .where(
+          and(
+            eq(partidas.id, id),
+            eq(partidas.estado, 'en_curso'),
+            eq(partidas.modoEjecucion, 'pausado'),
+            isNull(partidas.autoRunActivoDesde),
+          ),
+        )
+        .run();
+
+      if (updateResult.changes === 0) {
+        return { kind: 'conflict' } as const;
+      }
+
+      tx.update(partidaEquipos)
+        .set({ warnings: 0 })
+        .where(eq(partidaEquipos.partidaId, id))
+        .run();
+
+      return { kind: 'started', delay } as const;
+    });
+  } catch (error) {
+    const conflict = toSqliteConflictError(
+      error,
+      'Ya existe una mutación en curso para esta partida',
+      'GAME_MUTATION_IN_PROGRESS',
+    );
+    if (conflict) {
+      return NextResponse.json(
+        { error: conflict.message, code: conflict.code },
+        { status: conflict.statusCode },
+      );
+    }
+    throw error;
+  }
+
+  if (result.kind === 'not_found') {
     return NextResponse.json({ error: 'Partida no encontrada' }, { status: 404 });
   }
-  if (partida.estado !== 'en_curso') {
+  if (result.kind === 'invalid_state') {
     return NextResponse.json(
       { error: 'La partida no está en curso' },
       { status: 400 },
     );
   }
-  if (partida.modoEjecucion !== 'pausado') {
+  if (result.kind === 'invalid_mode') {
     return NextResponse.json(
-      { error: `La partida no está pausada (modo actual: ${partida.modoEjecucion})` },
+      { error: `La partida no está pausada (modo actual: ${result.modo})` },
       { status: 400 },
     );
   }
-  if (partida.autoRunActivoDesde !== null || gameRunner.isRunning(id)) {
+  if (result.kind === 'conflict' || gameRunner.isRunning(id)) {
+    if (result.kind !== 'conflict') {
+      await db
+        .update(partidas)
+        .set({ autoRunActivoDesde: null, modoEjecucion: 'pausado' })
+        .where(eq(partidas.id, id));
+    }
     return NextResponse.json(
-      { error: 'Ya existe un bucle de auto-run activo para esta partida' },
+      {
+        error: 'Ya existe un bucle de auto-run activo o una mutación en curso para esta partida',
+        code: 'GAME_MUTATION_IN_PROGRESS',
+      },
       { status: 409 },
     );
   }
-
-  const delay = turnoDelayMs ?? partida.turnoDelayMs;
-
-  await db
-    .update(partidas)
-    .set({
-      modoEjecucion: 'auto',
-      turnoDelayMs: delay,
-      autoRunActivoDesde: new Date(),
-    })
-    .where(eq(partidas.id, id));
 
   // Notify connected clients that the game has resumed
   gameEventEmitter.emitTurnCompleted(id, {
@@ -91,16 +153,24 @@ export async function POST(
   });
 
   // Delegar al GameRunner (proceso servidor, fuera del ciclo HTTP)
-  // G006: reset warning counters on resume (§3.2)
-  await db
-    .update(partidaEquipos)
-    .set({ warnings: 0 })
-    .where(eq(partidaEquipos.partidaId, id));
+  const runnerStarted = gameRunner.start(id, result.delay);
+  if (!runnerStarted) {
+    await db
+      .update(partidas)
+      .set({ autoRunActivoDesde: null, modoEjecucion: 'pausado' })
+      .where(eq(partidas.id, id));
 
-  gameRunner.start(id, delay);
+    return NextResponse.json(
+      {
+        error: 'Ya existe un bucle de auto-run activo o una mutación en curso para esta partida',
+        code: 'GAME_MUTATION_IN_PROGRESS',
+      },
+      { status: 409 },
+    );
+  }
 
   return NextResponse.json(
-    { success: true, modoEjecucion: 'auto', turnoDelayMs: delay },
+    { success: true, modoEjecucion: 'auto', turnoDelayMs: result.delay },
     { status: 202 },
   );
 }

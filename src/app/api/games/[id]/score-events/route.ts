@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { scoreEvents } from '@/lib/db/schema';
+import { scoreEvents, turnos } from '@/lib/db/schema';
 import { partidas } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 
@@ -31,11 +31,45 @@ export async function GET(
     .where(eq(scoreEvents.gameId, gameId))
     .all();
 
+  const gameTurns = await db
+    .select({
+      numero: turnos.numero,
+      startedAt: turnos.startedAt,
+      finishedAt: turnos.finishedAt,
+    })
+    .from(turnos)
+    .where(eq(turnos.partidaId, gameId))
+    .all();
+
+  const sortedTurns = gameTurns
+    .filter((turno) => turno.startedAt)
+    .sort((a, b) => (a.startedAt?.getTime() ?? 0) - (b.startedAt?.getTime() ?? 0));
+
+  function resolveDisplayTurn(eventTurn: number, createdAt: Date | null): number {
+    if (createdAt && sortedTurns.length > 0) {
+      const createdMs = createdAt.getTime();
+      for (let i = 0; i < sortedTurns.length; i++) {
+        const current = sortedTurns[i];
+        const startMs = current.startedAt?.getTime() ?? Number.NEGATIVE_INFINITY;
+        const nextStartMs = sortedTurns[i + 1]?.startedAt?.getTime() ?? Number.POSITIVE_INFINITY;
+        const finishMs = current.finishedAt?.getTime() ?? nextStartMs;
+        if (createdMs >= startMs && createdMs <= Math.max(finishMs, nextStartMs)) {
+          return current.numero;
+        }
+      }
+    }
+
+    // Fallback: most legacy score events persisted the internal zero-based
+    // turnoActual counter instead of the spectator-facing turn number.
+    return Math.max(1, eventTurn + 1);
+  }
+
   return NextResponse.json({
     events: events.map((ev) => ({
       id: ev.id,
       equipoId: ev.equipoId,
       turno: ev.turno,
+      displayTurn: resolveDisplayTurn(ev.turno, ev.createdAt as Date | null),
       type: ev.type,
       points: ev.points,
       meta: ev.meta ? (JSON.parse(ev.meta) as Record<string, unknown>) : null,

@@ -2,6 +2,7 @@ import { and, eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { partidasEntrenamiento } from '@/lib/db/schema';
 import { ConflictError, NotFoundError, ValidationError } from '@/lib/utils/errors';
+import { trainingRunner } from '@/lib/game/training-runner';
 
 export interface DeleteTrainingGameInput {
   gameId: string;
@@ -43,7 +44,17 @@ export async function deleteTrainingGame({
   }
 
   if (row.estado === 'en_curso') {
-    throw new ConflictError('No se puede eliminar una partida en curso. Abórtala primero.');
+    throw new ConflictError(
+      'No se puede eliminar una partida en curso. Abórtala primero.',
+      'TRAINING_GAME_IN_PROGRESS',
+    );
+  }
+
+  if (trainingRunner.isRunning(gameId)) {
+    throw new ConflictError(
+      'La partida todavía se está cerrando en segundo plano. Espera un momento y vuelve a intentarlo.',
+      'TRAINING_GAME_IN_PROGRESS',
+    );
   }
 
   await db.delete(partidasEntrenamiento).where(eq(partidasEntrenamiento.id, gameId));

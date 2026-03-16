@@ -184,22 +184,11 @@ export function TrainingDeductionBoard({
       cards: id === realEquipoId ? ownCards : new Set(botHands[id] ?? []),
       refutedCards: refutedCardsByTeam.get(id) ?? new Set<string>(),
     }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [botHands, equipoIds, realEquipoId, refutedCardsByTeam, JSON.stringify(turns.map((t) => t.id))]);
+  }, [botHands, equipoIds, realEquipoId, refutedCardsByTeam, turns]);
 
   const board = useMemo(
     () => buildDeductionBoard(adaptTurns(turns, realEquipoId), equipoIds),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [
-      JSON.stringify(
-        turns.flatMap((t) =>
-          t.accion?.action?.type === 'suggestion'
-            ? [`${t.id}:${t.gameStateView ? 'v' : 'n'}`]
-            : [],
-        ),
-      ),
-      JSON.stringify(equipoIds),
-    ],
+    [equipoIds, realEquipoId, turns],
   );
 
   const hasAnyHandCards = equipoCols.some((e) => e.cards.size > 0);

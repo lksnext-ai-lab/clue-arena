@@ -7,6 +7,7 @@ import { CreateGameSchema } from '@/lib/schemas/game';
 import { initGame } from '@/lib/game/engine';
 import { v4 as uuidv4 } from 'uuid';
 import { notificationEmitter } from '@/lib/ws/NotificationEmitter';
+import { normalizeTeamStatus } from '@/lib/teams/status';
 
 // GET /api/games  (Admin: all games; Equipo: only their games)
 export async function GET(request: Request) {
@@ -91,6 +92,14 @@ export async function POST(request: Request) {
   if (teamRows.some((t) => !t)) {
     return NextResponse.json(
       { error: 'EQUIPOS_INVALIDOS', message: 'Uno o más equipos no existen' },
+      { status: 400 }
+    );
+  }
+
+  const inactiveTeams = teamRows.filter((team) => team && normalizeTeamStatus(team.estado) !== 'activo');
+  if (inactiveTeams.length > 0) {
+    return NextResponse.json(
+      { error: 'EQUIPOS_INACTIVOS', message: 'Solo los equipos activos pueden incluirse en partidas oficiales' },
       { status: 400 }
     );
   }

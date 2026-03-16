@@ -146,7 +146,12 @@ export default async function EntrenamientoPage() {
   );
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-6">
+    <div className="relative isolate overflow-hidden">
+      <div className="absolute inset-0 -z-10 bg-[url('/fondo-train.png')] bg-cover bg-center bg-no-repeat opacity-30" />
+      <div className="absolute inset-0 -z-10 bg-[linear-gradient(180deg,rgba(2,6,23,0.72),rgba(2,6,23,0.88))]" />
+      <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.14),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(251,191,36,0.12),transparent_24%)]" />
+
+      <div className="mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-6">
       <section className="relative overflow-hidden rounded-[28px] border border-cyan-400/15 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.18),transparent_34%),linear-gradient(145deg,rgba(15,23,42,0.96),rgba(2,6,23,0.98))] p-6 shadow-[0_30px_80px_rgba(2,6,23,0.45)] sm:p-8">
         <div className="absolute right-0 top-0 h-40 w-40 rounded-full bg-cyan-400/10 blur-3xl" />
         <div className="absolute bottom-0 left-10 h-32 w-32 rounded-full bg-amber-400/10 blur-3xl" />
@@ -399,6 +404,7 @@ export default async function EntrenamientoPage() {
           })}
         </section>
       )}
+      </div>
     </div>
   );
 }

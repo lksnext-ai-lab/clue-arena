@@ -6,6 +6,7 @@ import { eq } from 'drizzle-orm';
 import { TeamRegistrationSchema } from '@/lib/schemas/team';
 import type { TeamResponse } from '@/types/api';
 import { resolveTeamId } from '@/lib/utils/team-id';
+import { normalizeTeamStatus } from '@/lib/teams/status';
 
 /** Builds a safe TeamResponse, never exposing mattinApiKey. */
 function toTeamResponse(t: typeof equipos.$inferSelect): TeamResponse {
@@ -19,7 +20,7 @@ function toTeamResponse(t: typeof equipos.$inferSelect): TeamResponse {
     hasMattinApiKey: !!t.mattinApiKey,
     avatarUrl: t.avatarUrl ?? null,
     usuarioId: t.usuarioId,
-    estado: t.estado as TeamResponse['estado'],
+    estado: normalizeTeamStatus(t.estado),
     miembros: JSON.parse(t.miembros ?? '[]') as string[],
     createdAt: t.createdAt instanceof Date ? t.createdAt.toISOString() : String(t.createdAt),
   };
@@ -135,16 +136,33 @@ export async function POST(request: Request) {
     );
   }
 
+  const requestedOwnerId = userRol === 'admin' ? parsed.data.usuarioId : undefined;
+
+  if (requestedOwnerId) {
+    const ownerExists = await db
+      .select({ id: usuarios.id })
+      .from(usuarios)
+      .where(eq(usuarios.id, requestedOwnerId))
+      .get();
+
+    if (!ownerExists) {
+      return NextResponse.json(
+        { error: 'El usuario seleccionado no existe' },
+        { status: 400 }
+      );
+    }
+  }
+
   const newTeam = {
     id: resolvedTeamId,
     nombre: parsed.data.nombre,
-    agentId: parsed.data.agentId,
+    agentId: parsed.data.agentId ?? '',
     agentBackend: parsed.data.agentBackend ?? 'mattin',
     appId: parsed.data.appId ?? null,
     mattinApiKey: parsed.data.mattinApiKey ?? null,
     miembros: JSON.stringify(parsed.data.miembros ?? []),
-    usuarioId: user.id,
-    estado: 'registrado' as const,
+    usuarioId: requestedOwnerId ?? user.id,
+    estado: parsed.data.estado ?? 'activo',
     createdAt: new Date(),
   };
 

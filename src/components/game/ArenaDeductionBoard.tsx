@@ -28,7 +28,11 @@ const SECTIONS: { category: CardCategory; cards: readonly string[] }[] = [
   { category: 'habitacion', cards: HABITACIONES },
 ];
 
-interface TooltipProps { text: string; children: React.ReactNode }
+interface TooltipProps {
+  text: string;
+  children: React.ReactNode;
+}
+
 function Tooltip({ text, children }: TooltipProps) {
   const [visible, setVisible] = useState(false);
   return (
@@ -39,7 +43,7 @@ function Tooltip({ text, children }: TooltipProps) {
     >
       {children}
       {visible && (
-        <span className="absolute z-10 bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2 py-1 rounded bg-slate-900 border border-slate-600 text-xs text-slate-200 whitespace-nowrap pointer-events-none shadow-lg">
+        <span className="absolute bottom-full left-1/2 z-10 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded bg-slate-950 px-2 py-1 text-xs text-slate-200 shadow-lg border border-slate-700">
           {text}
         </span>
       )}
@@ -49,8 +53,12 @@ function Tooltip({ text, children }: TooltipProps) {
 
 export function ArenaDeductionBoard({ partida }: ArenaDeductionBoardProps) {
   const equipoIds = partida.equipos.map((e) => e.equipoId);
+  const secretCards = new Set(
+    partida.sobre
+      ? [partida.sobre.sospechoso, partida.sobre.arma, partida.sobre.habitacion]
+      : []
+  );
 
-  // Cartas en mano por equipo (solo visibles para el equipo propio o admin)
   const handCardsByTeam = useMemo(() => {
     const map = new Map<string, Set<string>>();
     for (const equipo of partida.equipos) {
@@ -63,133 +71,204 @@ export function ArenaDeductionBoard({ partida }: ArenaDeductionBoardProps) {
 
   const hasAnyHandCards = handCardsByTeam.size > 0;
 
+  const shownRefutationCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const turno of partida.turnos ?? []) {
+      for (const sugerencia of turno.sugerencias) {
+        if (!sugerencia.refutadaPor || !sugerencia.cartaMostrada) continue;
+        const key = boardKey(sugerencia.refutadaPor, sugerencia.cartaMostrada);
+        counts.set(key, (counts.get(key) ?? 0) + 1);
+      }
+    }
+    return counts;
+  }, [partida.turnos]);
+
   const board = useMemo(
-    () => buildDeductionBoard(partida.turnos ?? [], partida.equipos.map((e) => e.equipoId)),
-    // Track suggestion IDs and their cartaMostrada so the board recomputes when
-    // live data arrives with refuted-card info (same turn IDs, updated suggestions).
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [
-      JSON.stringify(partida.turnos?.flatMap((t) => t.sugerencias.map((s) => `${s.id}:${s.cartaMostrada ?? ''}`))),
-      JSON.stringify(equipoIds),
-    ]
+    () => buildDeductionBoard(partida.turnos ?? [], equipoIds),
+    [equipoIds, partida.turnos]
   );
 
+  const totalMarks = Array.from(board.values()).reduce((count, cell) => count + (cell.turnos.length > 0 ? 1 : 0), 0);
+  const refutedMarks = Array.from(board.values()).reduce((count, cell) => count + (cell.turnosRefutados.length > 0 ? 1 : 0), 0);
+  const unresolvedMarks = totalMarks - refutedMarks;
+
   return (
-    <div className="rounded-xl border border-slate-700 bg-slate-800 p-4 overflow-x-auto">
-      <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">
-        Tablero de deducción
-      </h2>
+    <section className="arena-panel arena-grid-glow overflow-hidden p-3">
+      <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-slate-400">
+            Matriz de deduccion
+          </p>
+        </div>
+        <div className="grid grid-cols-3 gap-0.5 text-center">
+          <div className="arena-stat-card arena-stat-card-compact">
+            <span className="arena-stat-label">Lecturas</span>
+            <span className="arena-stat-value">{totalMarks}</span>
+          </div>
+          <div className="arena-stat-card arena-stat-card-compact">
+            <span className="arena-stat-label">Refutadas</span>
+            <span className="arena-stat-value">{refutedMarks}</span>
+          </div>
+          <div className="arena-stat-card arena-stat-card-compact">
+            <span className="arena-stat-label">Abiertas</span>
+            <span className="arena-stat-value">{unresolvedMarks}</span>
+          </div>
+        </div>
+      </div>
 
-      <table className="min-w-full text-xs border-collapse">
-        <thead>
-          <tr>
-            {/* Card name column */}
-            <th className="text-left text-slate-500 font-medium pb-2 pr-4 w-36">Carta</th>
-            {partida.equipos.map((e) => (
-              <th key={e.equipoId} className="pb-2 px-2 text-center min-w-[5rem]">
-                <span
-                  className={cn(
-                    'block font-medium text-center break-words leading-tight',
-                    e.eliminado ? 'text-slate-600 line-through' : 'text-slate-300'
-                  )}
-                >
-                  {e.equipoNombre}
-                </span>
+      <div className="mt-3 overflow-x-auto pb-1 scrollbar-panel">
+        <table className="min-w-full border-separate border-spacing-y-1 text-[11px]">
+          <thead>
+            <tr>
+              <th className="w-32 pb-1.5 pr-3 text-left text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                Carta
               </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {SECTIONS.map(({ category, cards }) => (
-            <React.Fragment key={category}>
-              {/* Section header row */}
-              <tr>
-                <td
-                  colSpan={partida.equipos.length + 1}
-                  className="pt-3 pb-1 text-xs font-semibold text-slate-500 uppercase tracking-widest"
-                >
-                  {CATEGORY_LABELS[category]}
-                </td>
-              </tr>
-
-              {cards.map((card) => (
-                <tr key={card} className="border-t border-slate-700/40">
-                  <td className="py-1 pr-4 text-slate-400 whitespace-nowrap">{card}</td>
-                  {partida.equipos.map((e) => {
-                    const inHand = handCardsByTeam.get(e.equipoId)?.has(card) ?? false;
-                    const cell = board.get(boardKey(e.equipoId, card));
-                    const seen = cell && cell.turnos.length > 0;
-                    const refuted = seen && cell!.turnosRefutados.length > 0;
-                    const tooltipText = inHand
-                      ? 'En tu mano'
-                      : seen
-                      ? cell!.turnos
-                          .map((t) =>
-                            cell!.turnosRefutados.includes(t) ? `T${t}↩` : `T${t}`
-                          )
-                          .join(', ')
-                      : '';
-                    return (
-                      <td key={e.equipoId} className="py-1 px-1 text-center">
-                        {inHand ? (
-                          <Tooltip text={tooltipText}>
-                            <span className="inline-block w-5 h-5 rounded leading-5 cursor-default select-none bg-red-500/20 text-red-400">
-                              ♦
-                            </span>
-                          </Tooltip>
-                        ) : seen ? (
-                          <Tooltip text={tooltipText}>
-                            <span
-                              className={cn(
-                                'inline-block w-5 h-5 rounded leading-5 cursor-default select-none',
-                                refuted
-                                  ? 'bg-orange-500/20 text-orange-300'
-                                  : 'bg-cyan-500/20 text-cyan-300'
-                              )}
-                            >
-                              ✦
-                            </span>
-                          </Tooltip>
-                        ) : (
-                          <span className="inline-block w-5 h-5 rounded bg-slate-700/50 text-slate-600 leading-5 select-none text-center">
-                            ·
-                          </span>
-                        )}
-                      </td>
-                    );
-                  })}
-                </tr>
+              {partida.equipos.map((e) => (
+                <th key={e.equipoId} className="min-w-[4.4rem] px-1.5 pb-1.5 text-center">
+                  <span
+                    className={cn(
+                      'block break-words text-center text-[10px] font-semibold uppercase tracking-[0.14em] leading-tight',
+                      e.eliminado ? 'text-slate-600 line-through' : 'text-slate-300'
+                    )}
+                  >
+                    {e.equipoNombre}
+                  </span>
+                </th>
               ))}
-            </React.Fragment>
-          ))}
-        </tbody>
-      </table>
+            </tr>
+          </thead>
+          <tbody>
+            {SECTIONS.map(({ category, cards }) => (
+              <React.Fragment key={category}>
+                <tr>
+                  <td
+                    colSpan={partida.equipos.length + 1}
+                    className="pt-2.5 pb-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-slate-500"
+                  >
+                    {CATEGORY_LABELS[category]}
+                  </td>
+                </tr>
 
-      {/* Legend */}
-      <div className="flex flex-wrap gap-3 mt-3 pt-2 border-t border-slate-700/40 text-xs text-slate-500">
+                {cards.map((card) => (
+                  <tr
+                    key={card}
+                    className={cn(
+                      'bg-white/[0.025]',
+                      secretCards.has(card) && 'bg-amber-400/[0.06]'
+                    )}
+                  >
+                    <td
+                      className={cn(
+                        'whitespace-nowrap rounded-l-xl border-y border-l py-1.5 pl-2.5 pr-3 text-slate-300',
+                        secretCards.has(card)
+                          ? 'border-amber-300/35 text-amber-100 shadow-[inset_3px_0_0_rgba(252,211,77,0.55)]'
+                          : 'border-white/6'
+                      )}
+                    >
+                      {card}
+                    </td>
+                    {partida.equipos.map((e) => {
+                      const inHand = handCardsByTeam.get(e.equipoId)?.has(card) ?? false;
+                      const cell = board.get(boardKey(e.equipoId, card));
+                      const seen = Boolean(cell && cell.turnos.length > 0);
+                      const refuted = Boolean(seen && cell && cell.turnosRefutados.length > 0);
+                      const shownCount = shownRefutationCounts.get(boardKey(e.equipoId, card)) ?? 0;
+                      const tooltipText = inHand
+                        ? 'En tu mano'
+                        : seen && cell
+                          ? cell.turnos
+                              .map((turno) => (cell.turnosRefutados.includes(turno) ? `T${turno}↩` : `T${turno}`))
+                              .join(', ')
+                          : '';
+
+                      return (
+                        <td
+                          key={e.equipoId}
+                          className={cn(
+                            'border-y px-1 py-1.5 text-center last:rounded-r-xl last:border-r',
+                            secretCards.has(card) ? 'border-amber-300/35' : 'border-white/6'
+                          )}
+                        >
+                          {inHand ? (
+                            <Tooltip text={tooltipText}>
+                              <span className="inline-flex h-5 w-5 items-center justify-center rounded-lg border border-red-400/20 bg-red-500/15 text-red-300 shadow-[0_0_18px_rgba(248,113,113,0.2)]">
+                                ♦
+                                {shownCount > 0 && (
+                                  <span className="absolute -right-2 -top-2 rounded-full bg-amber-300/95 px-1 py-[1px] text-[8px] font-bold leading-none text-slate-950 shadow-[0_4px_12px_rgba(251,191,36,0.35)]">
+                                    x{shownCount}
+                                  </span>
+                                )}
+                              </span>
+                            </Tooltip>
+                          ) : seen ? (
+                            <Tooltip text={tooltipText}>
+                              <span
+                                className={cn(
+                                  'relative inline-flex h-5 w-5 items-center justify-center rounded-lg border select-none',
+                                  refuted
+                                    ? 'border-amber-300/20 bg-amber-400/15 text-amber-200'
+                                    : 'border-cyan-300/20 bg-cyan-400/15 text-cyan-200'
+                                )}
+                              >
+                                ✦
+                                {shownCount > 0 && (
+                                  <span className="absolute -right-2 -top-2 rounded-full bg-amber-300/95 px-1 py-[1px] text-[8px] font-bold leading-none text-slate-950 shadow-[0_4px_12px_rgba(251,191,36,0.35)]">
+                                    x{shownCount}
+                                  </span>
+                                )}
+                              </span>
+                            </Tooltip>
+                          ) : (
+                            <span className="relative inline-flex h-5 w-5 items-center justify-center rounded-lg border border-white/6 bg-white/[0.04] text-slate-600">
+                              ·
+                              {shownCount > 0 && (
+                                <span className="absolute -right-2 -top-2 rounded-full bg-amber-300/95 px-1 py-[1px] text-[8px] font-bold leading-none text-slate-950 shadow-[0_4px_12px_rgba(251,191,36,0.35)]">
+                                  x{shownCount}
+                                </span>
+                              )}
+                            </span>
+                          )}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </React.Fragment>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="mt-3 flex flex-wrap gap-2.5 border-t border-white/8 pt-2 text-[11px] text-slate-400">
         <span className="flex items-center gap-1">
-          <span className="inline-block w-4 h-4 rounded bg-slate-700/50 text-slate-600 leading-4 text-center">·</span>
+          <span className="inline-flex h-4 w-4 items-center justify-center rounded-md border border-white/6 bg-white/[0.04] text-slate-600">·</span>
           No propuesta
         </span>
         <span className="flex items-center gap-1">
-          <span className="inline-block w-4 h-4 rounded bg-cyan-500/20 text-cyan-300 leading-4 text-center">✦</span>
-          Sugerida (sin refutar)
+          <span className="inline-flex h-4 w-4 items-center justify-center rounded-md border border-cyan-300/20 bg-cyan-400/15 text-cyan-200">✦</span>
+          Sugerida
         </span>
         <span className="flex items-center gap-1">
-          <span className="inline-block w-4 h-4 rounded bg-orange-500/20 text-orange-300 leading-4 text-center">✦</span>
+          <span className="inline-flex h-4 w-4 items-center justify-center rounded-md border border-amber-300/20 bg-amber-400/15 text-amber-200">✦</span>
           Refutada
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="rounded-full bg-amber-300/95 px-1 py-[1px] text-[8px] font-bold leading-none text-slate-950">xN</span>
+          Veces mostrada al refutar por ese equipo
         </span>
         {hasAnyHandCards && (
           <span className="flex items-center gap-1">
-            <span className="inline-block w-4 h-4 rounded bg-red-500/20 text-red-400 leading-4 text-center">♦</span>
+            <span className="inline-flex h-4 w-4 items-center justify-center rounded-md border border-red-400/20 bg-red-500/15 text-red-300">♦</span>
             En tu mano
           </span>
         )}
+        {partida.sobre && (
+          <span className="flex items-center gap-1">
+            <span className="inline-flex h-4 w-4 items-center justify-center rounded-md border border-amber-300/35 bg-amber-300/12 text-amber-200">✦</span>
+            Carta del sobre
+          </span>
+        )}
       </div>
-
-      {(partida.turnos ?? []).length === 0 && (
-        <p className="text-slate-600 text-xs mt-3">La partida no ha comenzado todavía.</p>
-      )}
-    </div>
+    </section>
   );
 }

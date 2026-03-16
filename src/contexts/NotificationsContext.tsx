@@ -4,7 +4,7 @@
 // F018: lifecycle notification context — subscribes via WS and exposes a
 // notification feed that any consumer can display.
 
-import React, { createContext, useContext, useState, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useState, useCallback } from 'react';
 import { useNotificationsSocket } from '@/lib/utils/useNotificationsSocket';
 import { useAppSession } from '@/contexts/SessionContext';
 import type { ServerMessage } from '@/lib/ws/protocol';

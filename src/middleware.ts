@@ -6,6 +6,7 @@ import { isAuthDisabled, DEV_COOKIE, DEV_USERS } from '@/lib/auth/dev';
 const PUBLIC_PATHS = [
   '/',
   '/acerca-del-juego',
+  '/creditos',
   '/instrucciones',
   '/ranking',
   '/partidas', // covers /partidas/[id] by startsWith
@@ -62,8 +63,8 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     // Match all paths except for:
-    // - _next/static, _next/image, favicon.ico, etc.
+    // - _next/static, _next/image and any public file with an extension
     // - /api/mcp (separate auth)
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.webp$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|.*\\..*$).*)',
   ],
 };

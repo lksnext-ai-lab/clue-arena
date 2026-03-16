@@ -5,15 +5,24 @@ import './globals.css';
 import { SessionProvider as NextAuthProvider } from 'next-auth/react';
 import { SessionProvider } from '@/contexts/SessionContext';
 import { NextIntlClientProvider } from 'next-intl';
-import { getLocale, getMessages } from 'next-intl/server';
+import { getLocale, getMessages, getTranslations } from 'next-intl/server';
 import { RootShell } from '@/components/layout/RootShell';
 
 const inter = Inter({ subsets: ['latin'] });
 
-export const metadata: Metadata = {
-  title: 'Clue Arena — El Algoritmo Asesinado',
-  description: 'Plataforma de competición gamificada con agentes IA jugando al Cluedo',
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations('metadata');
+
+  return {
+    title: t('appTitle'),
+    description: t('appDescription'),
+    icons: {
+      icon: '/lks.svg',
+      shortcut: '/lks.svg',
+      apple: '/lks.svg',
+    },
+  };
+}
 
 export default async function RootLayout({
   children,

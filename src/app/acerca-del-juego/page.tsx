@@ -1,5 +1,6 @@
 
 import type { Metadata } from 'next';
+import { getTranslations } from 'next-intl/server';
 import { JuegoHeroBanner } from '@/components/game/juego/JuegoHeroBanner';
 import { JuegoObjetivos } from '@/components/game/juego/JuegoObjetivos';
 import { JuegoQueEsCluedo } from '@/components/game/juego/JuegoQueEsCluedo';
@@ -8,11 +9,14 @@ import { JuegoPersonajes } from '@/components/game/juego/JuegoPersonajes';
 import { JuegoArmas } from '@/components/game/juego/JuegoArmas';
 import { JuegoEscenarios } from '@/components/game/juego/JuegoEscenarios';
 
-export const metadata: Metadata = {
-  title: 'El Juego — Clue Arena',
-  description:
-    'Contexto, personajes, armas, escenarios, mecánica de juego y objetivos del evento Clue Arena.',
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations('juego');
+
+  return {
+    title: `${t('pageTitle')} — Clue Arena`,
+    description: t('pageDescription'),
+  };
+}
 
 /**
  * Static Server Component — no API calls, no polling.

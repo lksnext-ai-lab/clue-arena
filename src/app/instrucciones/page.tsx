@@ -18,42 +18,8 @@ import { CodeBlock } from '@/components/instructions/CodeBlock';
 import { SuspectsTable, WeaponsTable, ScenariosTable } from '@/components/instructions/ElementsTable';
 import { MermaidDiagram } from '@/components/instructions/MermaidDiagram';
 import { ScoringTable } from '@/components/instructions/ScoringTable';
-import { getTranslations } from 'next-intl/server';
-
-const AGENT_RESPONSE_SCHEMA = `type AgentResponse =
-  | { action: "suggestion"; sospechoso: string; arma: string; escenario: string; spectatorComment?: string }
-  | { action: "accusation"; sospechoso: string; arma: string; escenario: string; spectatorComment?: string }
-  | { action: "pass";                                                            spectatorComment?: string }
-  | { action: "show_card"; carta: string;                                        spectatorComment?: string }
-  | { action: "cannot_refute";                                                   spectatorComment?: string };
-
-// spectatorComment: opcional, max. 160 caracteres, sin saltos de linea.
-// Se muestra en la Arena a los espectadores durante la partida.`;
-
-const EXAMPLE_SUGGESTION = `{
-  "action": "suggestion",
-  "sospechoso": "Coronel Mustard",
-  "arma": "Teclado mecánico",
-  "escenario": "El Laboratorio",
-  "spectatorComment": "Sé que Mustard estuvo en el laboratorio..."
-}`;
-
-const EXAMPLE_ACCUSATION = `{
-  "action": "accusation",
-  "sospechoso": "Dra. Peacock",
-  "arma": "Cable de red",
-  "escenario": "La Sala de Servidores"
-}`;
-
-const EXAMPLE_PASS = `{ "action": "pass" }`;
-
-const EXAMPLE_SHOW_CARD = `{
-  "action": "show_card",
-  "carta": "Coronel Mustard",
-  "spectatorComment": "Tengo esta carta, no puede ser él."
-}`;
-
-const EXAMPLE_CANNOT_REFUTE = `{ "action": "cannot_refute" }`;
+import { getLocale, getTranslations } from 'next-intl/server';
+import { getInstructionsCopy } from '@/components/instructions/copy';
 
 const GAME_STATE_INPUT = `{
   "game_id": "string",
@@ -118,144 +84,11 @@ const SAVE_MEMORY_INPUT = `{
 
 const SAVE_MEMORY_OUTPUT = `{ "ok": true }`;
 
-const SYSTEM_PROMPT = `Eres un agente detective de IA que participa en una competición de Cluedo corporativo
-llamada "El Algoritmo Asesinado".
-
-## Tools MCP disponibles
-
-Tienes acceso a tres herramientas MCP. Úsalas en este orden en cada turno:
-
-1. get_game_state(game_id, team_id)
-   Devuelve el estado actual de la partida filtrado para tu equipo (GameStateView).
-   Incluye: tus cartas en mano, el turno actual, el historial de sugerencias/refutaciones,
-   el estado de cada equipo y los valores canónicos válidos del juego. Consulta siempre este campo.
-
-2. get_agent_memory(game_id, team_id)
-   Recupera el JSON de deducción que guardaste en turnos anteriores.
-   Devuelve: { memory: { ... }, updatedAt: "ISO string" }
-   Si no hay memoria previa, devuelve { memory: {} }.
-
-3. save_agent_memory(game_id, team_id, memory)
-   Persiste tu estado de deducción entre turnos.
-   El parámetro memory es un JSON string (stringify antes de enviar).
-   Llámala después de cada turno para no perder tu razonamiento acumulado.
-
-## Valores canónicos del juego
-Los valores exactos los proporciona get_game_state en cada llamada.
-Usa UNICAMENTE los nombres tal como aparecen en la respuesta de get_game_state.
-
-## Reglas clave
-El motor te invocará con dos tipos de solicitud:
-
-- play_turn: debes elegir una acción (sugerencia, acusación o pase).
-- refute: debes decidir si puedes refutar la sugerencia recibida y, si es así, qué carta mostrar.
-
-Responde siempre con el formato JSON correcto para cada modo.
-El motor rechaza cualquier respuesta que no sea JSON válido con los campos exactos.
-
-## Formato de respuesta
-Responde UNICAMENTE con un objeto JSON válido, sin texto adicional.
-
-Modo play_turn:
-  Sugerencia: {"action":"suggestion","sospechoso":"...","arma":"...","escenario":"...","spectatorComment":"..."}
-  Acusación:  {"action":"accusation","sospechoso":"...","arma":"...","escenario":"...","spectatorComment":"..."}
-  Pase:       {"action":"pass","spectatorComment":"..."}
-
-Modo refute:
-  Mostrar carta: {"action":"show_card","carta":"NombreExactoDeLaCarta","spectatorComment":"..."}
-  No puede refutar: {"action":"cannot_refute","spectatorComment":"..."}
-
-spectatorComment: campo opcional (max. 160 caracteres, sin saltos de linea).
-Es visible para los espectadores en la Arena durante la partida.`;
-
-const SEQUENCE_DIAGRAM_MERMAID = `sequenceDiagram
-    autonumber
-    participant M as Motor de juego
-    participant A as Agente
-    M->>A: invocar play_turn
-    A->>M: get_game_state(game_id, team_id)
-    M-->>A: GameStateView filtrada
-    A->>M: get_agent_memory(game_id, team_id)
-    M-->>A: { memory: { ... } }
-    Note over A: Razona con estado y memoria
-    opt Persistencia opcional
-      A->>M: save_agent_memory({ ... })
-      M-->>A: { ok: true }
-    end
-    A-->>M: AgentResponse { action: "..." }
-    Note over M: Valida y aplica la acción`;
-
-const FAQ_ROWS = [
-  {
-    error: 'EVT_INVALID_FORMAT en todos los turnos',
-    cause: 'La respuesta no es JSON plano o falta el campo action.',
-    solution: 'Devuelve exactamente el objeto AgentResponse sin texto ni envolturas extra.',
-  },
-  {
-    error: 'EVT_INVALID_CARD en la primera sugerencia',
-    cause: 'Nombre con mayúscula, tilde o espacio distinto al canónico.',
-    solution: 'Lee get_game_state y copia literalmente los nombres válidos.',
-  },
-  {
-    error: 'historial: [] siempre vacío',
-    cause: 'Puede ocurrir en versiones previas del motor con el bug abierto de historial.',
-    solution: 'Diseña el agente para degradar bien aunque el historial llegue vacío.',
-  },
-  {
-    error: '401 Unauthorized',
-    cause: 'TEAM_MCP_TOKEN incorrecto o con espacios adicionales.',
-    solution: 'Verifica que se envía como Bearer <token> sin espacios extra.',
-  },
-  {
-    error: 'cannot_refute cuando sí tiene carta',
-    cause: 'Comparación de nombres no exacta.',
-    solution: 'Usa comparación estricta y los nombres canónicos exactos.',
-  },
-  {
-    error: 'EVT_TIMEOUT frecuente',
-    cause: 'El modelo tarda demasiado en responder.',
-    solution: 'Recorta prompt, simplifica estrategia o usa un modelo más rápido.',
-  },
-  {
-    error: 'EVT_REDUNDANT_SUGGESTION repetido',
-    cause: 'Se repite la misma tripla en turnos distintos.',
-    solution: 'Guarda sugerencias previas en save_agent_memory y exclúyelas al decidir.',
-  },
-];
-
-const QUICKSTART_STEPS = [
-  {
-    title: 'Crea una aplicación en MattinAI',
-    body: 'Abre una aplicación nueva para agrupar el agente, sus prompts y las integraciones MCP del evento.',
-  },
-  {
-    title: 'Registra el MCP de Clue Arena',
-    body: 'Añade el servidor MCP del evento y concede acceso a tu agente. La organización te facilitará URL y API key.',
-  },
-  {
-    title: 'Pega el system prompt base',
-    body: 'Usa el prompt de esta guía como base fija y deja la estrategia competitiva en el user prompt o prompt template.',
-  },
-  {
-    title: 'Guarda APP ID, Agent ID y API Key',
-    body: 'Son los tres datos que Clue Arena necesita para invocar tu agente en producción.',
-  },
-  {
-    title: 'Prueba y entrena',
-    body: 'Conecta el agente en la ficha del equipo y usa la zona de entrenamiento antes del evento.',
-  },
-];
-
-const LAUNCH_CHECKLIST = [
-  'El agente responde solo con JSON válido.',
-  'Los nombres de cartas se copian de get_game_state.',
-  'La memoria se guarda tras cada turno útil.',
-  'Las sugerencias repetidas se evitan con estado persistido.',
-];
-
 export default async function InstruccionesPage() {
+  const locale = await getLocale();
   const t = await getTranslations('instrucciones');
   const tJuego = await getTranslations('juego');
+  const copy = getInstructionsCopy(locale).page;
   const appBaseUrl = process.env.NEXT_PUBLIC_APP_URL?.trim() || 'http://localhost:3000';
   const mcpToken = process.env.MCP_AUTH_TOKEN?.trim() || '';
   const maskedMcpToken = maskSecret(mcpToken);
@@ -287,34 +120,29 @@ export default async function InstruccionesPage() {
             </div>
 
             <div className="grid gap-4 md:grid-cols-3">
-              <HeroMetric
-                icon={<Bot className="h-4 w-4" />}
-                label="Entrada esperada"
-                value="play_turn / refute"
-                tone="cyan"
-              />
-              <HeroMetric
-                icon={<DatabaseZap className="h-4 w-4" />}
-                label="Tools MCP"
-                value="3 herramientas"
-                tone="emerald"
-              />
-              <HeroMetric
-                icon={<ShieldCheck className="h-4 w-4" />}
-                label="Salida obligatoria"
-                value="JSON estricto"
-                tone="amber"
-              />
+              {copy.heroMetrics.map((metric, index) => (
+                <HeroMetric
+                  key={`${metric.label}-${index}`}
+                  icon={
+                    index === 0 ? <Bot className="h-4 w-4" /> :
+                    index === 1 ? <DatabaseZap className="h-4 w-4" /> :
+                    <ShieldCheck className="h-4 w-4" />
+                  }
+                  label={metric.label}
+                  value={metric.value}
+                  tone={metric.tone as 'cyan' | 'emerald' | 'amber'}
+                />
+              ))}
             </div>
 
             <div className="grid gap-4">
               <HighlightPanel
-                title="Lo esencial para competir"
-                description="Si tu equipo solo recuerda una cosa, que sea esta: el motor tolera poca ambigüedad. Prompt claro, nombres canónicos exactos y respuesta JSON limpia."
+                title={copy.essentialsTitle}
+                description={copy.essentialsDescription}
                 icon={<Sparkles className="h-4 w-4" />}
               >
                 <div className="grid gap-3 text-sm text-slate-300 sm:grid-cols-2">
-                  {LAUNCH_CHECKLIST.map((item) => (
+                  {copy.launchChecklist.map((item) => (
                     <div
                       key={item}
                       className="flex items-start gap-2 rounded-2xl border border-white/8 bg-white/5 px-3 py-3"
@@ -329,10 +157,10 @@ export default async function InstruccionesPage() {
               <aside className="rounded-[28px] border border-white/10 bg-slate-950/50 p-5 backdrop-blur">
                 <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-100">
                   <ClipboardCheck className="h-4 w-4 text-amber-300" />
-                  Camino recomendado
+                  {copy.recommendedPathTitle}
                 </div>
                 <div className="space-y-3">
-                  {QUICKSTART_STEPS.map((step, index) => (
+                  {copy.quickstartSteps.map((step, index) => (
                     <div key={step.title} className="rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-3">
                       <div className="mb-1 flex items-center gap-2 text-sm font-semibold text-white">
                         <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-amber-400/15 text-xs text-amber-200">
@@ -352,42 +180,31 @@ export default async function InstruccionesPage() {
             <div className="rounded-[28px] border border-cyan-400/15 bg-slate-950/70 p-5">
               <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-cyan-200">
                 <BrainCircuit className="h-4 w-4" />
-                Arquitectura mental del agente
+                {copy.mentalModelTitle}
               </div>
               <div className="space-y-3">
-                <FlowStep
-                  title="Lee el estado"
-                  description="Consulta get_game_state para obtener tus cartas, turno, historial y nombres válidos."
-                />
-                <FlowStep
-                  title="Recupera memoria"
-                  description="Carga lo que ya dedujiste en turnos anteriores para no empezar de cero."
-                />
-                <FlowStep
-                  title="Decide la jugada"
-                  description="Sugerencia, acusación, pase o refutación según el modo invocado."
-                />
-                <FlowStep
-                  title="Persiste contexto"
-                  description="Guarda deducciones y evita repeticiones con save_agent_memory."
-                />
+                {copy.flowSteps.map((step) => (
+                  <FlowStep
+                    key={step.title}
+                    title={step.title}
+                    description={step.description}
+                  />
+                ))}
               </div>
             </div>
 
             <div className="rounded-[28px] border border-amber-400/15 bg-[linear-gradient(180deg,_rgba(120,53,15,0.28),_rgba(15,23,42,0.72))] p-5">
               <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-amber-200">
                 <Trophy className="h-4 w-4" />
-                Qué premia la arena
+                {copy.arenaRewardsTitle}
               </div>
               <p className="text-sm leading-6 text-slate-300">
-                La puntuación recompensa precisión y velocidad, pero castiga duro los errores estructurales.
-                Un agente sobrio y consistente suele rendir mejor que uno brillante pero inestable.
+                {copy.arenaRewardsDescription}
               </p>
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                <MiniNote label="+ precisión" value="Acusar solo cuando la hipótesis esté madura." />
-                <MiniNote label="+ eficiencia" value="Resolver en pocos turnos propios suma bonus." />
-                <MiniNote label="- formato" value="JSON incorrecto consume turno y penaliza." />
-                <MiniNote label="- repetición" value="Duplicar sugerencias cuesta puntos evitables." />
+                {copy.rewardNotes.map((note) => (
+                  <MiniNote key={note.label} label={note.label} value={note.value} />
+                ))}
               </div>
             </div>
           </div>
@@ -396,7 +213,7 @@ export default async function InstruccionesPage() {
 
       <SectionWrapper id="quickstart" title={t('sec8Titulo')} titleNumber="1">
         <div className="grid gap-4 lg:grid-cols-2">
-          {QUICKSTART_STEPS.map((step, index) => (
+          {copy.quickstartSteps.map((step, index) => (
             <StepCard key={step.title} index={index + 1} title={step.title}>
               <p className="text-sm leading-6 text-slate-400">{step.body}</p>
             </StepCard>
@@ -405,41 +222,42 @@ export default async function InstruccionesPage() {
 
         <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
           <HighlightPanel
-            title="Configuración MCP de la app"
-            description="El endpoint MCP vive en la URL pública actual de Clue Arena. La autenticación entrante puede validarse por API key y este ejemplo usa la cabecera X-API-KEY."
+            title={copy.mcpConfigTitle}
+            description={copy.mcpConfigDescription}
             icon={<KeyRound className="h-4 w-4" />}
           >
             <CodeBlock code={mattinMcpConfig} language="json" filename="mcp-config.json" />
             <p className="text-xs leading-5 text-slate-500">
-              El token mostrado está redactado a propósito. La fuente real en servidor es
+              {copy.mcpConfigTokenNotePrefix}
               <code className="mx-1 font-mono text-slate-300">MCP_AUTH_TOKEN</code>.
             </p>
           </HighlightPanel>
 
           <HighlightPanel
-            title="Datos que luego registrarás en Clue Arena"
-            description="Cuando el agente exista en MattinAI, tu equipo debe copiar exactamente estos tres identificadores."
+            title={copy.clueArenaDataTitle}
+            description={copy.clueArenaDataDescription}
             icon={<ClipboardCheck className="h-4 w-4" />}
           >
             <div className="space-y-3">
-              <KeyValueItem label="APP ID" value="Identificador de la aplicación MattinAI" />
-              <KeyValueItem label="Agent ID" value="Identificador del agente dentro de esa aplicación" />
-              <KeyValueItem label="API Key" value="Clave privada para invocar el agente" />
+              {copy.keyValueItems.map((item) => (
+                <KeyValueItem key={item.label} label={item.label} value={item.value} />
+              ))}
             </div>
           </HighlightPanel>
         </div>
 
         <HighlightPanel
-          title="System prompt base"
-          description="Este bloque fija contrato, flujo de herramientas y formato de salida. Tu estrategia competitiva debe vivir aparte, en el user prompt o template."
+          title={copy.systemPromptTitle}
+          description={copy.systemPromptDescription}
           icon={<Bot className="h-4 w-4" />}
         >
-          <CodeBlock code={SYSTEM_PROMPT} language="text" filename="system-prompt.txt" />
+          <CodeBlock code={copy.systemPrompt} language="text" filename="system-prompt.txt" />
           <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
-            Los campos <code className="font-mono text-amber-200">sospechoso</code>,{' '}
+            {copy.systemPromptWarningPrefix}{' '}
+            <code className="font-mono text-amber-200">sospechoso</code>,{' '}
             <code className="font-mono text-amber-200">arma</code>,{' '}
             <code className="font-mono text-amber-200">escenario</code> y{' '}
-            <code className="font-mono text-amber-200">carta</code> deben coincidir exactamente con el contrato.
+            <code className="font-mono text-amber-200">carta</code> {copy.systemPromptWarningSuffix}
           </div>
         </HighlightPanel>
       </SectionWrapper>
@@ -447,69 +265,71 @@ export default async function InstruccionesPage() {
       <SectionWrapper id="como-funciona" title={t('sec2Titulo')} titleNumber="2">
         <div className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
           <HighlightPanel
-            title="Cuándo se invoca tu agente"
-            description="El motor no te pide mover piezas: te pide decidir. Esa decisión vuelve como AgentResponse y el coordinador aplica la acción."
+            title={copy.invokeAgentTitle}
+            description={copy.invokeAgentDescription}
             icon={<Swords className="h-4 w-4" />}
           >
             <div className="overflow-x-auto rounded-2xl border border-slate-800">
               <table className="w-full text-left text-sm">
                 <thead>
                   <tr>
-                    <th className="border-b border-slate-800 bg-slate-900/80 px-4 py-3 font-semibold text-slate-300">Situación</th>
-                    <th className="border-b border-slate-800 bg-slate-900/80 px-4 py-3 font-semibold text-slate-300">Modo</th>
-                    <th className="border-b border-slate-800 bg-slate-900/80 px-4 py-3 font-semibold text-slate-300">Qué debe devolver</th>
+                    {copy.invokeHeaders.map((header) => (
+                      <th
+                        key={header}
+                        className="border-b border-slate-800 bg-slate-900/80 px-4 py-3 font-semibold text-slate-300"
+                      >
+                        {header}
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
-                  <tr className="hover:bg-slate-800/30">
-                    <td className="border-b border-slate-800 px-4 py-3 text-slate-300">Es el turno del equipo</td>
-                    <td className="border-b border-slate-800 px-4 py-3 font-mono text-cyan-300">play_turn</td>
-                    <td className="border-b border-slate-800 px-4 py-3 text-slate-300">Sugerencia, acusación o pase</td>
-                  </tr>
-                  <tr className="hover:bg-slate-800/30">
-                    <td className="border-b border-slate-800 px-4 py-3 text-slate-300">Puede refutar a otro equipo</td>
-                    <td className="border-b border-slate-800 px-4 py-3 font-mono text-cyan-300">refute</td>
-                    <td className="border-b border-slate-800 px-4 py-3 text-slate-300">Mostrar carta o indicar que no puede</td>
-                  </tr>
+                  {copy.invokeRows.map(([situation, mode, result]) => (
+                    <tr key={`${mode}-${situation}`} className="hover:bg-slate-800/30">
+                      <td className="border-b border-slate-800 px-4 py-3 text-slate-300">{situation}</td>
+                      <td className="border-b border-slate-800 px-4 py-3 font-mono text-cyan-300">{mode}</td>
+                      <td className="border-b border-slate-800 px-4 py-3 text-slate-300">{result}</td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
           </HighlightPanel>
 
           <HighlightPanel
-            title="Secuencia completa de un turno"
-            description="Este orden es la coreografía recomendada. Ayuda a que el agente sea consistente y fácil de depurar."
+            title={copy.turnSequenceTitle}
+            description={copy.turnSequenceDescription}
             icon={<ChevronRight className="h-4 w-4" />}
           >
-            <MermaidDiagram chart={SEQUENCE_DIAGRAM_MERMAID} />
+            <MermaidDiagram chart={copy.sequenceDiagram} />
           </HighlightPanel>
         </div>
 
         <div className="rounded-2xl border border-cyan-400/15 bg-cyan-400/5 px-4 py-4 text-sm text-slate-300">
-          <strong className="text-cyan-200">Importante:</strong> el agente no ejecuta herramientas para
-          sugerir o acusar. Solo devuelve un <code className="font-mono text-cyan-200">AgentResponse</code> válido.
+          <strong className="text-cyan-200">{copy.importantNoteLabel}</strong> {copy.importantNotePrefix}{' '}
+          <code className="font-mono text-cyan-200">AgentResponse</code> {copy.importantNoteSuffix}
         </div>
       </SectionWrapper>
 
       <SectionWrapper id="herramientas" title={t('sec4Titulo')} titleNumber="4">
         <div className="grid gap-4 md:grid-cols-3">
-          <ToolSummary name="get_game_state" summary="Estado filtrado de la partida para tu equipo." />
-          <ToolSummary name="get_agent_memory" summary="Memoria persistida entre invocaciones." />
-          <ToolSummary name="save_agent_memory" summary="Persistencia del razonamiento acumulado." />
+          {copy.toolSummaries.map((tool) => (
+            <ToolSummary key={tool.name} name={tool.name} summary={tool.summary} />
+          ))}
         </div>
 
         <ToolPanel
           name="get_game_state"
-          description="Devuelve el estado de la partida filtrado para tu equipo. Solo ves tus cartas y el historial público."
-          footer="cartaMostrada solo aparece para el equipo que realizó la sugerencia y recibió esa carta."
+          description={copy.toolStateDescription}
+          footer={copy.toolStateFooter}
         >
           <div className="grid gap-4 xl:grid-cols-2">
             <div>
-              <p className="mb-2 text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Entrada</p>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">{copy.inputLabel}</p>
               <CodeBlock code={GAME_STATE_INPUT} language="json" />
             </div>
             <div>
-              <p className="mb-2 text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Respuesta</p>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">{copy.outputLabel}</p>
               <CodeBlock code={GAME_STATE_OUTPUT} language="json" />
             </div>
           </div>
@@ -517,15 +337,15 @@ export default async function InstruccionesPage() {
 
         <ToolPanel
           name="get_agent_memory"
-          description="Recupera libreta, hipótesis y descartes que guardaste en turnos anteriores."
+          description={copy.toolMemoryDescription}
         >
           <div className="grid gap-4 xl:grid-cols-2">
             <div>
-              <p className="mb-2 text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Entrada</p>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">{copy.inputLabel}</p>
               <CodeBlock code={MEMORY_INPUT} language="json" />
             </div>
             <div>
-              <p className="mb-2 text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Respuesta</p>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">{copy.outputLabel}</p>
               <CodeBlock code={MEMORY_OUTPUT} language="json" />
             </div>
           </div>
@@ -533,16 +353,16 @@ export default async function InstruccionesPage() {
 
         <ToolPanel
           name="save_agent_memory"
-          description="Guarda deducciones y contexto del turno para evitar perder razonamiento entre llamadas."
-          footer="Límite recomendado por partida y equipo: 64 KB."
+          description={copy.toolSaveDescription}
+          footer={copy.toolSaveFooter}
         >
           <div className="grid gap-4 xl:grid-cols-2">
             <div>
-              <p className="mb-2 text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Entrada</p>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">{copy.inputLabel}</p>
               <CodeBlock code={SAVE_MEMORY_INPUT} language="json" />
             </div>
             <div>
-              <p className="mb-2 text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Respuesta</p>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">{copy.outputLabel}</p>
               <CodeBlock code={SAVE_MEMORY_OUTPUT} language="json" />
             </div>
           </div>
@@ -552,25 +372,30 @@ export default async function InstruccionesPage() {
       <SectionWrapper id="respuesta" title={t('sec5Titulo')} titleNumber="5">
         <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
           <HighlightPanel
-            title="Contrato AgentResponse"
-            description="El motor espera exactamente esta forma. Cualquier desviación puede terminar en EVT_INVALID_FORMAT."
+            title={copy.agentResponseTitle}
+            description={copy.agentResponseDescription}
             icon={<ShieldCheck className="h-4 w-4" />}
           >
-            <CodeBlock code={AGENT_RESPONSE_SCHEMA} language="typescript" />
+            <CodeBlock code={copy.agentResponseSchema} language="typescript" />
           </HighlightPanel>
 
           <HighlightPanel
-            title="Acciones válidas por modo"
-            description="Cada modo admite un subconjunto distinto de acciones. Mezclarlos produce error de formato."
+            title={copy.validActionsTitle}
+            description={copy.validActionsDescription}
             icon={<ClipboardCheck className="h-4 w-4" />}
           >
             <div className="overflow-x-auto rounded-2xl border border-slate-800">
               <table className="w-full text-left text-sm">
                 <thead>
                   <tr>
-                    <th className="border-b border-slate-800 bg-slate-900/80 px-4 py-3 font-semibold text-slate-300">Modo</th>
-                    <th className="border-b border-slate-800 bg-slate-900/80 px-4 py-3 font-semibold text-slate-300">Válidas</th>
-                    <th className="border-b border-slate-800 bg-slate-900/80 px-4 py-3 font-semibold text-slate-300">Inválidas</th>
+                    {copy.validActionsHeaders.map((header) => (
+                      <th
+                        key={header}
+                        className="border-b border-slate-800 bg-slate-900/80 px-4 py-3 font-semibold text-slate-300"
+                      >
+                        {header}
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
@@ -591,39 +416,38 @@ export default async function InstruccionesPage() {
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          <ExampleCard title="Sugerencia" code={EXAMPLE_SUGGESTION} />
-          <ExampleCard title="Acusación" code={EXAMPLE_ACCUSATION} />
-          <ExampleCard title="Pase" code={EXAMPLE_PASS} />
-          <ExampleCard title="Mostrar carta" code={EXAMPLE_SHOW_CARD} />
-          <ExampleCard title="No puede refutar" code={EXAMPLE_CANNOT_REFUTE} />
+          <ExampleCard title={copy.exampleTitles[0]} code={copy.exampleSuggestion} />
+          <ExampleCard title={copy.exampleTitles[1]} code={copy.exampleAccusation} />
+          <ExampleCard title={copy.exampleTitles[2]} code={copy.examplePass} />
+          <ExampleCard title={copy.exampleTitles[3]} code={copy.exampleShowCard} />
+          <ExampleCard title={copy.exampleTitles[4]} code={copy.exampleCannotRefute} />
         </div>
 
         <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-4 text-sm text-amber-100">
-          En <code className="font-mono text-amber-200">show_card</code>, la carta debe ser una de tus cartas
-          propias y formar parte de la sugerencia que estás refutando.
+          {copy.showCardNotePrefix} <code className="font-mono text-amber-200">show_card</code>, {copy.showCardNoteSuffix}
         </div>
       </SectionWrapper>
 
       <SectionWrapper id="elementos" title={t('sec6Titulo')} titleNumber="6">
         <HighlightPanel
-          title="Usa siempre valores canónicos"
-          description="Mayúsculas, tildes y espacios forman parte del contrato. Si el nombre no coincide exactamente, el motor penaliza con EVT_INVALID_CARD."
+          title={copy.canonicalValuesTitle}
+          description={copy.canonicalValuesDescription}
           icon={<Sparkles className="h-4 w-4" />}
         >
           <div className="grid gap-4 md:grid-cols-3">
-            <MiniNote label="Sospechosos" value="6 nombres cerrados y exactos." />
-            <MiniNote label="Armas" value="6 opciones válidas del evento." />
-            <MiniNote label="Escenarios" value="9 habitaciones canónicas." />
+            {copy.canonicalNotes.map((note) => (
+              <MiniNote key={note.label} label={note.label} value={note.value} />
+            ))}
           </div>
         </HighlightPanel>
 
-        <h3 className="mt-2 text-lg font-semibold text-slate-200">Sospechosos</h3>
+        <h3 className="mt-2 text-lg font-semibold text-slate-200">{copy.canonicalHeadings[0]}</h3>
         <SuspectsTable />
 
-        <h3 className="mt-2 text-lg font-semibold text-slate-200">Armas</h3>
+        <h3 className="mt-2 text-lg font-semibold text-slate-200">{copy.canonicalHeadings[1]}</h3>
         <WeaponsTable />
 
-        <h3 className="mt-2 text-lg font-semibold text-slate-200">Escenarios</h3>
+        <h3 className="mt-2 text-lg font-semibold text-slate-200">{copy.canonicalHeadings[2]}</h3>
         <ScenariosTable />
       </SectionWrapper>
 
@@ -632,28 +456,22 @@ export default async function InstruccionesPage() {
 
         <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
           <HighlightPanel
-            title="Bonus de eficiencia"
-            description="Solo lo recibe el ganador. Premia resolver el caso en pocos turnos propios."
+            title={copy.speedBonusTitle}
+            description={copy.speedBonusDescription}
             icon={<Trophy className="h-4 w-4" />}
           >
-            <CodeBlock
-              language="text"
-              code={`EVT_WIN_EFFICIENCY = max(0, 500 - (T - T_min) x 25)\n\ndonde:\n  T      = turnos propios jugados hasta la acusación correcta\n  T_min  = 2\n  umbral = 22 turnos propios -> bonificación = 0`}
-            />
+            <CodeBlock language="text" code={copy.speedBonusFormula} />
           </HighlightPanel>
 
           <HighlightPanel
-            title="Implicaciones de diseño"
-            description="Estas decisiones de UX del juego deben reflejarse en la estrategia de tu agente."
+            title={copy.designImplicationsTitle}
+            description={copy.designImplicationsDescription}
             icon={<BrainCircuit className="h-4 w-4" />}
           >
             <div className="grid gap-3 sm:grid-cols-2">
-              <ChecklistItem text="No acuses sin certeza: fallar elimina y penaliza fuerte." />
-              <ChecklistItem text="Varía sugerencias para no pagar redundancia." />
-              <ChecklistItem text="Responde siempre en JSON estricto." />
-              <ChecklistItem text="Refuta cuando puedas: también suma." />
-              <ChecklistItem text="No declares cannot_refute si sí tienes carta." />
-              <ChecklistItem text="Evita pases innecesarios." />
+              {copy.designChecklist.map((item) => (
+                <ChecklistItem key={item} text={item} />
+              ))}
             </div>
           </HighlightPanel>
         </div>
@@ -661,49 +479,36 @@ export default async function InstruccionesPage() {
 
       <SectionWrapper id="registro" title={t('sec9Titulo')} titleNumber="9">
         <div className="grid gap-4 lg:grid-cols-2">
-          <StepCard index={1} title="Entra en Mi Equipo">
-            <p className="text-sm leading-6 text-slate-400">
-              Accede con las credenciales corporativas y abre la ficha operativa del equipo.
-            </p>
-          </StepCard>
-          <StepCard index={2} title="Introduce credenciales">
-            <p className="text-sm leading-6 text-slate-400">
-              Rellena <code className="font-mono text-cyan-300">APP ID</code>,{' '}
-              <code className="font-mono text-cyan-300">Agent ID</code> y{' '}
-              <code className="font-mono text-cyan-300">API Key</code>.
-            </p>
-          </StepCard>
-          <StepCard index={3} title="Verifica la conexión">
-            <p className="text-sm leading-6 text-slate-400">
-              Usa la comprobación integrada antes de dar el agente por bueno para el evento.
-            </p>
-          </StepCard>
-          <StepCard index={4} title="Entrena antes del día real">
-            <p className="text-sm leading-6 text-slate-400">
-              Lanza partidas de práctica para revisar latencia, formato y calidad estratégica.
-            </p>
-          </StepCard>
+          {copy.registrationSteps.map((step, index) => (
+            <StepCard key={step.title} index={index + 1} title={step.title}>
+              <p className="text-sm leading-6 text-slate-400">{step.body}</p>
+            </StepCard>
+          ))}
         </div>
 
         <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-4 text-sm text-rose-100">
-          Los agentes locales o expuestos solo en <code className="font-mono text-rose-200">localhost</code> no
-          sirven para producción del evento.
+          {copy.localhostWarningPrefix} <code className="font-mono text-rose-200">localhost</code> {copy.localhostWarningSuffix}
         </div>
       </SectionWrapper>
 
       <SectionWrapper id="faq" title={t('sec10Titulo')} titleNumber="10">
         <div className="overflow-x-auto rounded-2xl border border-slate-800">
           <table className="w-full text-left text-sm">
-            <caption className="sr-only">Errores frecuentes y soluciones</caption>
+            <caption className="sr-only">{copy.faqCaption}</caption>
             <thead>
               <tr>
-                <th className="border-b border-slate-800 bg-slate-900/80 px-4 py-3 font-semibold text-slate-300">Error / situación</th>
-                <th className="border-b border-slate-800 bg-slate-900/80 px-4 py-3 font-semibold text-slate-300">Causa probable</th>
-                <th className="border-b border-slate-800 bg-slate-900/80 px-4 py-3 font-semibold text-slate-300">Solución</th>
+                {copy.faqHeaders.map((header) => (
+                  <th
+                    key={header}
+                    className="border-b border-slate-800 bg-slate-900/80 px-4 py-3 font-semibold text-slate-300"
+                  >
+                    {header}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {FAQ_ROWS.map((row) => (
+              {copy.faqRows.map((row) => (
                 <tr key={row.error} className="hover:bg-slate-800/30">
                   <td className="border-b border-slate-800 px-4 py-3 align-top text-amber-300">{row.error}</td>
                   <td className="border-b border-slate-800 px-4 py-3 align-top text-slate-400">{row.cause}</td>
@@ -715,7 +520,7 @@ export default async function InstruccionesPage() {
         </div>
 
         <div className="rounded-2xl border border-slate-800 bg-slate-900/60 px-4 py-4 text-sm text-slate-400">
-          Si después de entrenar todavía tienes dudas, el canal oficial del evento debe ser tu siguiente punto de apoyo.
+          {copy.faqFooter}
         </div>
       </SectionWrapper>
     </InstructionsLayout>

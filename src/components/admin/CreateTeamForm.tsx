@@ -8,7 +8,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { apiFetch } from '@/lib/api/client';
 import { useTranslations } from 'next-intl';
 import { TeamRegistrationSchema, type TeamRegistrationInput } from '@/lib/schemas/team';
-import type { TeamResponse } from '@/types/api';
+import type { TeamResponse, UserResponse } from '@/types/api';
 import { resolveTeamId } from '@/lib/utils/team-id';
 
 interface CreateTeamFormProps {
@@ -16,10 +16,21 @@ interface CreateTeamFormProps {
   onCancel: () => void;
 }
 
+interface MattinCheckResponse {
+  reachable: boolean;
+  response?: string;
+  error?: string;
+}
+
 export function CreateTeamForm({ onCreated, onCancel }: CreateTeamFormProps) {
   const t = useTranslations('admin');
   const [serverError, setServerError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [testMessage, setTestMessage] = useState<string | null>(null);
+  const [isTestingMattin, setIsTestingMattin] = useState(false);
+  const [users, setUsers] = useState<UserResponse[]>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [ownerUserId, setOwnerUserId] = useState('');
 
   const {
     register,
@@ -27,22 +38,82 @@ export function CreateTeamForm({ onCreated, onCancel }: CreateTeamFormProps) {
     reset,
     watch,
     setValue,
+    trigger,
     formState: { errors },
   } = useForm<TeamRegistrationInput>({
     resolver: zodResolver(TeamRegistrationSchema),
-    defaultValues: { agentBackend: 'mattin', id: '' },
+    defaultValues: { agentBackend: 'mattin', id: '', estado: 'activo' },
   });
   const agentBackend = watch('agentBackend');
   const nombre = watch('nombre');
   const teamId = watch('id');
+  const agentId = watch('agentId');
+  const appId = watch('appId');
+  const mattinApiKey = watch('mattinApiKey');
   const suggestedTeamId = resolveTeamId(undefined, nombre ?? '');
 
   useEffect(() => {
     if (agentBackend === 'local') {
+      setValue('agentId', '');
       setValue('appId', '');
       setValue('mattinApiKey', undefined);
+      setTestMessage(null);
     }
   }, [agentBackend, setValue]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setUsersLoading(true);
+
+    apiFetch<{ users: UserResponse[] }>('/admin/users')
+      .then((data) => {
+        if (cancelled) return;
+        setUsers(data.users);
+        if (data.users.length > 0) {
+          setOwnerUserId((current) => current || data.users[0]?.id || '');
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setUsers([]);
+      })
+      .finally(() => {
+        if (!cancelled) setUsersLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleMattinCheck = async () => {
+    setTestMessage(null);
+    const isValid = await trigger(['agentId', 'appId', 'mattinApiKey']);
+    if (!isValid) return;
+
+    setIsTestingMattin(true);
+    try {
+      const result = await apiFetch<MattinCheckResponse>('/teams/check-mattin', {
+        method: 'POST',
+        body: JSON.stringify({
+          agentId,
+          appId,
+          mattinApiKey,
+        }),
+      });
+      setTestMessage(result.reachable ? t('mattinCheckOk') : result.error || t('mattinCheckError'));
+    } catch (err: unknown) {
+      let message = err instanceof Error ? err.message : t('mattinCheckError');
+      try {
+        const body = JSON.parse(message);
+        message = body?.error || t('mattinCheckError');
+      } catch {
+        // ignore parse errors and keep original message
+      }
+      setTestMessage(message);
+    } finally {
+      setIsTestingMattin(false);
+    }
+  };
 
   const onSubmit = async (data: TeamRegistrationInput) => {
     setIsSubmitting(true);
@@ -54,9 +125,12 @@ export function CreateTeamForm({ onCreated, onCancel }: CreateTeamFormProps) {
         body: JSON.stringify({
           ...data,
           id: data.id?.trim() || undefined,
+          usuarioId: ownerUserId || undefined,
         }),
       });
       reset();
+      setTestMessage(null);
+      setOwnerUserId(users[0]?.id ?? '');
       onCreated(res.equipo);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : '';
@@ -68,6 +142,10 @@ export function CreateTeamForm({ onCreated, onCancel }: CreateTeamFormProps) {
         }
         if (body?.code === 'ID_DUPLICADO') {
           setServerError(t('registroIdDuplicado'));
+          return;
+        }
+        if (body?.error === 'El usuario seleccionado no existe') {
+          setServerError(t('errorOwnerNoExiste'));
           return;
         }
       } catch {
@@ -170,20 +248,36 @@ export function CreateTeamForm({ onCreated, onCancel }: CreateTeamFormProps) {
               )}
             </Field>
 
-            <Field label={`${t('agentId')} *`}>
-              <input
-                {...register('agentId')}
-                type="text"
+            <Field label={t('ownerEquipo')} className="sm:col-span-2">
+              <select
+                value={ownerUserId}
+                onChange={(event) => setOwnerUserId(event.target.value)}
+                disabled={usersLoading}
                 className={inputClass}
                 style={{ background: 'rgba(15, 23, 42, 0.78)', color: '#f8fafc', border: '1px solid rgba(148, 163, 184, 0.22)' }}
-                placeholder="Ej: agent-alpha-v2"
-              />
-              {errors.agentId && (
-                <p className="mt-2 text-xs" style={{ color: '#fca5a5' }}>{errors.agentId.message}</p>
-              )}
+              >
+                {usersLoading ? <option value="">{t('cargandoUsuarios')}</option> : null}
+                {users.map((user) => (
+                  <option key={user.id} value={user.id}>
+                    {user.nombre} ({user.email})
+                  </option>
+                ))}
+                {!usersLoading && users.length === 0 ? <option value="">{t('cargandoUsuarios')}</option> : null}
+              </select>
             </Field>
 
-            <Field label={t('agentBackendLabel')}>
+            <Field label={t('estadoLabel')} className="sm:col-span-2">
+              <select
+                {...register('estado')}
+                className={inputClass}
+                style={{ background: 'rgba(15, 23, 42, 0.78)', color: '#f8fafc', border: '1px solid rgba(148, 163, 184, 0.22)' }}
+              >
+                <option value="activo">{t('status.activo')}</option>
+                <option value="inactivo">{t('status.inactivo')}</option>
+              </select>
+            </Field>
+
+            <Field label={t('agentBackendLabel')} className="sm:col-span-2">
               <select
                 {...register('agentBackend')}
                 className={inputClass}
@@ -197,6 +291,19 @@ export function CreateTeamForm({ onCreated, onCancel }: CreateTeamFormProps) {
 
             {agentBackend === 'mattin' && (
               <>
+                <Field label={`${t('agentId')} *`}>
+                  <input
+                    {...register('agentId')}
+                    type="text"
+                    className={inputClass}
+                    style={{ background: 'rgba(15, 23, 42, 0.78)', color: '#f8fafc', border: '1px solid rgba(148, 163, 184, 0.22)' }}
+                    placeholder="Ej: agent-alpha-v2"
+                  />
+                  {errors.agentId && (
+                    <p className="mt-2 text-xs" style={{ color: '#fca5a5' }}>{errors.agentId.message}</p>
+                  )}
+                </Field>
+
                 <Field label={t('appIdLabel')}>
                   <input
                     {...register('appId')}
@@ -210,7 +317,7 @@ export function CreateTeamForm({ onCreated, onCancel }: CreateTeamFormProps) {
                   )}
                 </Field>
 
-                <Field label={t('mattinApiKeyLabel')}>
+                <Field label={t('mattinApiKeyLabel')} className="sm:col-span-2">
                   <input
                     {...register('mattinApiKey')}
                     type="password"
@@ -226,6 +333,53 @@ export function CreateTeamForm({ onCreated, onCancel }: CreateTeamFormProps) {
               </>
             )}
           </div>
+
+          {agentBackend === 'mattin' ? (
+            <>
+              <div
+                className="flex flex-col gap-3 rounded-2xl border px-4 py-4 sm:flex-row sm:items-center sm:justify-between"
+                style={{ borderColor: 'rgba(52, 211, 153, 0.18)', background: 'rgba(8, 17, 29, 0.65)' }}
+              >
+                <div>
+                  <p className="text-sm font-semibold" style={{ color: '#f8fafc' }}>
+                    {t('mattinCheckTitle')}
+                  </p>
+                  <p className="mt-1 text-sm leading-6" style={{ color: '#94a3b8' }}>
+                    {t('mattinCheckDesc')}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleMattinCheck}
+                  disabled={isTestingMattin || isSubmitting}
+                  className="inline-flex items-center justify-center rounded-2xl px-5 py-3 text-sm font-semibold whitespace-nowrap disabled:opacity-50 sm:self-start"
+                  style={{ background: '#0f766e', color: '#ecfeff' }}
+                >
+                  {isTestingMattin ? t('mattinCheckLoading') : t('mattinCheckAction')}
+                </button>
+              </div>
+
+              {testMessage ? (
+                <div
+                  className="rounded-2xl border px-4 py-3 text-sm"
+                  style={{
+                    borderColor: testMessage === t('mattinCheckOk') ? 'rgba(34,197,94,0.28)' : 'rgba(248,113,113,0.28)',
+                    background: testMessage === t('mattinCheckOk') ? 'rgba(20,83,45,0.35)' : 'rgba(127,29,29,0.35)',
+                    color: testMessage === t('mattinCheckOk') ? '#bbf7d0' : '#fecaca',
+                  }}
+                >
+                  {testMessage}
+                </div>
+              ) : null}
+            </>
+          ) : (
+            <p
+              className="rounded-2xl border px-4 py-3 text-sm"
+              style={{ borderColor: 'rgba(148, 163, 184, 0.14)', background: 'rgba(8, 17, 29, 0.52)', color: '#94a3b8' }}
+            >
+              {t('localBackendHint')}
+            </p>
+          )}
 
           <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:justify-end">
             <button
@@ -252,9 +406,9 @@ export function CreateTeamForm({ onCreated, onCancel }: CreateTeamFormProps) {
   );
 }
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
+function Field({ label, children, className }: { label: string; children: ReactNode; className?: string }) {
   return (
-    <label className="block">
+    <label className={className}>
       <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em]" style={{ color: '#94a3b8' }}>
         {label}
       </span>

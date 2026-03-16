@@ -320,11 +320,31 @@ async function resolveRefutation(
 }
 
 // ---------------------------------------------------------------------------
+// Training execution helpers
+// ---------------------------------------------------------------------------
+
+async function getTrainingGameExecutionRow(gameId: string): Promise<{
+  estado: 'en_curso' | 'finalizada' | 'abortada';
+  motivoAbort: string | null;
+} | null> {
+  const row = await db
+    .select({
+      estado: partidasEntrenamiento.estado,
+      motivoAbort: partidasEntrenamiento.motivoAbort,
+    })
+    .from(partidasEntrenamiento)
+    .where(eq(partidasEntrenamiento.id, gameId))
+    .get();
+  return row ?? null;
+}
+
+// ---------------------------------------------------------------------------
 // Main export
 // ---------------------------------------------------------------------------
 
 export async function runTrainingGameLoop(
   options: TrainingLoopOptions,
+  signal?: AbortSignal,
 ): Promise<TrainingLoopResult> {
   const { gameId, equipoId, numBots } = options;
   const turnLimit = options.maxTurnos ?? MAX_TRAINING_TURNS;
@@ -362,205 +382,238 @@ export async function runTrainingGameLoop(
 
   try {
     while (totalTurns < turnLimit) {
-    if (isGameOver(state)) break;
+      if (signal?.aborted) {
+        abortReason ??= 'ABORTED';
+        break;
+      }
 
-    const activeEquipos = state.equipos.filter((e) => !e.eliminado);
-    if (activeEquipos.length === 0) break;
+      const executionRow = await getTrainingGameExecutionRow(gameId);
+      if (!executionRow) {
+        abortReason ??= 'TRAINING_GAME_NOT_FOUND';
+        break;
+      }
+      if (executionRow.estado !== 'en_curso') {
+        abortReason = executionRow.motivoAbort ?? (executionRow.estado === 'abortada' ? 'ABORTED' : abortReason);
+        break;
+      }
 
-    const currentEquipo = activeEquipos[state.turnoActual % activeEquipos.length];
-    if (!currentEquipo) break;
+      if (isGameOver(state)) break;
 
-    const currentTeamId = currentEquipo.equipoId;
-    const isRealTeam = currentTeamId === equipoId;
-    const gameStateJson = JSON.stringify(getGameStateView(state, currentTeamId));
-    const turnId = uuidv4();
-    const tsStart = Date.now();
+      const activeEquipos = state.equipos.filter((e) => !e.eliminado);
+      if (activeEquipos.length === 0) break;
 
-    let agentResponse: AgentResponse | null = null;
-    let traceJson: string | null = null;
-    let memoriaInicialJson: string | null = null;
-    let memoriaFinalJson: string | null = null;
-    let durationMs = 0;
+      const currentEquipo = activeEquipos[state.turnoActual % activeEquipos.length];
+      if (!currentEquipo) break;
 
-    if (isRealTeam) {
-      // Real team turn — invoke with trace
-      try {
-        const result = await invokeAgentWithTrace({
-          agentRequest: { type: 'play_turn', gameId, teamId: currentTeamId },
-          gameStateJson,
-          agentBackend:  options.agentBackend,
-          mattinAgentId: options.mattinAgentId,
-          mattinAppId:   options.mattinAppId,
-          mattinApiKey:  options.mattinApiKey,
+      const currentTeamId = currentEquipo.equipoId;
+      const isRealTeam = currentTeamId === equipoId;
+      const gameStateJson = JSON.stringify(getGameStateView(state, currentTeamId));
+      const turnId = uuidv4();
+      const tsStart = Date.now();
+
+      let agentResponse: AgentResponse | null = null;
+      let traceJson: string | null = null;
+      let memoriaInicialJson: string | null = null;
+      let memoriaFinalJson: string | null = null;
+      let durationMs = 0;
+
+      if (isRealTeam) {
+        try {
+          const result = await invokeAgentWithTrace({
+            agentRequest: { type: 'play_turn', gameId, teamId: currentTeamId },
+            gameStateJson,
+            agentBackend: options.agentBackend,
+            mattinAgentId: options.mattinAgentId,
+            mattinAppId: options.mattinAppId,
+            mattinApiKey: options.mattinApiKey,
+          });
+          agentResponse = result.agentResponse;
+          traceJson = JSON.stringify(result.trace);
+          memoriaInicialJson = JSON.stringify(result.memoriaInicial);
+          memoriaFinalJson = JSON.stringify(result.memoriaFinal);
+          durationMs = result.durationMs;
+        } catch (err) {
+          if (err instanceof TrainingAgentError) {
+            traceJson = JSON.stringify(err.trace);
+          }
+          agentResponse = { action: { type: 'pass' }, reasoning: 'agent_error', done: true };
+          durationMs = Date.now() - tsStart;
+        }
+      } else {
+        try {
+          agentResponse = await invokeBotAgent('play_turn', gameId, currentTeamId, gameStateJson);
+          durationMs = Date.now() - tsStart;
+        } catch {
+          agentResponse = { action: { type: 'pass' }, reasoning: 'bot_error', done: true };
+          durationMs = Date.now() - tsStart;
+        }
+      }
+
+      let gameAction = toGameAction(agentResponse, currentTeamId);
+      if (!gameAction) gameAction = { type: 'pass', equipoId: currentTeamId };
+
+      let refutacionJsonStr: string | null = null;
+
+      if (gameAction.type === 'suggestion') {
+        const refutRes = await resolveRefutation(
+          state,
+          gameId,
+          currentTeamId,
+          gameAction.sospechoso,
+          gameAction.arma,
+          gameAction.habitacion,
+          equipoId,
+          {
+            agentBackend: options.agentBackend,
+            mattinAgentId: options.mattinAgentId,
+            mattinAppId: options.mattinAppId,
+            mattinApiKey: options.mattinApiKey,
+          },
+        );
+        const { refutadorId, card, realTeamRefuteResult, botRefutacionRazonamiento } = refutRes;
+
+        const applyResult = applyAction(state, gameAction);
+        state = applyResult.state;
+
+        if (refutadorId && card && state.historial.length > 0) {
+          const lastRecord = state.historial[state.historial.length - 1];
+          if (lastRecord.result && 'refutadaPor' in lastRecord.result) {
+            (lastRecord.result as { refutadaPor: string | null; cartaMostrada: string | null }).cartaMostrada = card;
+          }
+        }
+
+        refutacionJsonStr = JSON.stringify({
+          refutadaPor: refutadorId,
+          cartaMostrada: card,
+          razonamiento:
+            refutadorId === null
+              ? undefined
+              : realTeamRefuteResult
+                ? realTeamRefuteResult.agentResponse.reasoning
+                : botRefutacionRazonamiento,
         });
-        agentResponse = result.agentResponse;
-        traceJson = JSON.stringify(result.trace);
-        memoriaInicialJson = JSON.stringify(result.memoriaInicial);
-        memoriaFinalJson = JSON.stringify(result.memoriaFinal);
-        durationMs = result.durationMs;
-      } catch (err) {
-        // Capture trace even on error, then auto-pass
-        if (err instanceof TrainingAgentError) {
-          traceJson = JSON.stringify(err.trace);
+
+        if (realTeamRefuteResult && !isRealTeam) {
+          const refuteTurnId = uuidv4();
+          const refuteGameStateJson = JSON.stringify(getGameStateView(state, equipoId));
+          await db.insert(turnosEntrenamiento).values({
+            id: refuteTurnId,
+            partidaId: gameId,
+            equipoId,
+            esBot: false,
+            numero: totalTurns + 1,
+            accion: JSON.stringify(realTeamRefuteResult.agentResponse),
+            gameStateView: refuteGameStateJson,
+            agentTrace: JSON.stringify(realTeamRefuteResult.trace),
+            memoriaInicial: JSON.stringify(realTeamRefuteResult.memoriaInicial),
+            memoriaFinal: JSON.stringify(realTeamRefuteResult.memoriaFinal),
+            durationMs: realTeamRefuteResult.durationMs,
+            createdAt: new Date(),
+          });
         }
-        agentResponse = { action: { type: 'pass' }, reasoning: 'agent_error', done: true };
-        durationMs = Date.now() - tsStart;
-      }
-    } else {
-      // Bot turn — no trace
-      try {
-        agentResponse = await invokeBotAgent('play_turn', gameId, currentTeamId, gameStateJson);
-        durationMs = Date.now() - tsStart;
-      } catch {
-        agentResponse = { action: { type: 'pass' }, reasoning: 'bot_error', done: true };
-        durationMs = Date.now() - tsStart;
-      }
-    }
-
-    // Handle suggestion refutation sub-flow before applying to engine
-    let gameAction = toGameAction(agentResponse, currentTeamId);
-    if (!gameAction) gameAction = { type: 'pass', equipoId: currentTeamId };
-
-    // refutacionJson built here so it can be attached to the suggestion turn below
-    let refutacionJsonStr: string | null = null;
-
-    if (gameAction.type === 'suggestion') {
-      const refutRes = await resolveRefutation(
-        state,
-        gameId,
-        currentTeamId,
-        gameAction.sospechoso,
-        gameAction.arma,
-        gameAction.habitacion,
-        equipoId,
-        {
-          agentBackend:  options.agentBackend,
-          mattinAgentId: options.mattinAgentId,
-          mattinAppId:   options.mattinAppId,
-          mattinApiKey:  options.mattinApiKey,
-        },
-      );
-      const { refutadorId, card, realTeamRefuteResult, botRefutacionRazonamiento } = refutRes;
-
-      const applyResult = applyAction(state, gameAction);
-      state = applyResult.state;
-
-      // Patch the last historial entry with correct refutation card
-      if (refutadorId && card && state.historial.length > 0) {
-        const lastRecord = state.historial[state.historial.length - 1];
-        if (lastRecord.result && 'refutadaPor' in lastRecord.result) {
-          (lastRecord.result as { refutadaPor: string | null; cartaMostrada: string | null }).cartaMostrada = card;
-        }
+      } else {
+        const applyResult = applyAction(state, gameAction);
+        state = applyResult.state;
       }
 
-      // Build refutation summary attached to this suggestion turn (all cases)
-      refutacionJsonStr = JSON.stringify({
-        refutadaPor:   refutadorId,
-        cartaMostrada: card,
-        razonamiento:
-          refutadorId === null
-            ? undefined
-            : realTeamRefuteResult
-            ? realTeamRefuteResult.agentResponse.reasoning
-            : botRefutacionRazonamiento,
+      await db.insert(turnosEntrenamiento).values({
+        id: turnId,
+        partidaId: gameId,
+        equipoId: currentTeamId,
+        esBot: !isRealTeam,
+        numero: totalTurns + 1,
+        accion: agentResponse ? JSON.stringify(agentResponse) : null,
+        gameStateView: isRealTeam ? gameStateJson : null,
+        agentTrace: isRealTeam ? traceJson : null,
+        memoriaInicial: isRealTeam ? memoriaInicialJson : null,
+        memoriaFinal: isRealTeam ? memoriaFinalJson : null,
+        refutacionJson: refutacionJsonStr,
+        durationMs,
+        createdAt: new Date(),
       });
 
-      // Persist refutation sub-turn for the real team when they were the refutador
-      // (another team made the suggestion that triggered it)
-      if (realTeamRefuteResult && !isRealTeam) {
-        const refuteTurnId = uuidv4();
-        const refuteGameStateJson = JSON.stringify(getGameStateView(state, equipoId));
-        await db.insert(turnosEntrenamiento).values({
-          id:             refuteTurnId,
-          partidaId:      gameId,
-          equipoId:       equipoId,
-          esBot:          false,
-          numero:         totalTurns + 1,
-          accion:         JSON.stringify(realTeamRefuteResult.agentResponse),
-          gameStateView:  refuteGameStateJson,
-          agentTrace:     JSON.stringify(realTeamRefuteResult.trace),
-          memoriaInicial: JSON.stringify(realTeamRefuteResult.memoriaInicial),
-          memoriaFinal:   JSON.stringify(realTeamRefuteResult.memoriaFinal),
-          durationMs:     realTeamRefuteResult.durationMs,
-          createdAt:      new Date(),
-        });
-      }
-    } else {
-      const applyResult = applyAction(state, gameAction);
-      state = applyResult.state;
+      totalTurns++;
     }
 
-    // Persist turn
-    await db.insert(turnosEntrenamiento).values({
-      id: turnId,
-      partidaId: gameId,
-      equipoId: currentTeamId,
-      esBot: !isRealTeam,
-      numero: totalTurns + 1,
-      accion: agentResponse ? JSON.stringify(agentResponse) : null,
-      gameStateView: isRealTeam ? gameStateJson : null,
-      agentTrace: isRealTeam ? traceJson : null,
-      memoriaInicial: isRealTeam ? memoriaInicialJson : null,
-      memoriaFinal: isRealTeam ? memoriaFinalJson : null,
-      refutacionJson: refutacionJsonStr,
-      durationMs,
-      createdAt: new Date(),
+    if (signal?.aborted && !abortReason) {
+      abortReason = 'ABORTED';
+    }
+    if (!isGameOver(state) && totalTurns >= turnLimit) {
+      abortReason = 'MAX_TURNS_EXCEEDED';
+    }
+
+    const ganadorId = state.ganadorId;
+    const realEquipoState = state.equipos.find((e) => e.equipoId === equipoId);
+    const puntosSimulados = realEquipoState?.puntos ?? 0;
+    const resultado = {
+      ganadorId,
+      puntosSimulados,
+      turnosJugados: realEquipoState?.turnosJugados ?? 0,
+    };
+
+    const currentRow = await getTrainingGameExecutionRow(gameId);
+    let finalEstado: 'finalizada' | 'abortada' =
+      abortReason ? 'abortada' : 'finalizada';
+
+    if (!currentRow) {
+      finalEstado = 'abortada';
+      abortReason ??= 'TRAINING_GAME_NOT_FOUND';
+    } else if (currentRow.estado !== 'en_curso') {
+      finalEstado = currentRow.estado === 'abortada' ? 'abortada' : 'finalizada';
+      if (finalEstado === 'abortada') {
+        abortReason = currentRow.motivoAbort ?? abortReason ?? 'ABORTED';
+      }
+    } else {
+      const updateResult = await db
+        .update(partidasEntrenamiento)
+        .set({
+          estado: finalEstado,
+          sobresJson: JSON.stringify(state.sobre),
+          resultadoJson: JSON.stringify(resultado),
+          motivoAbort: abortReason ?? null,
+          finishedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(partidasEntrenamiento.id, gameId),
+            eq(partidasEntrenamiento.estado, 'en_curso'),
+          ),
+        )
+        .run();
+
+      if (updateResult.changes === 0) {
+        const latestRow = await getTrainingGameExecutionRow(gameId);
+        if (!latestRow) {
+          finalEstado = 'abortada';
+          abortReason ??= 'TRAINING_GAME_NOT_FOUND';
+        } else {
+          finalEstado = latestRow.estado === 'abortada' ? 'abortada' : 'finalizada';
+          if (finalEstado === 'abortada') {
+            abortReason = latestRow.motivoAbort ?? abortReason ?? 'ABORTED';
+          }
+        }
+      }
+    }
+
+    notificationEmitter.emitTeam({
+      type: 'notification:training_finished',
+      trainingGameId: gameId,
+      equipoId,
+      estado: finalEstado,
+      ganadorId,
+      numTurnos: totalTurns,
+      puntosSimulados,
+      motivoAbort: abortReason,
+      ts: Date.now(),
     });
 
-    totalTurns++;
-  }
-
-  // Check abort condition
-  if (!isGameOver(state) && totalTurns >= turnLimit) {
-    abortReason = 'MAX_TURNS_EXCEEDED';
-  }
-
-  const finalEstado = abortReason ? 'abortada' : 'finalizada';
-  const ganadorId = state.ganadorId;
-
-  // Compute simulated score using engine scoring
-  const realEquipoState = state.equipos.find((e) => e.equipoId === equipoId);
-  const puntosSimulados = realEquipoState?.puntos ?? 0;
-
-  // Build resultado JSON
-  const resultado = {
-    ganadorId,
-    puntosSimulados,
-    turnosJugados: realEquipoState?.turnosJugados ?? 0,
-  };
-
-  // Persist final state
-  await db
-    .update(partidasEntrenamiento)
-    .set({
+    return {
       estado: finalEstado,
-      sobresJson: JSON.stringify(state.sobre),
-      resultadoJson: JSON.stringify(resultado),
-      motivoAbort: abortReason ?? null,
-      finishedAt: new Date(),
-    })
-    .where(eq(partidasEntrenamiento.id, gameId));
-
-  // F018: notify team that training has finished
-  notificationEmitter.emitTeam({
-    type: 'notification:training_finished',
-    trainingGameId: gameId,
-    equipoId,
-    estado: finalEstado,
-    ganadorId,
-    numTurnos: totalTurns,
-    puntosSimulados,
-    motivoAbort: abortReason,
-    ts: Date.now(),
-  });
-
-  return {
-    estado: finalEstado,
-    ganadorId,
-    numTurnos: totalTurns,
-    puntosSimulados,
-    motivoAbort: abortReason,
-  };
+      ganadorId,
+      numTurnos: totalTurns,
+      puntosSimulados,
+      motivoAbort: abortReason,
+    };
   } catch (err) {
     // F018: notify team of a catastrophic loop error (unhandled exception)
     notificationEmitter.emitTeam({

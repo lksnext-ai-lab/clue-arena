@@ -3,7 +3,7 @@
 import { use, useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, BarChart3, CalendarDays, Play, ShieldAlert, Sparkles, Swords, Trash2, Trophy, Users } from 'lucide-react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { apiFetch } from '@/lib/api/client';
 import type { TournamentDetailResponse } from '@/types/api';
 import { FormatBadge, TournamentStatusBadge } from '@/components/admin/TournamentStatusBadge';
@@ -13,21 +13,16 @@ import { TournamentTeamsSection } from '@/components/admin/TournamentTeamsSectio
 
 type Tab = 'teams' | 'rounds' | 'standings';
 
-function formatDate(value: string | null) {
-  if (!value) return 'Sin fecha';
-  return new Intl.DateTimeFormat('es-ES', {
+function formatDate(value: string | null, locale: string, fallback: string) {
+  if (!value) return fallback;
+  const languageTag = locale === 'eu' ? 'eu-ES' : 'es-ES';
+  return new Intl.DateTimeFormat(languageTag, {
     day: '2-digit',
     month: 'short',
     year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
   }).format(new Date(value));
-}
-
-function getTournamentPulse(tournament: TournamentDetailResponse) {
-  if (tournament.status === 'active') return 'En plena operación';
-  if (tournament.status === 'finished') return 'Cerrado y listo para análisis';
-  return 'Aún en configuración';
 }
 
 export default function AdminTorneoDetailPage({
@@ -37,6 +32,7 @@ export default function AdminTorneoDetailPage({
 }) {
   const { id } = use(params);
   const t = useTranslations('admin');
+  const locale = useLocale();
 
   const [tournament, setTournament] = useState<TournamentDetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -86,7 +82,7 @@ export default function AdminTorneoDetailPage({
   };
 
   const handleDelete = async () => {
-    if (!window.confirm('¿Eliminar este torneo? Esta acción no se puede deshacer.')) return;
+    if (!window.confirm(t('torneoDeleteConfirm'))) return;
 
     setActing(true);
     setActionError(null);
@@ -138,6 +134,12 @@ export default function AdminTorneoDetailPage({
 
   if (!tournament) return null;
 
+  const getTournamentPulse = (value: TournamentDetailResponse) => {
+    if (value.status === 'active') return t('torneoPulseActive');
+    if (value.status === 'finished') return t('torneoPulseFinished');
+    return t('torneoPulseDraft');
+  };
+
   const activeRound = tournament.rounds.find((round) => round.status === 'active') ?? null;
   const completedRounds = tournament.rounds.filter((round) => round.status === 'finished').length;
   const totalGames = tournament.rounds.reduce((acc, round) => acc + round.games.filter((game) => !game.isBye).length, 0);
@@ -145,30 +147,40 @@ export default function AdminTorneoDetailPage({
 
   const statCards = [
     {
-      label: 'Equipos',
+      label: t('torneoStatTeamsLabel'),
       value: tournament.teams.length,
-      detail: eliminatedTeams > 0 ? `${eliminatedTeams} eliminados` : 'Plantilla intacta',
+      detail: eliminatedTeams > 0
+        ? t('torneoStatTeamsDetailEliminated', { count: eliminatedTeams })
+        : t('torneoStatTeamsDetailIntact'),
       icon: Users,
       tone: 'border-cyan-400/20 bg-cyan-400/10 text-cyan-100',
     },
     {
-      label: 'Rondas',
+      label: t('torneoStatRoundsLabel'),
       value: tournament.rounds.length,
-      detail: `${completedRounds} completadas`,
+      detail: t('torneoStatRoundsDetail', { count: completedRounds }),
       icon: Swords,
       tone: 'border-amber-300/20 bg-amber-300/10 text-amber-100',
     },
     {
-      label: 'Partidas',
+      label: t('torneoStatGamesLabel'),
       value: totalGames,
-      detail: activeRound ? `Ronda activa ${activeRound.roundNumber}` : 'Sin ronda activa',
+      detail: activeRound
+        ? t('torneoStatGamesDetailActive', { round: activeRound.roundNumber })
+        : t('torneoStatGamesDetailNone'),
       icon: BarChart3,
       tone: 'border-emerald-300/20 bg-emerald-300/10 text-emerald-100',
     },
     {
-      label: 'Estado',
+      label: t('torneoStatStatusLabel'),
       value: getTournamentPulse(tournament),
-      detail: tournament.finishedAt ? `Cerrado ${formatDate(tournament.finishedAt)}` : `Creado ${formatDate(tournament.createdAt)}`,
+      detail: tournament.finishedAt
+        ? t('torneoStatStatusDetailFinished', {
+            date: formatDate(tournament.finishedAt, locale, t('tournamentDateUnknown')),
+          })
+        : t('torneoStatStatusDetailCreated', {
+            date: formatDate(tournament.createdAt, locale, t('tournamentDateUnknown')),
+          }),
       icon: Trophy,
       tone: 'border-fuchsia-300/20 bg-fuchsia-300/10 text-fuchsia-100',
     },
@@ -193,7 +205,7 @@ export default function AdminTorneoDetailPage({
               <div className="flex flex-wrap items-center gap-2">
                 <span className="inline-flex items-center gap-2 rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.26em] text-emerald-200">
                   <Sparkles size={14} />
-                  Centro de mando
+                  {t('torneoCommandCenterEyebrow')}
                 </span>
                 <FormatBadge format={tournament.format} />
                 <TournamentStatusBadge status={tournament.status} />
@@ -204,7 +216,7 @@ export default function AdminTorneoDetailPage({
                   {tournament.name}
                 </h1>
                 <p className="max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">
-                  Supervisa inscripciones, lanza rondas y valida la clasificación desde una vista operativa pensada para que el equipo admin reaccione rápido.
+                  {t('torneoHeroDesc')}
                 </p>
               </div>
 
@@ -228,7 +240,7 @@ export default function AdminTorneoDetailPage({
             <aside className="rounded-[28px] border border-white/10 bg-slate-950/45 p-5 backdrop-blur">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Pulso del torneo</p>
+                  <p className="text-xs uppercase tracking-[0.24em] text-slate-500">{t('torneoPulseLabel')}</p>
                   <p className="mt-2 text-xl font-semibold text-white">{getTournamentPulse(tournament)}</p>
                 </div>
                 <CalendarDays size={18} className="text-slate-500" />
@@ -236,17 +248,17 @@ export default function AdminTorneoDetailPage({
 
               <div className="mt-5 space-y-3 text-sm text-slate-300">
                 <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3">
-                  <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Creado</p>
-                  <p className="mt-2 text-white">{formatDate(tournament.createdAt)}</p>
+                  <p className="text-xs uppercase tracking-[0.2em] text-slate-500">{t('torneoPulseCreatedLabel')}</p>
+                  <p className="mt-2 text-white">{formatDate(tournament.createdAt, locale, t('tournamentDateUnknown'))}</p>
                 </div>
                 <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3">
-                  <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Inicio</p>
-                  <p className="mt-2 text-white">{formatDate(tournament.startedAt)}</p>
+                  <p className="text-xs uppercase tracking-[0.2em] text-slate-500">{t('torneoPulseStartLabel')}</p>
+                  <p className="mt-2 text-white">{formatDate(tournament.startedAt, locale, t('tournamentDateUnknown'))}</p>
                 </div>
                 <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3">
-                  <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Ronda viva</p>
+                  <p className="text-xs uppercase tracking-[0.2em] text-slate-500">{t('torneoPulseActiveRoundLabel')}</p>
                   <p className="mt-2 text-white">
-                    {activeRound ? `Ronda ${activeRound.roundNumber}` : 'No hay ninguna activa'}
+                    {activeRound ? t('torneoRonda', { n: activeRound.roundNumber }) : t('torneoPulseNoActiveRound')}
                   </p>
                 </div>
               </div>
@@ -257,7 +269,7 @@ export default function AdminTorneoDetailPage({
                     <button
                       onClick={() => handleAction('start')}
                       disabled={acting || tournament.teams.length < 2}
-                      title={tournament.teams.length < 2 ? 'Se necesitan al menos 2 equipos' : undefined}
+                      title={tournament.teams.length < 2 ? t('torneoMinTeamsHint') : undefined}
                       className="inline-flex items-center justify-center gap-2 rounded-full bg-emerald-300 px-4 py-3 text-sm font-semibold text-slate-950 transition-all hover:-translate-y-0.5 hover:bg-emerald-200 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       <Play size={16} />
@@ -276,7 +288,7 @@ export default function AdminTorneoDetailPage({
 
                 {tournament.status === 'active' ? (
                   <button
-                    onClick={() => handleAction('finish', '¿Finalizar el torneo? Esta acción marca al ganador actual.')}
+                    onClick={() => handleAction('finish', t('torneoFinishConfirm'))}
                     disabled={acting}
                     className="inline-flex items-center justify-center gap-2 rounded-full bg-amber-300 px-4 py-3 text-sm font-semibold text-slate-950 transition-all hover:-translate-y-0.5 hover:bg-amber-200 disabled:opacity-60"
                   >
@@ -298,8 +310,8 @@ export default function AdminTorneoDetailPage({
         <section className="rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(15,23,42,0.94),rgba(7,11,22,0.98))] p-4 sm:p-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Áreas de trabajo</p>
-              <p className="mt-2 text-lg font-semibold text-white">Cambia entre operación, ejecución y resultados</p>
+              <p className="text-xs uppercase tracking-[0.24em] text-slate-500">{t('torneoWorkspaceEyebrow')}</p>
+              <p className="mt-2 text-lg font-semibold text-white">{t('torneoWorkspaceTitle')}</p>
             </div>
             <div className="flex flex-wrap gap-2">
               {(Object.keys(tabLabels) as Tab[]).map((tab) => (

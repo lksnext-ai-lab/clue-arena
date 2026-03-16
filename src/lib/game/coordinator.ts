@@ -37,6 +37,8 @@ import {
   EVT_FALSE_CANNOT_REFUTE_POINTS,
   EVT_WRONG_ACCUSATION_POINTS,
   EVT_PASS_POINTS,
+  EVT_TURN_SPEED_FAST_MS,
+  EVT_TURN_SPEED_SLOW_MS,
   EVT_INVALID_CARD_POINTS,
   EVT_REDUNDANT_SUGGESTION_POINTS,
   EVT_INVALID_FORMAT_POINTS,
@@ -46,7 +48,9 @@ import {
   EVT_WARNING_POINTS,
   EVT_WARNING_ELIMINATION_POINTS,
   calcEfficiencyBonus,
+  calcTurnSpeedBonus,
 } from '@/lib/game/engine';
+import { claimTurnExecution, releaseTurnExecution } from '@/lib/game/turn-claim';
 import type { InferSelectModel } from 'drizzle-orm';
 import { gameEventEmitter } from '@/lib/ws/GameEventEmitter';
 import { notificationEmitter } from '@/lib/ws/NotificationEmitter';
@@ -140,8 +144,27 @@ async function countOwnTurns(gameId: string, teamId: string): Promise<number> {
   return total;
 }
 
-/** Calculates EVT_WIN_EFFICIENCY bonus based on own turns played. */
-// Note: imported from engine.ts — local definition removed to avoid duplication.
+function buildTurnSpeedEvent(
+  equipoId: string,
+  turno: number,
+  responseMs: number,
+): ScoreEventInput | null {
+  const bonus = calcTurnSpeedBonus(responseMs);
+  if (bonus <= 0) return null;
+
+  return {
+    equipoId,
+    type: 'EVT_TURN_SPEED',
+    points: bonus,
+    turno,
+    meta: {
+      responseMs,
+      fastMs: EVT_TURN_SPEED_FAST_MS,
+      slowMs: EVT_TURN_SPEED_SLOW_MS,
+      bonus,
+    },
+  };
+}
 
 // ---------------------------------------------------------------------------
 // G006 — Warning system helpers
@@ -340,7 +363,6 @@ function sanitizeSpectatorComment(raw: string | undefined, maxLen = 160): string
 }
 import { v4 as uuidv4 } from 'uuid';
 import { invokeAgent } from '@/lib/api/agent';
-import { AgentResponseError } from '@/lib/api/local-agent';
 import { logInvocacionValidity } from '@/lib/utils/log';
 import type { Carta } from '@/types/domain';
 
@@ -407,6 +429,7 @@ export class CoordinatorError extends Error {
   constructor(
     public readonly statusCode: number,
     message: string,
+    public readonly code = 'COORDINATOR_ERROR',
   ) {
     super(message);
     this.name = 'CoordinatorError';
@@ -450,6 +473,17 @@ export async function advanceTurn(gameId: string): Promise<AdvanceTurnResult> {
   if (partida.estado !== 'en_curso') {
     throw new CoordinatorError(400, `La partida no está en curso (estado: ${partida.estado})`);
   }
+
+  const turnClaim = await claimTurnExecution(gameId);
+  if (!turnClaim) {
+    throw new CoordinatorError(
+      409,
+      'Ya hay un avance de turno en curso para esta partida',
+      'TURN_IN_PROGRESS',
+    );
+  }
+
+  try {
 
   // ── 2. Get teams and determine current team ───────────────────────────────
   const allTeams = await db
@@ -883,6 +917,9 @@ export async function advanceTurn(gameId: string): Promise<AdvanceTurnResult> {
       actionType: 'pass',
     };
   }
+  } finally {
+    await releaseTurnExecution(gameId, turnClaim.token);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -993,6 +1030,11 @@ async function handleSuggestion(p: SuggestionParams): Promise<{ maxTurnsReached:
 
   // ── Scoring for suggestion ─────────────────────────────────────────────
   const suggestionScoreEvents: ScoreEventInput[] = [];
+  const turnSpeedEvent = buildTurnSpeedEvent(teamId, turnoActual, agentDurationMs);
+  if (turnSpeedEvent) {
+    suggestionScoreEvents.push(turnSpeedEvent);
+  }
+
   if (isRedundant) {
     suggestionScoreEvents.push({
       equipoId: teamId,
@@ -1281,6 +1323,10 @@ async function handleAccusation(p: AccusationParams): Promise<{ gameOver: boolea
     const winEvents: ScoreEventInput[] = [
       { equipoId: teamId, type: 'EVT_WIN', points: EVT_WIN_POINTS, turno: turnoActual, meta: { T } },
     ];
+    const turnSpeedEvent = buildTurnSpeedEvent(teamId, turnoActual, agentDurationMs);
+    if (turnSpeedEvent) {
+      winEvents.push(turnSpeedEvent);
+    }
     if (effBonus > 0) {
       winEvents.push({
         equipoId: teamId,
@@ -1306,9 +1352,14 @@ async function handleAccusation(p: AccusationParams): Promise<{ gameOver: boolea
   }
 
   // Incorrect accusation: penalise with EVT_WRONG_ACCUSATION then eliminate
-  await insertScoreEvents(gameId, [
+  const wrongAccusationEvents: ScoreEventInput[] = [
     { equipoId: teamId, type: 'EVT_WRONG_ACCUSATION', points: EVT_WRONG_ACCUSATION_POINTS, turno: turnoActual },
-  ]);
+  ];
+  const turnSpeedEvent = buildTurnSpeedEvent(teamId, turnoActual, agentDurationMs);
+  if (turnSpeedEvent) {
+    wrongAccusationEvents.push(turnSpeedEvent);
+  }
+  await insertScoreEvents(gameId, wrongAccusationEvents);
   gameEventEmitter.emitTurnCompleted(gameId, {
     type: 'score_event',
     gameId,

@@ -30,11 +30,13 @@ export interface TeamResponse {
 export interface CreateTeamRequest {
   id?: string;
   nombre: string;
-  agentId: string;
+  agentId?: string;
   agentBackend?: 'mattin' | 'local';
   appId?: string;
   mattinApiKey?: string;
   miembros?: string[];
+  usuarioId?: string;
+  estado?: TeamStatus;
 }
 
 export interface UpdateTeamRequest {
@@ -116,6 +118,7 @@ export interface ScoreEventPublic {
   id: number;
   equipoId: string;
   turno: number;
+  displayTurn: number;
   type: string;
   points: number;
   meta: Record<string, unknown> | null;

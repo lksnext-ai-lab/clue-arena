@@ -45,7 +45,7 @@ async function insertTeam(db: TestDb['db'], nombre: string) {
     avatarUrl: null,
     miembros: '[]',
     usuarioId: ownerId,
-    estado: 'registrado',
+    estado: 'activo',
     createdAt: new Date(),
   });
   return id;

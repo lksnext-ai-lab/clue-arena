@@ -7,17 +7,30 @@ import { NextRequest, NextResponse, after } from 'next/server';
 import { getAuthSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { partidasEntrenamiento, turnosEntrenamiento, equipos } from '@/lib/db/schema';
-import { eq, desc, count } from 'drizzle-orm';
+import { and, desc, eq, count, inArray } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 import { CreateTrainingGameSchema } from '@/lib/schemas/training';
-import {
-  runTrainingGameLoop,
-  countActiveTrainingGames,
-  countTotalTrainingGames,
-} from '@/lib/game/training-loop';
+import { trainingRunner } from '@/lib/game/training-runner';
+import { toSqliteConflictError } from '@/lib/db/sqlite-errors';
 
 const MAX_HISTORY = 20;
 const RATE_LIMIT_MS = 60_000; // 60 s between games
+
+async function getActiveTrainingGameId(equipoId: string): Promise<string | null> {
+  const activeGame = await db
+    .select({ id: partidasEntrenamiento.id })
+    .from(partidasEntrenamiento)
+    .where(
+      and(
+        eq(partidasEntrenamiento.equipoId, equipoId),
+        eq(partidasEntrenamiento.estado, 'en_curso'),
+      ),
+    )
+    .limit(1)
+    .get();
+
+  return activeGame?.id ?? null;
+}
 
 // ---------------------------------------------------------------------------
 // GET /api/training/games
@@ -132,93 +145,138 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // Concurrent game check
-  const activeCount = await countActiveTrainingGames(equipoId);
-  if (activeCount > 0) {
-    const activeGame = await db
-      .select({ id: partidasEntrenamiento.id })
-      .from(partidasEntrenamiento)
-      .where(eq(partidasEntrenamiento.equipoId, equipoId))
-      .limit(1)
-      .get();
-    return NextResponse.json(
-      { error: 'TRAINING_GAME_IN_PROGRESS', activeGameId: activeGame?.id ?? null },
-      { status: 409 },
+  let createResult:
+    | {
+        kind: 'created';
+        gameId: string;
+        resolvedSeed: string;
+        agentBackend: 'mattin' | 'local';
+        mattinAgentId?: string;
+        mattinAppId?: string;
+        mattinApiKey?: string;
+      }
+    | { kind: 'team_not_found' };
+
+  try {
+    createResult = db.transaction((tx) => {
+      const equipoRow = tx
+        .select({
+          agentBackend: equipos.agentBackend,
+          agentId: equipos.agentId,
+          appId: equipos.appId,
+          mattinApiKey: equipos.mattinApiKey,
+        })
+        .from(equipos)
+        .where(eq(equipos.id, equipoId))
+        .get();
+
+      if (!equipoRow) {
+        return { kind: 'team_not_found' } as const;
+      }
+
+      const histCountRow = tx
+        .select({ total: count() })
+        .from(partidasEntrenamiento)
+        .where(eq(partidasEntrenamiento.equipoId, equipoId))
+        .get();
+      const histCount = histCountRow?.total ?? 0;
+
+      if (histCount >= MAX_HISTORY) {
+        const oldestFinished = tx
+          .select({ id: partidasEntrenamiento.id })
+          .from(partidasEntrenamiento)
+          .where(
+            and(
+              eq(partidasEntrenamiento.equipoId, equipoId),
+              inArray(partidasEntrenamiento.estado, ['finalizada', 'abortada']),
+            ),
+          )
+          .orderBy(partidasEntrenamiento.createdAt)
+          .limit(1)
+          .get();
+
+        if (oldestFinished) {
+          tx.delete(partidasEntrenamiento)
+            .where(eq(partidasEntrenamiento.id, oldestFinished.id))
+            .run();
+        }
+      }
+
+      const gameId = uuidv4();
+      const resolvedSeed = seed ?? uuidv4();
+
+      tx.insert(partidasEntrenamiento)
+        .values({
+          id: gameId,
+          equipoId,
+          estado: 'en_curso',
+          numBots,
+          maxTurnos,
+          seed: resolvedSeed,
+          createdAt: new Date(),
+        })
+        .run();
+
+      return {
+        kind: 'created',
+        gameId,
+        resolvedSeed,
+        agentBackend: equipoRow.agentBackend as 'mattin' | 'local',
+        mattinAgentId: equipoRow.agentId ?? undefined,
+        mattinAppId: equipoRow.appId ?? undefined,
+        mattinApiKey: equipoRow.mattinApiKey ?? undefined,
+      } as const;
+    });
+  } catch (error) {
+    const conflict = toSqliteConflictError(
+      error,
+      'Ya existe una partida de entrenamiento en curso para este equipo',
+      'TRAINING_GAME_IN_PROGRESS',
     );
-  }
-
-  // History cap
-  const histCount = await countTotalTrainingGames(equipoId);
-  if (histCount >= MAX_HISTORY) {
-    // Delete oldest to make room
-    const oldest = await db
-      .select({ id: partidasEntrenamiento.id })
-      .from(partidasEntrenamiento)
-      .where(eq(partidasEntrenamiento.equipoId, equipoId))
-      .orderBy(partidasEntrenamiento.createdAt)
-      .limit(1)
-      .get();
-    if (oldest) {
-      await db.delete(partidasEntrenamiento).where(eq(partidasEntrenamiento.id, oldest.id));
+    if (conflict) {
+      const activeGameId = await getActiveTrainingGameId(equipoId);
+      return NextResponse.json(
+        {
+          error: conflict.code,
+          code: conflict.code,
+          activeGameId,
+        },
+        { status: conflict.statusCode },
+      );
     }
+    throw error;
   }
 
-  // Load team credentials so the loop can invoke the correct backend
-  const equipoRow = await db
-    .select({
-      agentBackend: equipos.agentBackend,
-      agentId:      equipos.agentId,
-      appId:        equipos.appId,
-      mattinApiKey: equipos.mattinApiKey,
-    })
-    .from(equipos)
-    .where(eq(equipos.id, equipoId))
-    .get();
-
-  if (!equipoRow) {
+  if (createResult.kind === 'team_not_found') {
     return NextResponse.json({ error: 'Equipo no encontrado' }, { status: 404 });
   }
-
-  // Create row first so loop can update it
-  const gameId = uuidv4();
-  const resolvedSeed = seed ?? uuidv4();
-
-  await db.insert(partidasEntrenamiento).values({
-    id: gameId,
-    equipoId,
-    estado: 'en_curso',
-    numBots,
-    maxTurnos,
-    seed: resolvedSeed,
-    createdAt: new Date(),
-  });
 
   // Kick off the game loop in the background (after the response is sent).
   // The client navigates to the detail page immediately and polls for updates.
   after(async () => {
-    try {
-      await runTrainingGameLoop({
-        gameId,
-        equipoId,
-        numBots,
-        maxTurnos,
-        seed: resolvedSeed,
-        agentBackend:   equipoRow.agentBackend as 'mattin' | 'local',
-        mattinAgentId:  equipoRow.agentId ?? undefined,
-        mattinAppId:    equipoRow.appId ?? undefined,
-        mattinApiKey:   equipoRow.mattinApiKey ?? undefined,
-      });
-    } catch (err) {
+    const runnerStarted = trainingRunner.start({
+      gameId: createResult.gameId,
+      equipoId,
+      numBots,
+      maxTurnos,
+      seed: createResult.resolvedSeed,
+      agentBackend: createResult.agentBackend,
+      mattinAgentId: createResult.mattinAgentId,
+      mattinAppId: createResult.mattinAppId,
+      mattinApiKey: createResult.mattinApiKey,
+    });
+
+    if (!runnerStarted) {
       await db
         .update(partidasEntrenamiento)
         .set({
           estado: 'abortada',
-          motivoAbort: err instanceof Error ? err.message : 'unknown',
+          motivoAbort: 'TRAINING_GAME_IN_PROGRESS',
           finishedAt: new Date(),
         })
-        .where(eq(partidasEntrenamiento.id, gameId));
+        .where(eq(partidasEntrenamiento.id, createResult.gameId));
     }
   });
 
-  return NextResponse.json({ id: gameId }, { status: 202 });
+  return NextResponse.json({ id: createResult.gameId }, { status: 202 });
 }

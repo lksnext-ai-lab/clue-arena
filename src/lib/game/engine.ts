@@ -105,6 +105,9 @@ export const EVT_SURVIVE_POINTS = 200;
 export const EVT_SUGGESTION_POINTS = 10;
 export const EVT_SUGGESTION_CAP = 5;
 export const EVT_REFUTATION_POINTS = 5;        // half of EVT_SUGGESTION_POINTS
+export const EVT_TURN_SPEED_POINTS_MAX = 4;
+export const EVT_TURN_SPEED_FAST_MS = 2_000;
+export const EVT_TURN_SPEED_SLOW_MS = 15_000;
 export const EVT_WRONG_ACCUSATION_POINTS = -150;
 export const EVT_PASS_POINTS = -5;
 export const EVT_INVALID_CARD_POINTS = -30;
@@ -124,6 +127,19 @@ export function calcEfficiencyBonus(turnosJugados: number): number {
   const BONUS_BASE = 500;
   const DECAY = 25;
   return Math.max(0, BONUS_BASE - (turnosJugados - T_MIN) * DECAY);
+}
+
+/** Returns the per-turn speed bonus based on the active agent response time. */
+export function calcTurnSpeedBonus(responseMs: number): number {
+  const clampedMs = Math.min(
+    Math.max(responseMs, EVT_TURN_SPEED_FAST_MS),
+    EVT_TURN_SPEED_SLOW_MS,
+  );
+  const normalized =
+    (EVT_TURN_SPEED_SLOW_MS - clampedMs) /
+    (EVT_TURN_SPEED_SLOW_MS - EVT_TURN_SPEED_FAST_MS);
+
+  return Math.max(0, Math.round(EVT_TURN_SPEED_POINTS_MAX * normalized));
 }
 
 /**

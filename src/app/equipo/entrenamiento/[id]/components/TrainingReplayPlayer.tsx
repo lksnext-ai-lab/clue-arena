@@ -935,23 +935,15 @@ export function TrainingReplayPlayer({ turns, equipoId, gameId }: TrainingReplay
   const [explanations, setExplanations] = useState<Map<string, string>>(new Map());
   const [explaining, setExplaining] = useState(false);
   const [explainError, setExplainError] = useState<string | null>(null);
+  const current = sorted[stepIndex] ?? null;
 
   // Clear error when user navigates between turns
   useEffect(() => { setExplainError(null); }, [stepIndex]);
 
-  if (sorted.length === 0) {
-    return (
-      <div className="rounded-lg border border-slate-700 bg-slate-800/40 p-8 text-center text-slate-400">
-        No hay turnos para reproducir.
-      </div>
-    );
-  }
-
-  const current = sorted[stepIndex];
-  const currentExplanation = explanations.get(current.id) ?? null;
-
+  const currentExplanation = current ? explanations.get(current.id) ?? null : null;
   const handleExplain = useCallback(async () => {
-    if (explanations.has(current.id)) return; // Already cached
+    if (!current || explanations.has(current.id)) return;
+
     setExplaining(true);
     setExplainError(null);
     try {
@@ -969,7 +961,15 @@ export function TrainingReplayPlayer({ turns, equipoId, gameId }: TrainingReplay
     } finally {
       setExplaining(false);
     }
-  }, [current.id, explanations, gameId]);
+  }, [current, explanations, gameId]);
+
+  if (sorted.length === 0) {
+    return (
+      <div className="rounded-lg border border-slate-700 bg-slate-800/40 p-8 text-center text-slate-400">
+        No hay turnos para reproducir.
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">

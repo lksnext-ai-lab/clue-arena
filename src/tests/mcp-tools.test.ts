@@ -35,8 +35,19 @@ function agentResult(action: Record<string, unknown>) {
   return { response: { action, reasoning: 'test', done: true }, invocacionId: 'test-inv-id' };
 }
 
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
 // ── Import after mocks ────────────────────────────────────────────────────────
 import { advanceTurn, CoordinatorError } from '@/lib/game/coordinator';
+import { recoverStaleTurnClaims } from '@/lib/game/turn-claim';
 import { getGameStateTool } from '@/lib/mcp/tools/get-game-state';
 import { makeSuggestionTool } from '@/lib/mcp/tools/make-suggestion';
 import { makeAccusationTool } from '@/lib/mcp/tools/make-accusation';
@@ -51,6 +62,7 @@ import {
   partidas,
   partidaEquipos,
   sobres,
+  scoreEvents,
   turnos,
   sugerencias,
   acusaciones,
@@ -302,6 +314,20 @@ describe('Coordinator — advanceTurn', () => {
       .where(eq(acusaciones.partidaId, gameId));
     expect(ac.correcta).toBe(true);
     expect(ac.equipoId).toBe('team-a');
+
+    const persistedEvents = await testDb.db
+      .select()
+      .from(scoreEvents)
+      .where(eq(scoreEvents.gameId, gameId));
+    expect(persistedEvents.some((event) => event.type === 'EVT_WIN')).toBe(true);
+    expect(persistedEvents.some((event) => event.type === 'EVT_WIN_EFFICIENCY')).toBe(true);
+
+    const speedEvent = persistedEvents.find((event) => event.type === 'EVT_TURN_SPEED');
+    expect(speedEvent).toBeDefined();
+    expect(speedEvent!.points).toBeGreaterThan(0);
+
+    const speedMeta = speedEvent?.meta ? JSON.parse(speedEvent.meta) as Record<string, unknown> : null;
+    expect(speedMeta?.responseMs).toEqual(expect.any(Number));
   });
 
   it('incorrect accusation eliminates the team; game continues', async () => {
@@ -382,6 +408,78 @@ describe('Coordinator — advanceTurn', () => {
     );
 
     await expect(advanceTurn(gameId)).rejects.toMatchObject({ statusCode: 422 });
+  });
+
+  it('rejects concurrent advanceTurn calls with TURN_IN_PROGRESS and keeps one active turn', async () => {
+    const { gameId } = await setupGame(testDb.db);
+    const firstAgentCall = deferred<ReturnType<typeof agentResult>>();
+
+    mockInvokeAgent.mockImplementationOnce(() => firstAgentCall.promise);
+
+    const firstAdvance = advanceTurn(gameId);
+
+    for (let attempt = 0; attempt < 10; attempt++) {
+      const partida = await testDb.db
+        .select()
+        .from(partidas)
+        .where(eq(partidas.id, gameId))
+        .get();
+      if (partida?.turnoEnProcesoToken) break;
+      await Promise.resolve();
+    }
+
+    await expect(advanceTurn(gameId)).rejects.toMatchObject({
+      statusCode: 409,
+      code: 'TURN_IN_PROGRESS',
+    });
+
+    firstAgentCall.resolve(
+      agentResult({ type: 'suggestion', suspect: SOSPECHOSO, weapon: ARMA, room: HABITACION }),
+    );
+    await firstAdvance;
+
+    expect(mockInvokeAgent).toHaveBeenCalledTimes(1);
+
+    const activeTurnos = await testDb.db
+      .select()
+      .from(turnos)
+      .where(and(eq(turnos.partidaId, gameId), eq(turnos.estado, 'en_curso')));
+    expect(activeTurnos).toHaveLength(1);
+
+    const partida = await testDb.db
+      .select()
+      .from(partidas)
+      .where(eq(partidas.id, gameId))
+      .get();
+    expect(partida?.turnoEnProcesoToken).toBeNull();
+    expect(partida?.turnoEnProcesoDesde).toBeNull();
+  });
+
+  it('recovers stale turn execution claims on startup recovery', async () => {
+    const { gameId } = await setupGame(testDb.db);
+
+    await testDb.db
+      .update(partidas)
+      .set({
+        turnoEnProcesoToken: 'stale-claim',
+        turnoEnProcesoDesde: new Date(Date.now() - 181_000),
+      })
+      .where(eq(partidas.id, gameId));
+
+    const recoveredGames = await recoverStaleTurnClaims();
+    expect(recoveredGames).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: gameId, nombre: 'Test Game' }),
+      ]),
+    );
+
+    const partida = await testDb.db
+      .select()
+      .from(partidas)
+      .where(eq(partidas.id, gameId))
+      .get();
+    expect(partida?.turnoEnProcesoToken).toBeNull();
+    expect(partida?.turnoEnProcesoDesde).toBeNull();
   });
 });
 

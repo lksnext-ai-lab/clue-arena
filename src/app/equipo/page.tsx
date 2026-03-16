@@ -1,7 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import {
@@ -37,7 +37,7 @@ export default function EquipoPage() {
   const t = useTranslations('equipo');
   const tCommon = useTranslations('common');
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       const [gamesData, teamData] = await Promise.all([
         apiFetch<{ games: GameResponse[] }>('/games?estado=en_curso'),
@@ -49,13 +49,13 @@ export default function EquipoPage() {
     } catch {
       setFetchError(t('registroError'));
     }
-  };
+  }, [equipo, t]);
 
   useEffect(() => {
     if (!isLoading) {
       void fetchData();
     }
-  }, [isLoading]);
+  }, [fetchData, isLoading]);
 
   useInterval(fetchData, 30_000);
 
@@ -82,7 +82,7 @@ export default function EquipoPage() {
     );
   }
 
-  const statusTone = getStatusTone(team?.estado ?? 'registrado');
+  const statusTone = getStatusTone(team?.estado ?? 'activo');
   const activeGame = games[0] ?? null;
 
   return (
@@ -163,7 +163,7 @@ export default function EquipoPage() {
                   style={{ background: statusTone.soft, color: statusTone.text }}
                 >
                   <span className="h-2 w-2 rounded-full" style={{ background: statusTone.text }} />
-                  {t('estadoLabel')}: {team?.estado ?? t('panelStatusUnknown')}
+                  {t('estadoLabel')}: {team?.estado ? t(`status.${team.estado}`) : t('panelStatusUnknown')}
                 </div>
               </div>
 
@@ -620,9 +620,8 @@ function EmptyStateCard({
 
 function getStatusTone(estado: string) {
   const tones: Record<string, { soft: string; text: string }> = {
-    registrado: { soft: 'rgba(148,163,184,0.14)', text: '#cbd5e1' },
     activo: { soft: 'rgba(34,197,94,0.16)', text: '#86efac' },
-    finalizado: { soft: 'rgba(245,158,11,0.16)', text: '#fcd34d' },
+    inactivo: { soft: 'rgba(245,158,11,0.16)', text: '#fcd34d' },
   };
-  return tones[estado] ?? tones.registrado;
+  return tones[estado] ?? tones.activo;
 }

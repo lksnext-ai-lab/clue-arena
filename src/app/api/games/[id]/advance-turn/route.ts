@@ -54,7 +54,10 @@ export async function POST(
     });
   } catch (err) {
     if (err instanceof CoordinatorError) {
-      return NextResponse.json({ error: err.message }, { status: err.statusCode });
+      return NextResponse.json(
+        { error: err.message, code: err.code },
+        { status: err.statusCode },
+      );
     }
     console.error('[advance-turn] Unexpected error:', err);
     return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });

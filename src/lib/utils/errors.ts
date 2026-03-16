@@ -48,8 +48,11 @@ export class ServerError extends AppError {
 }
 
 export class ConflictError extends AppError {
-  constructor(message: string) {
-    super(message, 'CONFLICT', 409);
+  constructor(
+    message: string,
+    code = 'CONFLICT',
+  ) {
+    super(message, code, 409);
     this.name = 'ConflictError';
   }
 }

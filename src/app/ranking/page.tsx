@@ -329,7 +329,13 @@ export default function RankingPage() {
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#07111f] text-white">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(251,191,36,0.14),transparent_28%),radial-gradient(circle_at_top_right,rgba(34,211,238,0.16),transparent_26%),linear-gradient(180deg,#08111e_0%,#0f172a_48%,#08111e_100%)]" />
+      <div className="pointer-events-none absolute inset-0">
+        <div
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-40"
+          style={{ backgroundImage: "url('/fondo-ranking.png')" }}
+        />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(251,191,36,0.12),transparent_28%),radial-gradient(circle_at_top_right,rgba(34,211,238,0.14),transparent_26%),linear-gradient(180deg,rgba(8,17,30,0.4)_0%,rgba(8,17,30,0.72)_36%,rgba(8,17,30,0.92)_100%)]" />
+      </div>
       <div className="absolute inset-x-0 top-0 h-64 bg-[linear-gradient(180deg,rgba(255,255,255,0.08),transparent)] opacity-30" />
 
       <div className="relative mx-auto flex max-w-7xl flex-col gap-8 px-4 py-6 sm:px-6 lg:px-8 lg:py-10">

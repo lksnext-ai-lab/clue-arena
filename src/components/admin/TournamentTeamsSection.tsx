@@ -94,7 +94,7 @@ export function TournamentTeamsSection({ tournamentId, status, teams, onRefresh 
         <div className="rounded-[28px] border border-white/10 bg-[linear-gradient(160deg,rgba(8,17,29,0.92),rgba(15,23,42,0.9))] p-5">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Roster del torneo</p>
+              <p className="text-xs uppercase tracking-[0.24em] text-slate-500">{t('torneoRosterEyebrow')}</p>
               <h2 className="mt-2 text-2xl font-semibold text-white">{t('torneoEquipos')}</h2>
             </div>
             <div className="rounded-2xl border border-cyan-400/20 bg-cyan-400/10 p-3 text-cyan-100">
@@ -104,30 +104,30 @@ export function TournamentTeamsSection({ tournamentId, status, teams, onRefresh 
 
           <div className="mt-5 grid gap-3 sm:grid-cols-3">
             <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-              <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Inscritos</p>
+              <p className="text-xs uppercase tracking-[0.2em] text-slate-500">{t('torneoRosterEnrolledLabel')}</p>
               <p className="mt-3 text-3xl font-semibold text-white">{teams.length}</p>
             </div>
             <div className="rounded-2xl border border-emerald-300/20 bg-emerald-300/10 p-4">
-              <p className="text-xs uppercase tracking-[0.2em] text-emerald-100">Activos</p>
+              <p className="text-xs uppercase tracking-[0.2em] text-emerald-100">{t('torneoRosterActiveLabel')}</p>
               <p className="mt-3 text-3xl font-semibold text-white">{activeTeams}</p>
             </div>
             <div className="rounded-2xl border border-amber-300/20 bg-amber-300/10 p-4">
-              <p className="text-xs uppercase tracking-[0.2em] text-amber-100">Disponibles</p>
+              <p className="text-xs uppercase tracking-[0.2em] text-amber-100">{t('torneoRosterAvailableLabel')}</p>
               <p className="mt-3 text-3xl font-semibold text-white">{available.length}</p>
             </div>
           </div>
 
           <p className="mt-4 text-sm leading-6 text-slate-400">
-            La inscripción queda abierta mientras el torneo está en borrador. Cuando arranca, esta vista pasa a ser un panel de control del roster ya fijado.
+            {t('torneoRosterDesc')}
           </p>
         </div>
 
         <div className="rounded-[28px] border border-white/10 bg-slate-950/45 p-5">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Estado de edición</p>
+              <p className="text-xs uppercase tracking-[0.24em] text-slate-500">{t('torneoEditStatusEyebrow')}</p>
               <p className="mt-2 text-xl font-semibold text-white">
-                {canEdit ? 'Inscripción abierta' : 'Roster bloqueado'}
+                {canEdit ? t('torneoEditStatusOpen') : t('torneoEditStatusLocked')}
               </p>
             </div>
             <div className={`rounded-2xl border p-3 ${canEdit ? 'border-emerald-300/20 bg-emerald-300/10 text-emerald-100' : 'border-white/10 bg-white/[0.04] text-slate-300'}`}>
@@ -137,7 +137,7 @@ export function TournamentTeamsSection({ tournamentId, status, teams, onRefresh 
 
           <div className="mt-5 space-y-3 text-sm text-slate-300">
             <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3">
-              <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Selección actual</p>
+              <p className="text-xs uppercase tracking-[0.2em] text-slate-500">{t('torneoEditSelectionLabel')}</p>
               <p className="mt-2 text-white">
                 {selectedIds.size > 0
                   ? `${selectedIds.size} ${selectedIds.size === 1 ? t('torneoSeleccionado') : t('torneoSeleccionados')}`
@@ -145,7 +145,7 @@ export function TournamentTeamsSection({ tournamentId, status, teams, onRefresh 
               </p>
             </div>
             <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3">
-              <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Semillas asignadas</p>
+              <p className="text-xs uppercase tracking-[0.2em] text-slate-500">{t('torneoEditSeedsLabel')}</p>
               <p className="mt-2 text-white">{teams.filter((team) => team.seed !== null).length}</p>
             </div>
           </div>
@@ -162,7 +162,7 @@ export function TournamentTeamsSection({ tournamentId, status, teams, onRefresh 
         <div className="rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(15,23,42,0.92),rgba(7,11,22,0.96))] p-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Pool disponible</p>
+              <p className="text-xs uppercase tracking-[0.24em] text-slate-500">{t('torneoPoolEyebrow')}</p>
               <p className="mt-2 text-xl font-semibold text-white">{t('torneoEquiposDisponibles')}</p>
             </div>
             <div className="flex flex-wrap items-center gap-3">
@@ -174,7 +174,7 @@ export function TournamentTeamsSection({ tournamentId, status, teams, onRefresh 
                   disabled={available.length === 0}
                   className="accent-emerald-300"
                 />
-                Seleccionar todo
+                {t('torneoSelectAll')}
               </label>
               {selectedIds.size > 0 ? (
                 <button
@@ -228,7 +228,7 @@ export function TournamentTeamsSection({ tournamentId, status, teams, onRefresh 
 
           <div className="mt-5 flex flex-col gap-3 border-t border-white/10 pt-4 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-slate-400">
-              Selecciona varios equipos y añádelos de una sola vez para acelerar la preparación.
+              {t('torneoBulkEnrollHint')}
             </p>
             <button
               onClick={handleEnroll}
@@ -249,16 +249,16 @@ export function TournamentTeamsSection({ tournamentId, status, teams, onRefresh 
       ) : (
         <div className="overflow-hidden rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(15,23,42,0.92),rgba(7,11,22,0.96))]">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px] text-sm">
-              <thead className="bg-white/[0.04]">
-                <tr className="border-b border-white/10 text-slate-400">
-                  <th className="px-5 py-3 text-left font-medium">Equipo</th>
-                  <th className="px-5 py-3 text-center font-medium">{t('torneoSeed')}</th>
-                  <th className="px-5 py-3 text-center font-medium">{t('torneoFase')}</th>
-                  <th className="px-5 py-3 text-center font-medium">Estado</th>
-                  {canEdit ? <th className="px-5 py-3 text-right font-medium">Acciones</th> : null}
-                </tr>
-              </thead>
+                <table className="w-full min-w-[720px] text-sm">
+                  <thead className="bg-white/[0.04]">
+                    <tr className="border-b border-white/10 text-slate-400">
+                      <th className="px-5 py-3 text-left font-medium">{t('torneoTableTeamLabel')}</th>
+                      <th className="px-5 py-3 text-center font-medium">{t('torneoSeed')}</th>
+                      <th className="px-5 py-3 text-center font-medium">{t('torneoFase')}</th>
+                      <th className="px-5 py-3 text-center font-medium">{t('torneoTableStatusLabel')}</th>
+                      {canEdit ? <th className="px-5 py-3 text-right font-medium">{t('torneoTableActionsLabel')}</th> : null}
+                    </tr>
+                  </thead>
               <tbody className="divide-y divide-white/8">
                 {teams.map((team) => (
                   <tr key={team.id} className="transition-colors hover:bg-white/[0.03]">

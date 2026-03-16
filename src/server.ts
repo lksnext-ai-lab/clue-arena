@@ -13,6 +13,7 @@ import { db } from '@/lib/db';
 import { partidas } from '@/lib/db/schema';
 import { isNotNull, eq } from 'drizzle-orm';
 import { seedDevUsers } from '@/lib/db/seed';
+import { recoverStaleTurnClaims } from '@/lib/game/turn-claim';
 
 const dev = process.env.NODE_ENV !== 'production';
 const app = next({ dev });
@@ -49,6 +50,20 @@ async function recoverStaleAutoRun() {
   }
 }
 
+async function recoverStaleTurnExecutionClaims() {
+  try {
+    const staleGames = await recoverStaleTurnClaims();
+    if (staleGames.length === 0) return;
+
+    console.warn(
+      `> [recovery] ${staleGames.length} claim(s) de turno obsoletos limpiados: ` +
+        staleGames.map((g) => g.nombre).join(', '),
+    );
+  } catch (err) {
+    console.error('> [recovery] Error al limpiar claims de turno obsoletos:', err);
+  }
+}
+
 app.prepare().then(async () => {
   // En dev mode, aplicar migraciones y seed
   if (process.env.NODE_ENV !== 'production') {
@@ -67,6 +82,7 @@ app.prepare().then(async () => {
   }
 
   await recoverStaleAutoRun();
+  await recoverStaleTurnExecutionClaims();
 
   const httpServer = createServer((req, res) => {
     const parsedUrl = parse(req.url!, true);

@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import { ArrowRight, BadgeCheck, Building2, LockKeyhole, Sparkles } from 'lucide-react';
 import { getTranslations } from 'next-intl/server';
 import { redirect } from 'next/navigation';
@@ -12,8 +13,7 @@ import DevLoginButtons from './DevLoginButtons';
  * If a session already exists, redirects to the callbackUrl or the default dashboard.
  */
 type NextPageProps = {
-  params?: Promise<Record<string, any>>;
-  searchParams?: Promise<Record<string, any>>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
 
 const trustSignals = [
@@ -26,11 +26,12 @@ export default async function LoginPage({ searchParams }: NextPageProps) {
   const devMode = isAuthDisabled();
   const t = await getTranslations('auth');
   const session = await auth();
+  const floatingBadge = t('floatingBadge');
 
-  const params = await searchParams;
+  const params = (await searchParams) ?? {};
+  const callbackUrl = typeof params.callbackUrl === 'string' ? params.callbackUrl : undefined;
 
   if (session?.user) {
-    const callbackUrl = (params as any)?.callbackUrl as string | undefined;
     const defaultUrl = session.user.rol === 'admin' ? '/admin' : '/dashboard';
     redirect(callbackUrl ?? defaultUrl);
   }
@@ -38,17 +39,18 @@ export default async function LoginPage({ searchParams }: NextPageProps) {
   return (
     <main className="dark relative min-h-screen overflow-hidden bg-[#050b14] text-white">
       <div className="pointer-events-none absolute inset-0">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(34,211,238,0.18),_transparent_30%),radial-gradient(circle_at_78%_14%,_rgba(251,191,36,0.14),_transparent_20%),radial-gradient(circle_at_50%_85%,_rgba(248,113,113,0.12),_transparent_24%),linear-gradient(180deg,_#08111f_0%,_#050b14_100%)]" />
+        <div
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+          style={{ backgroundImage: "url('/fondo-login.png')" }}
+        />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(34,211,238,0.18),_transparent_30%),radial-gradient(circle_at_78%_14%,_rgba(251,191,36,0.14),_transparent_20%),radial-gradient(circle_at_50%_85%,_rgba(248,113,113,0.12),_transparent_24%),linear-gradient(180deg,_rgba(8,17,31,0.66)_0%,_rgba(5,11,20,0.88)_100%)]" />
         <div className="absolute left-1/2 top-24 h-72 w-72 -translate-x-1/2 rounded-full bg-cyan-400/10 blur-3xl" />
       </div>
 
       <div className="relative mx-auto flex min-h-screen max-w-7xl items-center px-6 py-10 sm:px-8 lg:px-10">
         <div className="grid w-full gap-8 lg:grid-cols-[1.08fr_0.92fr] lg:items-center">
           <section className="max-w-2xl">
-            <div className="inline-flex items-center gap-3 rounded-full border border-cyan-300/20 bg-cyan-300/10 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.3em] text-cyan-100">
-              <span className="h-2 w-2 rounded-full bg-cyan-300 shadow-[0_0_16px_rgba(103,232,249,0.85)]" />
-              {t('eyebrow')}
-            </div>
+            <Image src="/lks.svg" alt="LKS logo" width={64} height={64} priority className="h-16 w-auto" />
 
             <p className="mt-8 text-sm uppercase tracking-[0.28em] text-amber-200/80">{t('kicker')}</p>
             <h1
@@ -77,21 +79,17 @@ export default async function LoginPage({ searchParams }: NextPageProps) {
           </section>
 
           <section className="relative">
-            <div className="absolute -left-6 top-10 hidden rounded-full border border-amber-300/20 bg-amber-300/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-amber-100/90 lg:inline-flex">
-              {t('floatingBadge')}
-            </div>
+            {floatingBadge ? (
+              <div className="absolute -left-6 top-10 hidden rounded-full border border-amber-300/20 bg-amber-300/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-amber-100/90 lg:inline-flex">
+                {floatingBadge}
+              </div>
+            ) : null}
 
             <div className="overflow-hidden rounded-[34px] border border-white/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.12),rgba(255,255,255,0.04))] p-3 shadow-[0_30px_90px_rgba(2,6,23,0.55)]">
               <div className="rounded-[28px] border border-white/10 bg-[#08111f]/90 p-6 sm:p-8">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.28em] text-cyan-200/80">{t('panelEyebrow')}</p>
-                    <h2 className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-white">{t('panelTitle')}</h2>
-                    <p className="mt-3 max-w-md text-sm leading-7 text-slate-400">{t('panelDescription')}</p>
-                  </div>
-                  <div className="hidden rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-emerald-100 sm:inline-flex">
-                    {t('securityBadge')}
-                  </div>
+                <div>
+                  <h2 className="text-3xl font-semibold tracking-[-0.04em] text-white">{t('panelTitle')}</h2>
+                  <p className="mt-3 max-w-md text-sm leading-7 text-slate-400">{t('panelDescription')}</p>
                 </div>
 
                 <div className="mt-8 rounded-[28px] border border-white/8 bg-[linear-gradient(180deg,rgba(15,23,42,0.88),rgba(8,17,31,0.94))] p-5 sm:p-6">
@@ -109,7 +107,7 @@ export default async function LoginPage({ searchParams }: NextPageProps) {
                     className="mt-6"
                     action={async () => {
                       'use server';
-                      await signIn('microsoft-entra-id', { redirectTo: (params as any)?.callbackUrl as string || '/' });
+                      await signIn('microsoft-entra-id', { redirectTo: callbackUrl ?? '/' });
                     }}
                   >
                     <button
@@ -121,9 +119,6 @@ export default async function LoginPage({ searchParams }: NextPageProps) {
                     </button>
                   </form>
 
-                  <div className="mt-4 rounded-2xl border border-white/8 bg-white/5 px-4 py-3 text-sm leading-6 text-slate-400">
-                    {t('accessNote')}
-                  </div>
                 </div>
 
                 {devMode && <DevLoginButtons />}

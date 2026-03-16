@@ -6,6 +6,8 @@ import {
   ARMA_META,
   ESCENARIO_META,
 } from '@/types/domain';
+import { getLocale } from 'next-intl/server';
+import { getInstructionsCopy } from './copy';
 
 function TableWrapper({ children }: { children: React.ReactNode }) {
   return (
@@ -36,16 +38,19 @@ function Td({ children, mono }: { children: React.ReactNode; mono?: boolean }) {
   );
 }
 
-export function SuspectsTable() {
+export async function SuspectsTable() {
+  const locale = await getLocale();
+  const copy = getInstructionsCopy(locale).elements;
+
   return (
     <TableWrapper>
-      <caption className="sr-only">Sospechosos canónicos del evento</caption>
+      <caption className="sr-only">{copy.suspectsCaption}</caption>
       <thead>
         <tr>
-          <Th>ID</Th>
-          <Th>Nombre canónico</Th>
-          <Th>Departamento</Th>
-          <Th>Color</Th>
+          <Th>{copy.idHeader}</Th>
+          <Th>{copy.canonicalNameHeader}</Th>
+          <Th>{copy.departmentHeader}</Th>
+          <Th>{copy.colorHeader}</Th>
         </tr>
       </thead>
       <tbody>
@@ -55,7 +60,7 @@ export function SuspectsTable() {
             <tr key={s} className="hover:bg-slate-800/30">
               <Td mono>S-0{i + 1}</Td>
               <Td mono>{s}</Td>
-              <Td>{meta.departamento}</Td>
+              <Td>{copy.departments[s] ?? meta.departamento}</Td>
               <Td>
                 <span className="flex items-center gap-2">
                   <span
@@ -73,15 +78,18 @@ export function SuspectsTable() {
   );
 }
 
-export function WeaponsTable() {
+export async function WeaponsTable() {
+  const locale = await getLocale();
+  const copy = getInstructionsCopy(locale).elements;
+
   return (
     <TableWrapper>
-      <caption className="sr-only">Armas canónicas del evento</caption>
+      <caption className="sr-only">{copy.weaponsCaption}</caption>
       <thead>
         <tr>
-          <Th>ID</Th>
-          <Th>Nombre canónico</Th>
-          <Th>Emoji</Th>
+          <Th>{copy.idHeader}</Th>
+          <Th>{copy.canonicalNameHeader}</Th>
+          <Th>{copy.emojiHeader}</Th>
         </tr>
       </thead>
       <tbody>
@@ -100,15 +108,18 @@ export function WeaponsTable() {
   );
 }
 
-export function ScenariosTable() {
+export async function ScenariosTable() {
+  const locale = await getLocale();
+  const copy = getInstructionsCopy(locale).elements;
+
   return (
     <TableWrapper>
-      <caption className="sr-only">Escenarios canónicos del evento</caption>
+      <caption className="sr-only">{copy.scenariosCaption}</caption>
       <thead>
         <tr>
-          <Th>ID</Th>
-          <Th>Nombre canónico</Th>
-          <Th>Emoji</Th>
+          <Th>{copy.idHeader}</Th>
+          <Th>{copy.canonicalNameHeader}</Th>
+          <Th>{copy.emojiHeader}</Th>
         </tr>
       </thead>
       <tbody>

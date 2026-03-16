@@ -7,6 +7,7 @@ import { getAuthSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { partidasEntrenamiento } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
+import { trainingRunner } from '@/lib/game/training-runner';
 
 export async function POST(
   _request: NextRequest,
@@ -45,6 +46,8 @@ export async function POST(
     .update(partidasEntrenamiento)
     .set({ estado: 'abortada', motivoAbort: 'ABORTADA_POR_EQUIPO', finishedAt: new Date() })
     .where(eq(partidasEntrenamiento.id, id));
+
+  trainingRunner.stop(id);
 
   return NextResponse.json({ success: true });
 }

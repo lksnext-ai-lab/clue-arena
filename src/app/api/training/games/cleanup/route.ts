@@ -3,6 +3,7 @@ import { and, eq, inArray } from 'drizzle-orm';
 import { getAuthSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { partidasEntrenamiento } from '@/lib/db/schema';
+import { trainingRunner } from '@/lib/game/training-runner';
 
 type CleanupScope = 'all';
 
@@ -43,7 +44,9 @@ export async function POST(request: NextRequest) {
         ),
       )
       .all()
-  ).map((game) => game.id);
+  )
+    .map((game) => game.id)
+    .filter((gameId) => !trainingRunner.isRunning(gameId));
 
   if (targetIds.length === 0) {
     return NextResponse.json({ success: true, deleted: 0, scope });

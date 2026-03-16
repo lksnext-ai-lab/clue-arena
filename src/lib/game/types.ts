@@ -37,6 +37,7 @@ export interface EquipoState {
 export type ScoreEventType =
   | 'EVT_WIN'
   | 'EVT_WIN_EFFICIENCY'
+  | 'EVT_TURN_SPEED'
   | 'EVT_SURVIVE'
   | 'EVT_SUGGESTION'
   | 'EVT_REFUTATION'
@@ -46,7 +47,8 @@ export type ScoreEventType =
   | 'EVT_TIMEOUT'
   | 'EVT_INVALID_CARD'
   | 'EVT_REDUNDANT_SUGGESTION'
-  | 'EVT_INVALID_FORMAT'  | 'EVT_COMM_ERROR'          // communication error (agent request failed)  // G006: warnings system
+  | 'EVT_INVALID_FORMAT'
+  | 'EVT_COMM_ERROR'          // communication error (agent request failed)
   | 'EVT_WRONG_REFUTATION'    // refutador showed card not in hand or not in suggestion
   | 'EVT_WARNING'             // informational: team accumulated a warning (0 pts)
   | 'EVT_WARNING_ELIMINATION';// team eliminated upon reaching 3 warnings

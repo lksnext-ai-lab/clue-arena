@@ -1,6 +1,15 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useGame } from '@/contexts/GameContext';
+import {
+  EVT_REFUTATION_POINTS,
+  EVT_SUGGESTION_CAP,
+  EVT_SUGGESTION_POINTS,
+  EVT_TURN_SPEED_POINTS_MAX,
+  EVT_WIN_POINTS,
+  calcEfficiencyBonus,
+} from '@/lib/game/engine';
 import type { GameDetailResponse } from '@/types/api';
 import { ArenaTeamCard } from './ArenaTeamCard';
 
@@ -8,18 +17,11 @@ interface ArenaTeamPanelProps {
   partida: GameDetailResponse;
 }
 
-/** Shape forwarded to each card: the coordinator is waiting on this team. */
 export interface PendingRequest {
   type: 'turno' | 'refutacion';
   fromTs: number;
 }
 
-/**
- * Derives a map of { equipoId → PendingRequest } from the live micro-event
- * stream.  We walk the events of the active turn in order, tracking which
- * team the coordinator has requested something from and whether a response
- * has already arrived.
- */
 function usePendingRequests(): Map<string, PendingRequest> {
   const { currentTurnActivity } = useGame();
   const events = currentTurnActivity.active?.events ?? [];
@@ -31,7 +33,6 @@ function usePendingRequests(): Map<string, PendingRequest> {
     } else if (ev.type === 'turn:agent_responded' && ev.equipoId) {
       map.delete(ev.equipoId);
     } else if (ev.type === 'turn:refutation_requested' && ev.refutadoresIds?.length) {
-      // Only the first candidate is tracked (sequential refutation rule).
       map.set(ev.refutadoresIds[0], { type: 'refutacion', fromTs: ev.ts });
     } else if (ev.type === 'turn:refutation_received' && ev.equipoId) {
       map.delete(ev.equipoId);
@@ -40,27 +41,71 @@ function usePendingRequests(): Map<string, PendingRequest> {
   return map;
 }
 
+function getConfiguredScoreMax(partida: GameDetailResponse): number {
+  const teamCount = Math.max(1, partida.equipos.length);
+  const configuredTurns = partida.maxTurnos ?? Math.max(partida.turnos.length, teamCount);
+  const ownTurns = Math.ceil(configuredTurns / teamCount);
+  const otherTurns = Math.max(0, configuredTurns - ownTurns);
+  const suggestionPoints = Math.min(ownTurns, EVT_SUGGESTION_CAP) * EVT_SUGGESTION_POINTS;
+  const speedPoints = ownTurns * EVT_TURN_SPEED_POINTS_MAX;
+  const refutationPoints = otherTurns * EVT_REFUTATION_POINTS;
+  const winPoints = EVT_WIN_POINTS + calcEfficiencyBonus(2);
+
+  return Math.max(100, suggestionPoints + speedPoints + refutationPoints + winPoints);
+}
+
 export function ArenaTeamPanel({ partida }: ArenaTeamPanelProps) {
+  const t = useTranslations('arena.detail.teamPanel');
   const { activeEquipoId } = useGame();
   const pending = usePendingRequests();
 
-  // Sort by match order (orden) to keep position stable across turns
   const sorted = [...partida.equipos].sort((a, b) => a.orden - b.orden);
+  const leader = [...sorted].sort((a, b) => b.puntos - a.puntos)[0] ?? null;
+  const alive = sorted.filter((equipo) => !equipo.eliminado).length;
+  const pendingCount = Array.from(pending.values()).length;
+  const scoreMax = getConfiguredScoreMax(partida);
+  const liveOrder = activeEquipoId
+    ? sorted.findIndex((equipo) => equipo.equipoId === activeEquipoId) + 1
+    : null;
 
   return (
-    <div className="rounded-xl border border-slate-700 bg-slate-800 p-4 flex flex-col gap-3">
-      <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">Equipos</h2>
-      <div className="flex flex-col gap-2 sm:grid sm:grid-cols-2 lg:flex lg:flex-col">
+    <aside className="arena-panel flex flex-col gap-3 overflow-hidden p-3">
+      <div>
+        <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-slate-400">
+          {t('title')}
+        </p>
+      </div>
+
+      {partida.estado !== 'finalizada' && (
+        <div className="grid grid-cols-3 gap-1.5 text-center">
+          <div className="arena-stat-card">
+            <span className="arena-stat-label">{t('stats.active')}</span>
+            <span className="arena-stat-value">{alive}</span>
+          </div>
+          <div className="arena-stat-card">
+            <span className="arena-stat-label">{t('stats.queued')}</span>
+            <span className="arena-stat-value">{pendingCount}</span>
+          </div>
+          <div className="arena-stat-card">
+            <span className="arena-stat-label">{t('stats.order')}</span>
+            <span className="arena-stat-value">{liveOrder ?? '--'}</span>
+          </div>
+        </div>
+      )}
+
+      <div className="flex flex-col gap-2 sm:grid sm:grid-cols-2 xl:flex xl:flex-col">
         {sorted.map((equipo) => (
           <ArenaTeamCard
             key={equipo.equipoId}
             gameId={partida.id}
             equipo={equipo}
             isActiveTurn={equipo.equipoId === activeEquipoId}
+            isLeader={equipo.equipoId === leader?.equipoId}
+            scoreMax={scoreMax}
             pendingRequest={pending.get(equipo.equipoId)}
           />
         ))}
       </div>
-    </div>
+    </aside>
   );
 }

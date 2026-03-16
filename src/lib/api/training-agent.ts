@@ -278,7 +278,6 @@ async function invokeAgentWithTraceMatttin(
 
   let rawResponse = '';
   let parsedAction: AgentResponse | null = null;
-  let parseError: string | null = null;
 
   try {
     const { invokeAgent: invokeMattinAgent } = await import('./mattin');

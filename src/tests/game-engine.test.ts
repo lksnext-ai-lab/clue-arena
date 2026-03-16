@@ -5,6 +5,10 @@ import {
   isGameOver,
   getWinner,
   calcEfficiencyBonus,
+  calcTurnSpeedBonus,
+  EVT_TURN_SPEED_FAST_MS,
+  EVT_TURN_SPEED_POINTS_MAX,
+  EVT_TURN_SPEED_SLOW_MS,
   getGameStateView,
   applyWarningElimination,
 } from '@/lib/game/engine';
@@ -262,6 +266,13 @@ describe('Game Engine', () => {
     expect(calcEfficiencyBonus(10)).toBe(300);
     expect(calcEfficiencyBonus(22)).toBe(0);  // 500 - (22-2)*25 = 0
     expect(calcEfficiencyBonus(25)).toBe(0); // clamped to 0
+  });
+
+  it('calcTurnSpeedBonus rewards fast turns and clamps slow ones', () => {
+    expect(calcTurnSpeedBonus(EVT_TURN_SPEED_FAST_MS)).toBe(EVT_TURN_SPEED_POINTS_MAX);
+    expect(calcTurnSpeedBonus((EVT_TURN_SPEED_FAST_MS + EVT_TURN_SPEED_SLOW_MS) / 2)).toBe(2);
+    expect(calcTurnSpeedBonus(EVT_TURN_SPEED_SLOW_MS)).toBe(0);
+    expect(calcTurnSpeedBonus(EVT_TURN_SPEED_SLOW_MS + 5_000)).toBe(0);
   });
 
   // --------------- getGameStateView tests (G003) ---------------

@@ -1,24 +1,18 @@
 'use client';
 
-/**
- * TurnActivityFeed (F016)
- * Displays coordinator micro-events in real-time during each turn:
- *   turn:agent_invoked → turn:agent_responded → turn:refutation_requested → turn:refutation_received
- *
- * The component consumes `currentTurnActivity` from GameContext which is populated
- * by the WebSocket micro-event stream (turn:* messages).
- */
-
 import { useEffect, useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils/cn';
 import { useGame } from '@/contexts/GameContext';
 import type { TurnMicroEventUI, TurnActivityEntry } from '@/types/domain';
 
-// ── Elapsed counter hook ──────────────────────────────────────────────────────
 function useElapsedMs(fromTs: number | null, active: boolean): number {
   const [elapsed, setElapsed] = useState(0);
   useEffect(() => {
-    if (!active || fromTs === null) { setElapsed(0); return; }
+    if (!active || fromTs === null) {
+      setElapsed(0);
+      return;
+    }
     setElapsed(Date.now() - fromTs);
     const id = setInterval(() => setElapsed(Date.now() - fromTs), 100);
     return () => clearInterval(id);
@@ -26,153 +20,93 @@ function useElapsedMs(fromTs: number | null, active: boolean): number {
   return elapsed;
 }
 
-// ── Duration label ─────────────────────────────────────────────────────────────
 function DurationBadge({ ms }: { ms: number }) {
   return (
-    <span className="min-w-[56px] text-right font-mono text-xs text-slate-500">
+    <span className="min-w-[52px] text-right font-mono text-[11px] text-slate-500">
       {ms >= 1000 ? `${(ms / 1000).toFixed(1)} s` : `${ms} ms`}
     </span>
   );
 }
 
-// ── Animated waiting row ───────────────────────────────────────────────────────
 function WaitingRow({ fromTs }: { fromTs: number }) {
+  const t = useTranslations('arena.detail.turnFeed');
   const elapsed = useElapsedMs(fromTs, true);
   return (
-    <li className="flex items-center gap-3 text-sm">
-      <span className="min-w-[56px] text-right font-mono text-xs text-slate-500">
+    <li className="flex items-center gap-2 text-sm">
+      <span className="min-w-[52px] text-right font-mono text-[11px] text-slate-500">
         {elapsed >= 1000 ? `${(elapsed / 1000).toFixed(1)} s` : `${elapsed} ms`}
       </span>
       <span className="h-2 w-2 rounded-full bg-cyan-400 animate-pulse" />
-      <span className="text-slate-400 italic text-xs">esperando respuesta…</span>
+      <span className="text-[11px] italic text-slate-400">{t('waiting')}</span>
     </li>
   );
 }
 
-function warningReasonLabel(reason: string | undefined): string {
-  switch (reason) {
-    case 'EVT_TIMEOUT':
-      return 'timeout';
-    case 'EVT_COMM_ERROR':
-      return 'error de comunicacion';
-    case 'EVT_INVALID_FORMAT':
-      return 'formato invalido';
-    case 'EVT_INVALID_CARD':
-      return 'carta invalida';
-    case 'EVT_WRONG_REFUTATION':
-      return 'refutacion invalida';
-    default:
-      return reason?.toLowerCase() ?? 'warning';
-  }
-}
-
-function shouldShowWaiting(entry: TurnActivityEntry): boolean {
-  if (entry.isCompleted) return false;
-  const lastEvent = entry.events.at(-1);
-  return lastEvent?.type === 'turn:agent_invoked' || lastEvent?.type === 'turn:refutation_requested';
-}
-
-// ── Single micro-event row ────────────────────────────────────────────────────
 function EventRow({ ev }: { ev: TurnMicroEventUI }) {
+  const t = useTranslations('arena.detail.turnFeed');
   switch (ev.type) {
     case 'turn:agent_invoked':
       return (
-        <span className="flex items-center gap-2 text-slate-400 text-xs">
+        <span className="flex items-center gap-1.5 text-[11px] text-slate-400">
           <span className="text-cyan-400">→</span>
-          Solicitando turno a{' '}
-          <span className="font-semibold text-slate-200">{ev.equipoNombre}</span>…
+          {t('requestTurn')} <span className="font-semibold text-slate-200">{ev.equipoNombre}</span>
         </span>
       );
 
     case 'turn:agent_responded': {
-      const isError =
-        ev.accion === 'timeout' ||
-        ev.accion === 'formato_invalido' ||
-        ev.accion === 'error_comunicacion';
+      const isError = ev.accion === 'timeout' || ev.accion === 'formato_invalido';
       return (
-        <span className={cn('flex flex-col gap-0.5 text-xs', isError ? 'text-red-400' : 'text-emerald-400')}>
-          <span className="flex items-center gap-2">
+        <span className={cn('flex flex-col gap-0.5 text-[11px]', isError ? 'text-red-300' : 'text-emerald-300')}>
+          <span className="flex items-center gap-1.5">
             {isError ? '⏱' : '✓'}
             <span className="font-semibold text-slate-200">{ev.equipoNombre}</span>
-            {ev.accion === 'sugerencia' && <span className="text-amber-400">sugiere</span>}
-            {ev.accion === 'acusacion' && <span className="text-red-300">acusa</span>}
-            {ev.accion === 'pasar'     && <span className="text-slate-500">pasa</span>}
-            {ev.accion === 'timeout'          && <span>timeout</span>}
-            {ev.accion === 'formato_invalido' && <span>formato inválido</span>}
-            {ev.accion === 'error_comunicacion' && <span>error de comunicación</span>}
+            <span className="text-slate-400">{ev.accion}</span>
             {ev.durationMs !== undefined && (
-              <span className="ml-auto text-slate-500 font-mono text-xs">{ev.durationMs} ms</span>
+              <span className="ml-auto font-mono text-[11px] text-slate-500">{ev.durationMs} ms</span>
             )}
           </span>
           {ev.sugerencia && (
-            <span className="ml-5 text-slate-300 text-xs">
+            <span className="ml-4 text-[11px] text-slate-300">
               {ev.sugerencia.sospechoso} · {ev.sugerencia.arma} · {ev.sugerencia.habitacion}
             </span>
           )}
-          {/* G004: spectator comment */}
           {ev.spectatorComment && (
-            <span className="mt-0.5 ml-5 block text-xs text-slate-400 italic">
-              💬 &quot;{ev.spectatorComment}&quot;
+            <span className="ml-4 mt-0.5 block text-[11px] italic text-slate-400">
+              💬 &ldquo;{ev.spectatorComment}&rdquo;
             </span>
           )}
         </span>
       );
     }
 
-    case 'warning:issued':
-      return (
-        <span className="flex flex-col gap-0.5 text-xs text-amber-300">
-          <span className="flex items-center gap-2">
-            <span>!</span>
-            <span className="font-semibold text-slate-200">{ev.equipoNombre ?? ev.equipoId}</span>
-            <span>warning {ev.warnings ?? '?'}/3</span>
-          </span>
-          <span className="ml-5 text-slate-400">
-            motivo: {warningReasonLabel(ev.reason)}
-          </span>
-        </span>
-      );
-
-    case 'warning:agent_eliminated':
-      return (
-        <span className="flex flex-col gap-0.5 text-xs text-red-300">
-          <span className="flex items-center gap-2">
-            <span>✗</span>
-            <span className="font-semibold text-slate-200">{ev.equipoNombre ?? ev.equipoId}</span>
-            <span>eliminado por warnings</span>
-          </span>
-        </span>
-      );
-
     case 'turn:refutation_requested':
       return (
-        <span className="flex items-center gap-2 text-slate-400 text-xs">
+        <span className="flex items-center gap-1.5 text-[11px] text-slate-400">
           <span className="text-amber-400">→</span>
-          Solicitando refutación…
+          {t('requestRefutation')}
         </span>
       );
 
     case 'turn:refutation_received': {
       const refuted = ev.resultado === 'refutada';
       return (
-        <span className={cn('flex flex-col gap-0.5 text-xs', refuted ? 'text-amber-400' : 'text-slate-500')}>
-          <span className="flex items-center gap-2">
+        <span className={cn('flex flex-col gap-0.5 text-[11px]', refuted ? 'text-amber-300' : 'text-slate-500')}>
+          <span className="flex items-center gap-1.5">
             {refuted ? '✓' : '·'}
             <span className="font-semibold text-slate-200">{ev.equipoNombre}</span>
-            {refuted ? 'refutó' : 'no puede refutar'}
+            {refuted ? t('refuted') : t('cannotRefute')}
             {ev.durationMs !== undefined && (
-              <span className="ml-auto text-slate-500 font-mono text-xs">{ev.durationMs} ms</span>
+              <span className="ml-auto font-mono text-[11px] text-slate-500">{ev.durationMs} ms</span>
             )}
           </span>
           {refuted && ev.cartaMostrada && (
-            <span className="ml-5 text-slate-300 text-xs">
-              carta: <span className="font-semibold text-amber-300">{ev.cartaMostrada}</span>
+            <span className="ml-4 text-[11px] text-slate-300">
+              {t('card')}: <span className="font-semibold text-amber-200">{ev.cartaMostrada}</span>
             </span>
           )}
-          {/* G004: spectator comment */}
           {ev.spectatorComment && (
-            <span className="mt-0.5 ml-5 block text-xs text-slate-400 italic">
-              💬 &quot;{ev.spectatorComment}&quot;
+            <span className="ml-4 mt-0.5 block text-[11px] italic text-slate-400">
+              💬 &ldquo;{ev.spectatorComment}&rdquo;
             </span>
           )}
         </span>
@@ -184,38 +118,30 @@ function EventRow({ ev }: { ev: TurnMicroEventUI }) {
   }
 }
 
-// ── Single turn feed block ────────────────────────────────────────────────────
 function TurnFeedBlock({ entry, showWaiting }: { entry: TurnActivityEntry; showWaiting: boolean }) {
-  // The last event's ts is used as the "from" reference for the elapsed counter
+  const t = useTranslations('arena.detail.turnFeed');
   const lastTs = entry.events.at(-1)?.ts ?? null;
 
   return (
     <div
       className={cn(
-        'rounded-md border px-4 py-3 transition-colors',
+        'rounded-2xl border px-3 py-2.5 transition-colors',
         entry.isCompleted
-          ? 'border-slate-700/60 bg-slate-800/30'
-          : 'border-cyan-500/30 bg-slate-800/70',
+          ? 'border-white/8 bg-slate-950/40'
+          : 'border-cyan-400/25 bg-[radial-gradient(circle_at_top,rgba(34,211,238,0.12),transparent_55%),rgba(15,23,42,0.9)]'
       )}
     >
-      {/* Header */}
-      <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider">
-        <span
-          className={cn(
-            'h-2 w-2 rounded-full',
-            entry.isCompleted ? 'bg-slate-500' : 'bg-cyan-400 animate-pulse',
-          )}
-        />
-        <span className={entry.isCompleted ? 'text-slate-500' : 'text-cyan-400'}>
-          Turno {entry.turnoNumero}
+      <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.16em]">
+        <span className={cn('h-2 w-2 rounded-full', entry.isCompleted ? 'bg-slate-500' : 'bg-cyan-400 animate-pulse')} />
+        <span className={entry.isCompleted ? 'text-slate-400' : 'text-cyan-300'}>
+          {t('turn', { count: entry.turnoNumero })}
         </span>
         {entry.isCompleted && (
-          <span className="text-slate-600 font-normal normal-case tracking-normal">completado</span>
+          <span className="normal-case tracking-normal text-slate-500">{t('completed')}</span>
         )}
       </div>
 
-      {/* Event rows */}
-      <ol className="space-y-1.5">
+      <ol className="space-y-1">
         {entry.events.map((ev, i) => (
           <li key={i} className="flex items-start gap-3">
             <DurationBadge ms={ev.durationMs ?? 0} />
@@ -228,42 +154,31 @@ function TurnFeedBlock({ entry, showWaiting }: { entry: TurnActivityEntry; showW
   );
 }
 
-// ── Public component ──────────────────────────────────────────────────────────
 export function TurnActivityFeed() {
+  const t = useTranslations('arena.detail.turnFeed');
   const { currentTurnActivity } = useGame();
   const { active, history } = currentTurnActivity;
 
   return (
-    <aside
-      aria-label="Actividad del coordinador"
-      className="rounded-xl border border-slate-700 bg-slate-800 p-4 flex flex-col gap-3 min-h-0"
-    >
-      {/* Panel header */}
-      <h2 className="shrink-0 text-sm font-semibold text-slate-400 uppercase tracking-wider">
-        Coordinador
-      </h2>
+    <aside aria-label={t('ariaLabel')} className="arena-panel flex min-h-0 flex-col gap-2.5 overflow-hidden p-3">
+      <div className="shrink-0">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-400">
+          {t('eyebrow')}
+        </p>
+        <h2 className="mt-0.5 text-base font-semibold text-white">{t('title')}</h2>
+      </div>
 
-      {/* Empty state */}
       {!active && history.length === 0 && (
-        <div className="flex flex-1 items-center justify-center py-8 text-center">
-          <p className="text-xs text-slate-600 leading-relaxed">
-            La actividad del coordinador<br />aparecerá aquí al inicio del turno.
+        <div className="flex flex-1 items-center justify-center rounded-2xl border border-dashed border-white/10 bg-slate-950/35 py-6 text-center">
+          <p className="text-[11px] leading-relaxed text-slate-500">
+            {t('empty')}
           </p>
         </div>
       )}
 
-      {/* Scrollable event list */}
       {(active || history.length > 0) && (
-        <div className="flex flex-col gap-2 overflow-y-auto">
-          {/* Active turn block */}
-          {active && (
-            <TurnFeedBlock
-              entry={active}
-              showWaiting={shouldShowWaiting(active)}
-            />
-          )}
-
-          {/* Last N completed turns */}
+        <div className="flex flex-col gap-1.5 overflow-y-auto pr-1 scrollbar-panel">
+          {active && <TurnFeedBlock entry={active} showWaiting={!active.isCompleted} />}
           {history.map((entry) => (
             <TurnFeedBlock key={entry.turnoId} entry={entry} showWaiting={false} />
           ))}

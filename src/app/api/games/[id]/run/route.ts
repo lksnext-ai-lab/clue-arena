@@ -20,8 +20,9 @@ import { z } from 'zod';
 import { getAuthSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { partidas } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { gameRunner } from '@/lib/game/runner';
+import { toSqliteConflictError } from '@/lib/db/sqlite-errors';
 import { gameEventEmitter } from '@/lib/ws/GameEventEmitter';
 
 const RunBodySchema = z.object({
@@ -49,39 +50,89 @@ export async function POST(
     // Body is optional; ignore parse errors
   }
 
-  const partida = await db
-    .select()
-    .from(partidas)
-    .where(eq(partidas.id, id))
-    .get();
+  let result:
+    | { kind: 'started'; delay: number }
+    | { kind: 'not_found' }
+    | { kind: 'invalid_state' }
+    | { kind: 'conflict' };
 
-  if (!partida) {
+  try {
+    result = db.transaction((tx) => {
+      const partida = tx
+        .select()
+        .from(partidas)
+        .where(eq(partidas.id, id))
+        .get();
+
+      if (!partida) {
+        return { kind: 'not_found' } as const;
+      }
+      if (partida.estado !== 'en_curso') {
+        return { kind: 'invalid_state' } as const;
+      }
+
+      const delay = turnoDelayMs ?? partida.turnoDelayMs;
+      const updateResult = tx
+        .update(partidas)
+        .set({
+          modoEjecucion: 'auto',
+          turnoDelayMs: delay,
+          autoRunActivoDesde: new Date(),
+        })
+        .where(
+          and(
+            eq(partidas.id, id),
+            eq(partidas.estado, 'en_curso'),
+            isNull(partidas.autoRunActivoDesde),
+          ),
+        )
+        .run();
+
+      if (updateResult.changes === 0) {
+        return { kind: 'conflict' } as const;
+      }
+
+      return { kind: 'started', delay } as const;
+    });
+  } catch (error) {
+    const conflict = toSqliteConflictError(
+      error,
+      'Ya existe una mutación en curso para esta partida',
+      'GAME_MUTATION_IN_PROGRESS',
+    );
+    if (conflict) {
+      return NextResponse.json(
+        { error: conflict.message, code: conflict.code },
+        { status: conflict.statusCode },
+      );
+    }
+    throw error;
+  }
+
+  if (result.kind === 'not_found') {
     return NextResponse.json({ error: 'Partida no encontrada' }, { status: 404 });
   }
-  if (partida.estado !== 'en_curso') {
+  if (result.kind === 'invalid_state') {
     return NextResponse.json(
       { error: 'La partida no está en curso' },
       { status: 400 },
     );
   }
-  if (partida.autoRunActivoDesde !== null || gameRunner.isRunning(id)) {
+  if (result.kind === 'conflict' || gameRunner.isRunning(id)) {
+    if (result.kind !== 'conflict') {
+      await db
+        .update(partidas)
+        .set({ autoRunActivoDesde: null, modoEjecucion: 'manual' })
+        .where(eq(partidas.id, id));
+    }
     return NextResponse.json(
-      { error: 'Ya existe un bucle de auto-run activo para esta partida' },
+      {
+        error: 'Ya existe un bucle de auto-run activo o una mutación en curso para esta partida',
+        code: 'GAME_MUTATION_IN_PROGRESS',
+      },
       { status: 409 },
     );
   }
-
-  const delay = turnoDelayMs ?? partida.turnoDelayMs;
-
-  // Mark as auto and record start timestamp
-  await db
-    .update(partidas)
-    .set({
-      modoEjecucion: 'auto',
-      turnoDelayMs: delay,
-      autoRunActivoDesde: new Date(),
-    })
-    .where(eq(partidas.id, id));
 
   gameEventEmitter.emitTurnCompleted(id, {
     type: 'status_changed',
@@ -90,10 +141,24 @@ export async function POST(
   });
 
   // Delegar al GameRunner (proceso servidor, fuera del ciclo HTTP)
-  gameRunner.start(id, delay);
+  const runnerStarted = gameRunner.start(id, result.delay);
+  if (!runnerStarted) {
+    await db
+      .update(partidas)
+      .set({ autoRunActivoDesde: null, modoEjecucion: 'manual' })
+      .where(eq(partidas.id, id));
+
+    return NextResponse.json(
+      {
+        error: 'Ya existe un bucle de auto-run activo o una mutación en curso para esta partida',
+        code: 'GAME_MUTATION_IN_PROGRESS',
+      },
+      { status: 409 },
+    );
+  }
 
   return NextResponse.json(
-    { success: true, modoEjecucion: 'auto', turnoDelayMs: delay },
+    { success: true, modoEjecucion: 'auto', turnoDelayMs: result.delay },
     { status: 202 },
   );
 }

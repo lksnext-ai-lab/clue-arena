@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
+import { getLocale, getTranslations } from 'next-intl/server';
 import {
   ArrowRight,
   Clock3,
@@ -14,6 +15,7 @@ import { GameStatusBadge } from '@/components/game/GameStatusBadge';
 import { db } from '@/lib/db';
 import { equipos, partidaEquipos, partidas } from '@/lib/db/schema';
 import type { GameStatus } from '@/types/domain';
+import type { Locale } from '@/i18n/request';
 
 type ArenaGame = {
   id: string;
@@ -27,23 +29,7 @@ type ArenaGame = {
   equipoNombres: string[];
 };
 
-const SECTION_META: Record<GameStatus, { eyebrow: string; title: string; description: string }> = {
-  en_curso: {
-    eyebrow: 'Directo',
-    title: 'Partidas activas',
-    description: 'La arena está viva. Entra en cualquier mesa para seguir turnos, deducciones y cambios de ritmo.',
-  },
-  pendiente: {
-    eyebrow: 'Siguiente ola',
-    title: 'A punto de empezar',
-    description: 'Mesas preparadas para arrancar. Perfectas para anticipar cruces y equipos protagonistas.',
-  },
-  finalizada: {
-    eyebrow: 'Reciente',
-    title: 'Últimos cierres',
-    description: 'Consulta las partidas ya resueltas y salta a la vista completa para revisar cómo terminaron.',
-  },
-};
+type ArenaTranslations = Awaited<ReturnType<typeof getTranslations>>;
 
 /**
  * /arena — Gateway hacia las vistas de espectador.
@@ -51,6 +37,8 @@ const SECTION_META: Record<GameStatus, { eyebrow: string; title: string; descrip
  * Página pública accesible sin autenticación.
  */
 export default async function ArenaGatewayPage() {
+  const t = await getTranslations('arena');
+  const locale = await getLocale() as Locale;
   const allGames = await db
     .select()
     .from(partidas)
@@ -86,6 +74,24 @@ export default async function ArenaGatewayPage() {
     .filter((game) => game.estado === 'finalizada')
     .sort((a, b) => (b.finishedAt?.getTime() ?? 0) - (a.finishedAt?.getTime() ?? 0))
     .slice(0, 6);
+
+  const sectionMeta: Record<GameStatus, { eyebrow: string; title: string; description: string }> = {
+    en_curso: {
+      eyebrow: t('sections.live.eyebrow'),
+      title: t('sections.live.title'),
+      description: t('sections.live.description'),
+    },
+    pendiente: {
+      eyebrow: t('sections.pending.eyebrow'),
+      title: t('sections.pending.title'),
+      description: t('sections.pending.description'),
+    },
+    finalizada: {
+      eyebrow: t('sections.finished.eyebrow'),
+      title: t('sections.finished.title'),
+      description: t('sections.finished.description'),
+    },
+  };
 
   const uniqueTeams = new Set(enriched.flatMap((game) => game.equipoNombres));
   const featuredGame = enCurso[0] ?? pendientes[0] ?? finalizadas[0] ?? null;
@@ -124,64 +130,73 @@ export default async function ArenaGatewayPage() {
                 style={{ background: 'rgba(56,189,248,0.12)', color: '#7dd3fc' }}
               >
                 <Radar size={14} />
-                Arena de competición
+                {t('hero.kicker')}
               </div>
 
               <div className="space-y-3">
                 <h1 className="max-w-4xl text-3xl font-semibold leading-tight text-white sm:text-5xl">
-                  Sigue el pulso del torneo y entra en cualquier partida con un clic.
+                  {t('hero.title')}
                 </h1>
-                <p className="max-w-3xl text-sm leading-7 text-slate-300 sm:text-base">
-                  Esta vista prioriza lo que está ocurriendo ahora, separa claramente lo que viene
-                  después y te deja acceder a la arena sin fricción.
-                </p>
               </div>
 
               <div className="grid gap-3 sm:grid-cols-3">
                 <StatCard
                   icon={<Sparkles size={16} />}
-                  label="En vivo"
+                  label={t('stats.live')}
                   value={String(enCurso.length)}
                   accent="#4ade80"
+                  backgroundImage="/home/electro.png"
                 />
                 <StatCard
                   icon={<Clock3 size={16} />}
-                  label="Pendientes"
+                  label={t('stats.pending')}
                   value={String(pendientes.length)}
                   accent="#fbbf24"
+                  backgroundImage="/home/scene.png"
+                  backgroundPosition="50% 72%"
+                  backgroundSize="132%"
                 />
                 <StatCard
                   icon={<Users2 size={16} />}
-                  label="Equipos visibles"
+                  label={t('stats.teams')}
                   value={String(uniqueTeams.size)}
                   accent="#38bdf8"
+                  backgroundImage="/home/lupa.png"
+                  backgroundPosition="60% 38%"
+                  backgroundSize="165%"
                 />
               </div>
             </div>
 
             <aside
-              className="flex h-full flex-col justify-between rounded-[28px] border p-5"
+              className="relative flex h-full flex-col justify-between overflow-hidden rounded-[28px] border p-5"
               style={{
                 borderColor: 'rgba(148,163,184,0.12)',
                 background: 'linear-gradient(180deg, rgba(10,18,32,0.9), rgba(4,8,15,0.88))',
               }}
             >
-              <div className="space-y-3">
+              <div
+                className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+                style={{ backgroundImage: "url('/home/partida.png')" }}
+              />
+              <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(3,8,18,0.38),rgba(3,8,18,0.82))]" />
+
+              <div className="relative space-y-3">
                 <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
-                  Partida destacada
+                  {t('featured.eyebrow')}
                 </p>
                 {featuredGame ? (
                   <>
                     <p className="text-xl font-semibold text-white">{featuredGame.nombre}</p>
                     <p className="text-sm leading-6 text-slate-300">
-                      {buildSummary(featuredGame)}
+                      {buildSummary(featuredGame, t)}
                     </p>
                   </>
                 ) : (
                   <>
-                    <p className="text-xl font-semibold text-white">Esperando actividad</p>
+                    <p className="text-xl font-semibold text-white">{t('featured.emptyTitle')}</p>
                     <p className="text-sm leading-6 text-slate-400">
-                      Cuando se creen partidas, aparecerán aquí con acceso directo a la arena.
+                      {t('featured.emptyDescription')}
                     </p>
                   </>
                 )}
@@ -190,10 +205,10 @@ export default async function ArenaGatewayPage() {
               {featuredGame ? (
                 <Link
                   href={`/partidas/${featuredGame.id}`}
-                  className="mt-5 inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold transition-transform hover:-translate-y-0.5"
+                  className="relative mt-5 inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold transition-transform hover:-translate-y-0.5"
                   style={{ background: 'linear-gradient(135deg, #22c55e, #06b6d4)', color: '#03121f' }}
                 >
-                  Entrar en la arena
+                  {t('featured.cta')}
                   <ArrowRight size={16} />
                 </Link>
               ) : null}
@@ -202,23 +217,32 @@ export default async function ArenaGatewayPage() {
         </section>
 
         {allGames.length === 0 ? (
-          <EmptyArenaState />
+          <EmptyArenaState t={t} />
         ) : (
           <div className="grid gap-6">
             <GameSection
+              locale={locale}
+              t={t}
               status="en_curso"
+              meta={sectionMeta.en_curso}
               games={enCurso}
-              emptyMessage="No hay ninguna partida activa ahora mismo. En cuanto arranque una, aparecerá aquí con prioridad visual."
+              emptyMessage={t('empty.live')}
             />
             <GameSection
+              locale={locale}
+              t={t}
               status="pendiente"
+              meta={sectionMeta.pendiente}
               games={pendientes}
-              emptyMessage="No hay mesas pendientes de inicio en este momento."
+              emptyMessage={t('empty.pending')}
             />
             <GameSection
+              locale={locale}
+              t={t}
               status="finalizada"
+              meta={sectionMeta.finalizada}
               games={finalizadas}
-              emptyMessage="Aún no hay partidas finalizadas para revisar."
+              emptyMessage={t('empty.finished')}
             />
           </div>
         )}
@@ -228,56 +252,92 @@ export default async function ArenaGatewayPage() {
 }
 
 function GameSection({
+  locale,
+  t,
+  meta,
   status,
   games,
   emptyMessage,
 }: {
+  locale: Locale;
+  t: ArenaTranslations;
+  meta: { eyebrow: string; title: string; description: string };
   status: GameStatus;
   games: ArenaGame[];
   emptyMessage: string;
 }) {
-  const meta = SECTION_META[status];
+  const isActiveSection = status === 'en_curso';
 
   return (
     <section
-      className="overflow-hidden rounded-[28px] border px-5 py-5 sm:px-6"
+      className="relative overflow-hidden rounded-[28px] border px-5 py-5 sm:px-6"
       style={{
         borderColor: 'rgba(148,163,184,0.14)',
-        background: 'linear-gradient(180deg, rgba(8,12,24,0.9), rgba(4,8,15,0.82))',
+        background: isActiveSection
+          ? 'linear-gradient(180deg, rgba(8,12,24,0.56), rgba(4,8,15,0.8))'
+          : 'linear-gradient(180deg, rgba(8,12,24,0.9), rgba(4,8,15,0.82))',
       }}
     >
-      <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-        <div className="space-y-1">
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
-            {meta.eyebrow}
-          </p>
-          <h2 className="text-2xl font-semibold text-white">{meta.title}</h2>
-          <p className="max-w-3xl text-sm leading-6 text-slate-400">{meta.description}</p>
-        </div>
-        <p className="text-sm font-medium text-slate-500">
-          {games.length} {games.length === 1 ? 'partida' : 'partidas'}
-        </p>
-      </div>
+      {isActiveSection ? (
+        <>
+          <div
+            className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-35"
+            style={{ backgroundImage: "url('/fondo-inicio.png')" }}
+          />
+          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(4,10,18,0.32),rgba(4,8,15,0.78))]" />
+        </>
+      ) : null}
 
-      {games.length === 0 ? (
-        <div
-          className="rounded-[24px] border px-5 py-8 text-sm leading-6 text-slate-400"
-          style={{ borderColor: 'rgba(71,85,105,0.4)', background: 'rgba(9,15,28,0.62)' }}
-        >
-          {emptyMessage}
+      <div className="relative">
+        <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div className="space-y-1">
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+              {meta.eyebrow}
+            </p>
+            <h2 className="text-2xl font-semibold text-white">{meta.title}</h2>
+            <p className="max-w-3xl text-sm leading-6 text-slate-400">{meta.description}</p>
+          </div>
+          <p className="text-sm font-medium text-slate-500">
+            {t('gamesCount', { count: games.length })}
+          </p>
         </div>
-      ) : (
-        <div className="grid gap-4 lg:grid-cols-2">
-          {games.map((game) => (
-            <GameCard key={game.id} game={game} highlight={status === 'en_curso'} />
-          ))}
-        </div>
-      )}
+
+        {games.length === 0 ? (
+          <div
+            className="rounded-[24px] border px-5 py-8 text-sm leading-6 text-slate-400"
+            style={{ borderColor: 'rgba(71,85,105,0.4)', background: 'rgba(9,15,28,0.62)' }}
+          >
+            {emptyMessage}
+          </div>
+        ) : (
+          <div className="grid gap-4 lg:grid-cols-2">
+            {games.map((game) => (
+              <GameCard
+                key={game.id}
+                game={game}
+                highlight={status === 'en_curso'}
+                locale={locale}
+                t={t}
+              />
+            ))}
+          </div>
+        )}
+      </div>
     </section>
   );
 }
 
-function GameCard({ game, highlight }: { game: ArenaGame; highlight?: boolean }) {
+function GameCard({
+  game,
+  highlight,
+  locale,
+  t,
+}: {
+  game: ArenaGame;
+  highlight?: boolean;
+  locale: Locale;
+  t: ArenaTranslations;
+}) {
   const accent = highlight
     ? {
         border: 'rgba(74,222,128,0.3)',
@@ -300,16 +360,16 @@ function GameCard({ game, highlight }: { game: ArenaGame; highlight?: boolean })
         };
 
   const contextLabel = game.estado === 'finalizada'
-    ? formatDate(game.finishedAt)
+    ? formatDate(game.finishedAt, locale, t)
     : game.estado === 'en_curso'
-      ? formatDate(game.startedAt)
-      : formatDate(game.createdAt);
+      ? formatDate(game.startedAt, locale, t)
+      : formatDate(game.createdAt, locale, t);
 
   const contextPrefix = game.estado === 'finalizada'
-    ? 'Cerrada'
+    ? t('card.context.finished')
     : game.estado === 'en_curso'
-      ? 'Empezó'
-      : 'Creada';
+      ? t('card.context.started')
+      : t('card.context.created');
 
   return (
     <Link
@@ -335,10 +395,10 @@ function GameCard({ game, highlight }: { game: ArenaGame; highlight?: boolean })
             >
               <Swords size={13} />
               {game.estado === 'en_curso'
-                ? 'Siguiendo en directo'
+                ? t('card.status.live')
                 : game.estado === 'pendiente'
-                  ? 'Lista para arrancar'
-                  : 'Revisión disponible'}
+                  ? t('card.status.pending')
+                  : t('card.status.finished')}
             </div>
 
             <div>
@@ -357,24 +417,24 @@ function GameCard({ game, highlight }: { game: ArenaGame; highlight?: boolean })
         <div className="grid gap-3 sm:grid-cols-3">
           <InfoPill
             icon={<Clock3 size={15} />}
-            label="Turno"
+            label={t('card.labels.turn')}
             value={game.maxTurnos ? `${game.turnoActual} / ${game.maxTurnos}` : String(game.turnoActual)}
           />
           <InfoPill
             icon={<Users2 size={15} />}
-            label="Equipos"
+            label={t('card.labels.teams')}
             value={String(game.equipoNombres.length)}
           />
           <InfoPill
             icon={<Trophy size={15} />}
-            label="Modo"
-            value={game.estado === 'finalizada' ? 'Resumen' : 'Seguimiento'}
+            label={t('card.labels.mode')}
+            value={game.estado === 'finalizada' ? t('card.mode.summary') : t('card.mode.follow')}
           />
         </div>
 
         <div className="space-y-2">
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
-            Participantes
+            {t('card.participants')}
           </p>
           <div className="flex flex-wrap gap-2">
             {game.equipoNombres.length > 0 ? (
@@ -388,17 +448,17 @@ function GameCard({ game, highlight }: { game: ArenaGame; highlight?: boolean })
                 </span>
               ))
             ) : (
-              <span className="text-sm text-slate-500">Equipos pendientes de asignar</span>
+              <span className="text-sm text-slate-500">{t('card.noTeams')}</span>
             )}
           </div>
         </div>
 
         <div className="flex items-center justify-between gap-3 border-t border-slate-800/80 pt-4">
           <p className="text-sm text-slate-400">
-            {buildSummary(game)}
+            {buildSummary(game, t)}
           </p>
           <span className="inline-flex items-center gap-2 text-sm font-semibold text-cyan-300">
-            Abrir arena
+            {t('card.cta')}
             <ArrowRight size={16} className="transition-transform group-hover:translate-x-1" />
           </span>
         </div>
@@ -407,7 +467,7 @@ function GameCard({ game, highlight }: { game: ArenaGame; highlight?: boolean })
   );
 }
 
-function EmptyArenaState() {
+function EmptyArenaState({ t }: { t: ArenaTranslations }) {
   return (
     <section
       className="rounded-[28px] border px-6 py-10 text-center"
@@ -422,10 +482,9 @@ function EmptyArenaState() {
       >
         <Radar size={24} />
       </div>
-      <h2 className="text-2xl font-semibold text-white">La arena todavía no tiene mesas activas</h2>
+      <h2 className="text-2xl font-semibold text-white">{t('emptyState.title')}</h2>
       <p className="mx-auto mt-3 max-w-2xl text-sm leading-7 text-slate-400">
-        En cuanto el evento cree sus primeras partidas, esta pantalla se convertirá en el punto de
-        entrada para seguirlas y abrir cada vista de espectador.
+        {t('emptyState.description')}
       </p>
     </section>
   );
@@ -436,22 +495,44 @@ function StatCard({
   label,
   value,
   accent,
+  backgroundImage,
+  backgroundPosition = '72% 36%',
+  backgroundSize = '180%',
 }: {
   icon: ReactNode;
   label: string;
   value: string;
   accent: string;
+  backgroundImage?: string;
+  backgroundPosition?: string;
+  backgroundSize?: string;
 }) {
   return (
     <div
-      className="rounded-[22px] border px-4 py-4"
+      className="relative overflow-hidden rounded-[22px] border px-4 py-4"
       style={{ borderColor: `${accent}33`, background: 'rgba(8, 17, 29, 0.46)' }}
     >
-      <div className="flex items-center gap-2 text-sm font-medium" style={{ color: accent }}>
-        {icon}
-        {label}
+      {backgroundImage ? (
+        <>
+          <div
+            className="absolute inset-0 bg-cover bg-no-repeat opacity-45"
+            style={{
+              backgroundImage: `url('${backgroundImage}')`,
+              backgroundPosition,
+              backgroundSize,
+            }}
+          />
+          <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(5,12,20,0.58),rgba(5,12,20,0.84))]" />
+        </>
+      ) : null}
+
+      <div className="relative">
+        <div className="flex items-center gap-2 text-sm font-medium" style={{ color: accent }}>
+          {icon}
+          {label}
+        </div>
+        <p className="mt-3 text-3xl font-semibold text-white">{value}</p>
       </div>
-      <p className="mt-3 text-3xl font-semibold text-white">{value}</p>
     </div>
   );
 }
@@ -479,22 +560,44 @@ function InfoPill({
   );
 }
 
-function buildSummary(game: ArenaGame) {
+function buildSummary(
+  game: ArenaGame,
+  t: ArenaTranslations,
+) {
   if (game.estado === 'en_curso') {
-    return `Turno ${game.turnoActual}${game.maxTurnos ? ` de ${game.maxTurnos}` : ''} con ${game.equipoNombres.length} equipos en juego.`;
+    return game.maxTurnos
+      ? t('summary.liveWithMax', {
+          turn: game.turnoActual,
+          maxTurnos: game.maxTurnos,
+          teams: game.equipoNombres.length,
+        })
+      : t('summary.live', {
+          turn: game.turnoActual,
+          teams: game.equipoNombres.length,
+        });
   }
 
   if (game.estado === 'pendiente') {
-    return `${game.equipoNombres.length} equipos listos para entrar en mesa.`;
+    return t('summary.pending', { teams: game.equipoNombres.length });
   }
 
-  return `Partida cerrada tras ${game.turnoActual} turnos${game.equipoNombres.length ? ` y ${game.equipoNombres.length} equipos` : ''}.`;
+  return game.equipoNombres.length > 0
+    ? t('summary.finishedWithTeams', {
+        turn: game.turnoActual,
+        teams: game.equipoNombres.length,
+      })
+    : t('summary.finished', { turn: game.turnoActual });
 }
 
-function formatDate(value: Date | null) {
-  if (!value) return 'sin fecha';
+function formatDate(
+  value: Date | null,
+  locale: Locale,
+  t: ArenaTranslations,
+) {
+  if (!value) return t('card.noDate');
 
-  return new Intl.DateTimeFormat('es-ES', {
+  const languageTag = locale === 'eu' ? 'eu-ES' : 'es-ES';
+  return new Intl.DateTimeFormat(languageTag, {
     day: '2-digit',
     month: 'short',
     hour: '2-digit',

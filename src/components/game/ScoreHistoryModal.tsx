@@ -1,61 +1,72 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { useTranslations } from 'next-intl';
+import { createPortal } from 'react-dom';
+import {
+  AlertTriangle,
+  ChevronRight,
+  Crown,
+  RefreshCw,
+  Shield,
+  Sparkles,
+  X,
+} from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { apiFetch } from '@/lib/api/client';
 import type { ScoreEventPublic, ScoreEventsResponse } from '@/types/api';
 
-// ── Labels & metadata per event type ─────────────────────────────────────────
-
 const EVENT_META: Record<
   string,
-  { label: string; color: 'emerald' | 'red' | 'amber' | 'cyan' }
+  { key: string; color: 'emerald' | 'red' | 'amber' | 'cyan'; Icon: typeof Sparkles }
 > = {
-  EVT_WIN:                  { label: '🏆 Victoria',                   color: 'emerald' },
-  EVT_WIN_EFFICIENCY:       { label: '⚡ Bonificación eficiencia',     color: 'emerald' },
-  EVT_SURVIVE:              { label: '🛡️ Supervivencia',               color: 'cyan'    },
-  EVT_SUGGESTION:           { label: '🔍 Sugerencia válida',           color: 'cyan'    },
-  EVT_REFUTATION:           { label: '↩ Refutación exitosa',          color: 'cyan'    },
-  EVT_WRONG_ACCUSATION:     { label: '✗ Acusación incorrecta',        color: 'red'     },
-  EVT_PASS:                 { label: '⏭ Turno pasado',               color: 'amber'   },
-  EVT_TIMEOUT:              { label: '⏱ Timeout de agente',           color: 'red'     },
-  EVT_INVALID_CARD:         { label: '⚠ Carta inválida',              color: 'red'     },
-  EVT_REDUNDANT_SUGGESTION: { label: '♻ Sugerencia redundante',       color: 'red'     },
-  EVT_INVALID_FORMAT:       { label: '⚠ Formato de respuesta inválido', color: 'red'   },
+  EVT_WIN:                  { key: 'win', color: 'emerald', Icon: Crown },
+  EVT_WIN_EFFICIENCY:       { key: 'winEfficiency', color: 'emerald', Icon: Sparkles },
+  EVT_TURN_SPEED:           { key: 'turnSpeed', color: 'emerald', Icon: Sparkles },
+  EVT_SURVIVE:              { key: 'survive', color: 'cyan', Icon: Shield },
+  EVT_SUGGESTION:           { key: 'suggestion', color: 'cyan', Icon: Sparkles },
+  EVT_REFUTATION:           { key: 'refutation', color: 'cyan', Icon: ChevronRight },
+  EVT_WRONG_ACCUSATION:     { key: 'wrongAccusation', color: 'red', Icon: AlertTriangle },
+  EVT_PASS:                 { key: 'pass', color: 'amber', Icon: ChevronRight },
+  EVT_TIMEOUT:              { key: 'timeout', color: 'red', Icon: AlertTriangle },
+  EVT_INVALID_CARD:         { key: 'invalidCard', color: 'red', Icon: AlertTriangle },
+  EVT_REDUNDANT_SUGGESTION: { key: 'redundantSuggestion', color: 'red', Icon: AlertTriangle },
+  EVT_INVALID_FORMAT:       { key: 'invalidFormat', color: 'red', Icon: AlertTriangle },
+  EVT_FALSE_CANNOT_REFUTE:  { key: 'falseCannotRefute', color: 'red', Icon: AlertTriangle },
+  EVT_WRONG_REFUTATION:     { key: 'wrongRefutation', color: 'red', Icon: AlertTriangle },
+  EVT_COMM_ERROR:           { key: 'commError', color: 'red', Icon: AlertTriangle },
+  EVT_WARNING:              { key: 'warning', color: 'amber', Icon: AlertTriangle },
+  EVT_WARNING_ELIMINATION:  { key: 'warningElimination', color: 'red', Icon: AlertTriangle },
 };
 
-function eventLabel(type: string): string {
-  return EVENT_META[type]?.label ?? type;
-}
-
-function eventColor(type: string): 'emerald' | 'red' | 'amber' | 'cyan' {
-  return EVENT_META[type]?.color ?? 'amber';
+function eventMeta(type: string, t: ReturnType<typeof useTranslations>) {
+  const meta = EVENT_META[type];
+  if (!meta) return { label: type, color: 'amber' as const, Icon: AlertTriangle };
+  return { label: t(`eventTypes.${meta.key}`), color: meta.color, Icon: meta.Icon };
 }
 
 const COLOR_CLASSES = {
   emerald: {
-    row:    'bg-emerald-400/5 border-emerald-400/20',
-    badge:  'bg-emerald-400/10 text-emerald-400',
-    points: 'text-emerald-400',
+    chip: 'border-emerald-400/18 bg-emerald-400/10 text-emerald-200',
+    total: 'text-emerald-200',
+    line: 'bg-emerald-300/35',
   },
   red: {
-    row:    'bg-red-400/5 border-red-400/20',
-    badge:  'bg-red-400/10 text-red-400',
-    points: 'text-red-400',
+    chip: 'border-red-400/18 bg-red-400/10 text-red-200',
+    total: 'text-red-200',
+    line: 'bg-red-300/35',
   },
   amber: {
-    row:    'bg-amber-400/5 border-amber-400/20',
-    badge:  'bg-amber-400/10 text-amber-400',
-    points: 'text-amber-400',
+    chip: 'border-amber-400/18 bg-amber-400/10 text-amber-200',
+    total: 'text-amber-200',
+    line: 'bg-amber-300/35',
   },
   cyan: {
-    row:    'bg-cyan-400/5 border-cyan-400/20',
-    badge:  'bg-cyan-400/10 text-cyan-400',
-    points: 'text-cyan-400',
+    chip: 'border-cyan-400/18 bg-cyan-400/10 text-cyan-200',
+    total: 'text-cyan-200',
+    line: 'bg-cyan-300/35',
   },
 } as const;
-
-// ── Sub-components ────────────────────────────────────────────────────────────
 
 function Spinner() {
   return (
@@ -66,14 +77,13 @@ function Spinner() {
 }
 
 function EmptyState() {
+  const t = useTranslations('arena.detail.scoreHistory');
   return (
-    <p className="py-8 text-center text-sm text-slate-500">
-      Todavía no hay eventos de puntuación registrados para este equipo.
-    </p>
+    <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.03] py-8 text-center text-sm text-slate-500">
+      {t('empty')}
+    </div>
   );
 }
-
-// ── Main component ────────────────────────────────────────────────────────────
 
 interface ScoreHistoryModalProps {
   gameId: string;
@@ -92,6 +102,8 @@ export function ScoreHistoryModal({
   currentPoints,
   onClose,
 }: ScoreHistoryModalProps) {
+  const t = useTranslations('arena.detail.scoreHistory');
+  const [mounted, setMounted] = useState(false);
   const [loadState, setLoadState] = useState<LoadState>('loading');
   const [events, setEvents] = useState<ScoreEventPublic[]>([]);
 
@@ -101,7 +113,7 @@ export function ScoreHistoryModal({
       const res = await apiFetch<ScoreEventsResponse>(`/games/${gameId}/score-events`);
       const teamEvents = res.events
         .filter((e) => e.equipoId === equipoId)
-        .sort((a, b) => a.turno - b.turno || a.id - b.id);
+        .sort((a, b) => a.displayTurn - b.displayTurn || a.id - b.id);
       setEvents(teamEvents);
       setLoadState('ok');
     } catch {
@@ -113,7 +125,11 @@ export function ScoreHistoryModal({
     load();
   }, [load]);
 
-  // Close on Escape
+  useEffect(() => {
+    setMounted(true);
+    return () => setMounted(false);
+  }, []);
+
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -122,101 +138,109 @@ export function ScoreHistoryModal({
     return () => window.removeEventListener('keydown', handleKey);
   }, [onClose]);
 
-  // Running total helper
   let running = 0;
 
-  return (
-    /* Backdrop */
+  if (!mounted) return null;
+
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-3 backdrop-blur-sm sm:p-4"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
-      {/* Panel */}
-      <div className="w-full max-w-lg rounded-2xl border border-slate-700 bg-slate-900 shadow-2xl flex flex-col max-h-[80vh] animate-in zoom-in-95 duration-200">
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-slate-700/60 gap-2">
-          <div className="min-w-0">
-            <h2 className="text-sm font-semibold text-white truncate">
-              Historial de puntuación
-            </h2>
-            <p className="text-xs text-slate-400 truncate">{equipoNombre}</p>
-          </div>
-          <div className="flex items-center gap-3 shrink-0">
-            <span className="text-sm font-bold text-cyan-400">
-              ♦ {currentPoints} pts
-            </span>
-            <button
-              onClick={onClose}
-              className="text-slate-400 hover:text-white transition-colors text-lg leading-none"
-              aria-label="Cerrar"
-            >
-              ✕
-            </button>
+      <div className="arena-panel arena-history-modal w-[min(1100px,96vw)] overflow-hidden p-0">
+        <div className="border-b border-white/8 px-4 py-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-400">
+                {t('title')}
+              </p>
+              <h2 className="mt-0.5 truncate text-base font-semibold text-white">{equipoNombre}</h2>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="rounded-full border border-cyan-400/16 bg-cyan-400/10 px-3 py-1 text-sm font-bold text-cyan-200">
+                ♦ {currentPoints} pts
+              </div>
+              <button
+                onClick={onClose}
+                className="rounded-full border border-white/10 bg-white/[0.04] p-2 text-slate-400 transition-colors hover:text-white"
+                aria-label={t('close')}
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* Body */}
-        <div className="overflow-y-auto p-4 flex flex-col gap-1.5">
+        <div className="scrollbar-history max-h-[82vh] overflow-y-auto p-4 sm:p-5">
           {loadState === 'loading' && <Spinner />}
+
           {loadState === 'error' && (
-            <div className="py-8 text-center space-y-2">
-              <p className="text-sm text-red-400">Error al cargar los eventos.</p>
+            <div className="rounded-2xl border border-red-400/16 bg-red-400/6 px-4 py-6 text-center">
+              <p className="text-sm text-red-300">{t('loadError')}</p>
               <button
                 onClick={load}
-                className="text-xs text-cyan-400 hover:text-cyan-300 transition-colors"
+                className="mt-2 inline-flex items-center gap-1 rounded-full border border-cyan-400/16 bg-cyan-400/10 px-3 py-1 text-xs font-semibold text-cyan-200"
               >
-                Reintentar
+                <RefreshCw className="h-3 w-3" />
+                {t('retry')}
               </button>
             </div>
           )}
+
           {loadState === 'ok' && events.length === 0 && <EmptyState />}
-          {loadState === 'ok' && events.length > 0 && events.map((ev) => {
-            running += ev.points;
-            const color = eventColor(ev.type);
-            const cls = COLOR_CLASSES[color];
-            const sign = ev.points >= 0 ? '+' : '';
-            return (
-              <div
-                key={ev.id}
-                className={cn(
-                  'flex items-center gap-2 rounded-lg border px-3 py-2 text-xs',
-                  cls.row,
-                )}
-              >
-                {/* Turn badge */}
-                <span className="shrink-0 font-mono text-slate-500 w-6 text-right">
-                  T{ev.turno}
-                </span>
 
-                {/* Event label */}
-                <span className={cn('flex-1 font-medium', cls.badge, 'px-1.5 py-0.5 rounded')}>
-                  {eventLabel(ev.type)}
-                </span>
+          {loadState === 'ok' && events.length > 0 && (
+            <div className="relative pl-5">
+              <span className="absolute bottom-2 left-[0.42rem] top-2 w-px bg-[linear-gradient(180deg,rgba(34,211,238,0.28),rgba(148,163,184,0.08))]" />
+              <div className="space-y-2.5">
+                {events.map((ev) => {
+                  running += ev.points;
+                  const meta = eventMeta(ev.type, t);
+                  const color = COLOR_CLASSES[meta.color];
+                  const sign = ev.points >= 0 ? '+' : '';
 
-                {/* Delta */}
-                <span className={cn('shrink-0 font-mono font-bold', cls.points)}>
-                  {sign}{ev.points}
-                </span>
+                  return (
+                    <div key={ev.id} className="relative">
+                      <span className={cn('absolute -left-5 top-5 h-3 w-3 rounded-full border-2 border-slate-950', color.line)} />
+                      <div className="rounded-[1rem] border border-white/8 bg-[linear-gradient(180deg,rgba(15,23,42,0.92),rgba(2,6,23,0.82))] px-3 py-3">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="rounded-full border border-white/10 bg-white/[0.05] px-2 py-0.5 font-mono text-[10px] text-slate-300">
+                            T{ev.displayTurn}
+                          </span>
+                          <span className={cn('inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em]', color.chip)}>
+                            <meta.Icon className="h-3 w-3" />
+                            {meta.label}
+                          </span>
+                          <span className={cn('ml-auto text-sm font-bold', color.total)}>
+                            {sign}{ev.points}
+                          </span>
+                        </div>
 
-                {/* Running total */}
-                <span className="shrink-0 font-mono text-slate-400 w-16 text-right">
-                  = {running}
-                </span>
+                        <div className="mt-2 flex items-center justify-between text-[11px] text-slate-400">
+                          <span>{t('displayTurn', { count: ev.displayTurn })}</span>
+                          <span className="font-mono">{t('runningTotal', { count: running })}</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-            );
-          })}
+            </div>
+          )}
         </div>
 
-        {/* Footer summary */}
         {loadState === 'ok' && events.length > 0 && (
-          <div className="border-t border-slate-700/60 px-4 py-3 flex items-center justify-between text-xs text-slate-400">
-            <span>{events.length} evento{events.length !== 1 ? 's' : ''}</span>
-            <span className="font-mono text-white font-semibold">
-              Total: {currentPoints} pts
-            </span>
+          <div className="border-t border-white/8 px-4 py-3 text-xs text-slate-400">
+            <div className="flex items-center justify-between">
+              <span>{t('events', { count: events.length })}</span>
+              <span className="font-mono font-semibold text-white">{t('total', { count: currentPoints })}</span>
+            </div>
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -10,7 +11,6 @@ import {
   Trophy,
   Medal,
   User,
-  Crosshair,
   BookOpen,
   Bot,
   Dumbbell,
@@ -34,6 +34,7 @@ interface NavItem {
   Icon: React.ComponentType<{ size?: number; strokeWidth?: number }>;
   labelKey: NavKey;
   roles: Array<'admin' | 'equipo' | 'espectador'>;
+  requiresTeam?: boolean;
 }
 
 const ALL_NAV_ITEMS: NavItem[] = [
@@ -45,8 +46,8 @@ const ALL_NAV_ITEMS: NavItem[] = [
   { href: '/ranking',         Icon: Trophy,          labelKey: 'ranking',       roles: ['admin', 'equipo', 'espectador'] },
   
   // Team-specific items
-  { href: '/equipo',          Icon: Users,           labelKey: 'miEquipo',  roles: ['equipo'] },
-  { href: '/equipo/entrenamiento', Icon: Dumbbell, labelKey: 'entrenamiento',     roles: ['equipo'] },
+  { href: '/equipo',          Icon: Users,           labelKey: 'miEquipo',       roles: ['equipo'] },
+  { href: '/equipo/entrenamiento', Icon: Dumbbell,   labelKey: 'entrenamiento',  roles: ['equipo'], requiresTeam: true },
 
   // Admin-specific items
   { href: '/admin',           Icon: LayoutDashboard, labelKey: 'admin',     roles: ['admin'] },
@@ -88,8 +89,9 @@ function SidebarLink({ href, Icon, label, active }: SidebarLinkProps) {
 
 export function Sidebar() {
   const pathname = usePathname();
-  const { rol } = useAppSession();
+  const { rol, equipo } = useAppSession();
   const t = useTranslations('nav');
+  const tCommon = useTranslations('common');
 
   const isActive = (href: string) => {
     if (href === '/admin' && pathname.startsWith('/admin')) return true;
@@ -99,13 +101,24 @@ export function Sidebar() {
   }
   
   const effectiveRole = rol ?? 'espectador';
+  const hasTeam = Boolean(equipo?.id);
 
-  const mainNav = ALL_NAV_ITEMS.filter(i => i.roles.includes(effectiveRole));
+  const mainNav = ALL_NAV_ITEMS.filter((item) => {
+    if (!item.roles.includes(effectiveRole)) {
+      return false;
+    }
+
+    if (item.requiresTeam && !hasTeam) {
+      return false;
+    }
+
+    return true;
+  });
   const bottomNav = BTM_ITEMS.filter(i => i.roles.includes(effectiveRole));
 
   return (
     <nav
-      aria-label="Navegación principal"
+      aria-label={tCommon('mainNavigation')}
       style={{
         width: 64, minWidth: 64, background: BG_SIDEBAR,
         borderRight: `1px solid ${BORDER_SIDEBAR}`,
@@ -115,12 +128,11 @@ export function Sidebar() {
       }}
     >
       {/* Logo */}
-      <Link href="/" style={{
-        width: 36, height: 36, borderRadius: 8, marginBottom: 20, flexShrink: 0,
-        background: ACCENT_BG, border: `1px solid ${ACCENT_BORDER}`,
+      <Link href="/" aria-label="Clue Arena" style={{
+        marginBottom: 20, flexShrink: 0,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
-        <Crosshair size={17} color={ACCENT} strokeWidth={2} />
+        <Image src="/lks.svg" alt="LKS logo" width={26} height={26} priority />
       </Link>
 
       {/* Main nav */}

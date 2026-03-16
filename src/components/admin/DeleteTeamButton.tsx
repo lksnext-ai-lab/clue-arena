@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { Trash2 } from 'lucide-react';
 import { apiFetch } from '@/lib/api/client';
 import { useTranslations } from 'next-intl';
 
@@ -8,13 +9,14 @@ interface Props {
   teamId: string;
   teamName: string;
   onDeleted: () => void;
+  variant?: 'default' | 'icon';
 }
 
 /**
  * Botón de eliminación de equipo con confirm dialog.
  * Maneja el código 409 EQUIPO_EN_PARTIDA mostrando aviso bloqueante.
  */
-export function DeleteTeamButton({ teamId, teamName, onDeleted }: Props) {
+export function DeleteTeamButton({ teamId, teamName, onDeleted, variant = 'default' }: Props) {
   const t = useTranslations('admin');
   const tCommon = useTranslations('common');
   const [open, setOpen] = useState(false);
@@ -57,11 +59,25 @@ export function DeleteTeamButton({ teamId, teamName, onDeleted }: Props) {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="inline-flex items-center justify-center rounded-2xl px-4 py-3 text-sm font-semibold transition"
-        style={{ background: 'rgba(248,113,113,0.12)', color: '#fca5a5' }}
+        type="button"
+        aria-label={t('eliminarEquipo')}
         title={t('eliminarEquipo')}
+        className={
+          variant === 'icon'
+            ? 'inline-flex h-10 w-10 items-center justify-center rounded-xl border transition'
+            : 'inline-flex items-center justify-center rounded-2xl px-4 py-3 text-sm font-semibold transition'
+        }
+        style={
+          variant === 'icon'
+            ? {
+                borderColor: 'rgba(248,113,113,0.18)',
+                background: 'rgba(127,29,29,0.18)',
+                color: '#fca5a5',
+              }
+            : { background: 'rgba(248,113,113,0.12)', color: '#fca5a5' }
+        }
       >
-        {t('eliminarEquipo')}
+        {variant === 'icon' ? <Trash2 size={16} /> : t('eliminarEquipo')}
       </button>
 
       {open && (

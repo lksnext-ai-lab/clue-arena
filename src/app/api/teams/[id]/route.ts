@@ -5,6 +5,7 @@ import { equipos, usuarios, partidaEquipos, partidas } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { UpdateTeamSchema, TeamMemberUpdateSchema } from '@/lib/schemas/team';
 import type { TeamResponse } from '@/types/api';
+import { normalizeTeamStatus } from '@/lib/teams/status';
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -20,7 +21,7 @@ function toTeamResponse(t: typeof equipos.$inferSelect): TeamResponse {
     hasMattinApiKey: !!t.mattinApiKey,
     avatarUrl: t.avatarUrl ?? null,
     usuarioId: t.usuarioId,
-    estado: t.estado as TeamResponse['estado'],
+    estado: normalizeTeamStatus(t.estado),
     miembros: JSON.parse(t.miembros ?? '[]') as string[],
     createdAt: t.createdAt instanceof Date ? t.createdAt.toISOString() : String(t.createdAt),
   };

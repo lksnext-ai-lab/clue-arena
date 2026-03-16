@@ -98,7 +98,7 @@ export async function JuegoQueEsCluedo() {
               <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent" />
               <Image
                 src="/game/escena.png"
-                alt="Escenarios del crimen — Clue Arena"
+                alt={t('queEsImageAlt')}
                 width={800}
                 height={960}
                 unoptimized

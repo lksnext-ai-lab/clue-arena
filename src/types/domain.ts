@@ -4,7 +4,7 @@ export type UserRole = 'admin' | 'equipo' | 'espectador';
 
 export type GameStatus = 'pendiente' | 'en_curso' | 'finalizada';
 
-export type TeamStatus = 'registrado' | 'activo' | 'finalizado';
+export type TeamStatus = 'activo' | 'inactivo';
 
 export interface User {
   id: string;

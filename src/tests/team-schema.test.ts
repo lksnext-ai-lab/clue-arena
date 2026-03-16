@@ -1,32 +1,33 @@
 import { TeamRegistrationSchema, UpdateTeamSchema, TeamMemberUpdateSchema } from '@/lib/schemas/team';
 
 describe('team schema validations', () => {
-  test('registration: local backend does not require appId or api key', () => {
+  test('registration: local backend does not require agentId, appId or api key', () => {
     const result = TeamRegistrationSchema.safeParse({
       id: 'equipo-a',
       nombre: 'Equipo',
-      agentId: 'agt1',
       agentBackend: 'local',
-      // no appId, no mattinApiKey
+      estado: 'inactivo',
     });
     expect(result.success).toBe(true);
   });
 
-  test('registration: mattin backend requires appId', () => {
+  test('registration: local backend accepts empty appId from the form state', () => {
     const result = TeamRegistrationSchema.safeParse({
       id: 'equipo-a',
       nombre: 'Equipo',
-      agentId: 'agt1',
-      agentBackend: 'mattin',
-      // missing appId should fail
+      agentBackend: 'local',
+      appId: '',
     });
-    // log output for investigation
-    // eslint-disable-next-line no-console
-    console.log('registration result', result);
-    // current behaviour: schema still passes because appId optional
-    // the UI prevents missing values; server also allows empty registration
-    // so we just assert we get a value and note the issue.
     expect(result.success).toBe(true);
+  });
+
+  test('registration: mattin backend requires agentId, appId and api key', () => {
+    const result = TeamRegistrationSchema.safeParse({
+      id: 'equipo-a',
+      nombre: 'Equipo',
+      agentBackend: 'mattin',
+    });
+    expect(result.success).toBe(false);
   });
 
   test('update schema allows switching to mattin only with appId', () => {

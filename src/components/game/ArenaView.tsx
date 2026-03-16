@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useAppSession } from '@/contexts/SessionContext';
 import { GameProvider, useGame } from '@/contexts/GameContext';
 import type { GameDetailResponse } from '@/types/api';
@@ -16,89 +17,78 @@ interface ArenaViewProps {
   initialData: GameDetailResponse | null;
 }
 
-// ── Skeleton ──────────────────────────────────────────────────────────────────
-
 function PulseLine({ h = 'h-4', w = 'w-full' }: { h?: string; w?: string }) {
   return <div className={`${h} ${w} rounded bg-slate-700 animate-pulse`} />;
 }
 
 function ArenaSkeleton() {
   return (
-    <div className="space-y-4 p-4 lg:p-6">
-      {/* Header skeleton */}
-      <div className="rounded-xl border border-slate-700 bg-slate-800 p-4 space-y-2">
-        <PulseLine h="h-6" w="w-48" />
-        <PulseLine h="h-4" w="w-32" />
+    <div className="arena-shell space-y-3 p-3 lg:p-4">
+      <div className="arena-panel p-4 space-y-2">
+        <PulseLine h="h-6" w="w-56" />
+        <PulseLine h="h-4" w="w-40" />
       </div>
-
-      {/* Main grid skeleton */}
-      <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-4">
-        {/* Team panel */}
-        <div className="rounded-xl border border-slate-700 bg-slate-800 p-4 space-y-3">
+      <div className="grid grid-cols-1 gap-3 xl:grid-cols-[280px_1fr_340px]">
+        <div className="arena-panel p-3 space-y-2.5">
           {[...Array(3)].map((_, i) => (
-            <div key={i} className="rounded-xl border border-slate-700 p-4 space-y-2">
+            <div key={i} className="rounded-2xl border border-slate-700/60 p-3 space-y-2">
               <PulseLine h="h-4" w="w-28" />
               <PulseLine h="h-3" w="w-16" />
             </div>
           ))}
         </div>
-        {/* Deduction board */}
-        <div className="rounded-xl border border-slate-700 bg-slate-800 p-4 space-y-2">
+        <div className="arena-panel p-3 space-y-2">
           {[...Array(7)].map((_, i) => (
-            <PulseLine key={i} h="h-4" />
+            <PulseLine key={i} h="h-5" />
           ))}
         </div>
-      </div>
-
-      {/* Feed skeleton */}
-      <div className="rounded-xl border border-slate-700 bg-slate-800 p-4 space-y-2">
-        {[...Array(4)].map((_, i) => (
-          <PulseLine key={i} h="h-16" />
-        ))}
+        <div className="arena-panel p-3 space-y-2">
+          {[...Array(4)].map((_, i) => (
+            <PulseLine key={i} h="h-16" />
+          ))}
+        </div>
       </div>
     </div>
   );
 }
 
-// ── Error state ───────────────────────────────────────────────────────────────
-
 function ArenaError({ error, onRetry }: { error: Error; onRetry: () => void }) {
+  const t = useTranslations('arena.detail');
   return (
-    <div className="flex items-center justify-center min-h-[300px]">
-      <div className="rounded-xl border border-red-500/30 bg-slate-800 p-8 text-center space-y-3 max-w-sm w-full">
-        <p className="text-red-400 font-semibold">✖ Error al cargar la partida</p>
+    <div className="flex min-h-[320px] items-center justify-center">
+      <div className="arena-panel max-w-sm w-full p-6 text-center space-y-2.5">
+        <p className="text-red-300 font-semibold">{t('error.title')}</p>
         <p className="text-sm text-slate-400">{error.message}</p>
         <button
           onClick={onRetry}
-          className="px-4 py-2 rounded-lg bg-slate-700 text-slate-200 text-sm hover:bg-slate-600 transition-colors"
+          className="rounded-full border border-slate-600 bg-slate-800 px-4 py-2 text-sm text-slate-200 transition-colors hover:bg-slate-700"
         >
-          Reintentar
+          {t('error.retry')}
         </button>
       </div>
     </div>
   );
 }
 
-// ── Pending state ─────────────────────────────────────────────────────────────
-
 function ArenaPending({ partida }: { partida: GameDetailResponse }) {
+  const t = useTranslations('arena.detail');
   return (
-    <div className="space-y-4 p-4 lg:p-6">
-      {/* Panel pendiente */}
-      <div className="rounded-xl border border-amber-500/20 bg-slate-800 p-6 text-center space-y-2">
-        <p className="text-amber-400 font-semibold text-lg">⚠ PARTIDA PENDIENTE DE INICIO</p>
-        <p className="text-slate-400 text-sm">
-          Esperando al administrador para iniciar la partida.
-          Actualización cada 10 s…
-        </p>
+    <div className="arena-shell space-y-3 p-3 lg:p-4">
+      <div className="arena-panel arena-grid-glow overflow-hidden p-6 text-center">
+        <div className="mx-auto max-w-2xl space-y-2">
+          <p className="text-[0.72rem] font-semibold uppercase tracking-[0.35em] text-amber-300/85">
+            {t('pending.eyebrow')}
+          </p>
+          <p className="text-xl font-semibold text-white">{t('pending.title')}</p>
+          <p className="text-xs text-slate-300 sm:text-sm">
+            {t('pending.description')}
+          </p>
+        </div>
       </div>
-      {/* Teams registered */}
       <ArenaTeamPanel partida={partida} />
     </div>
   );
 }
-
-// ── Main ArenaView (wraps GameProvider) ──────────────────────────────────────
 
 export function ArenaView({ gameId, initialData }: ArenaViewProps) {
   return (
@@ -108,13 +98,10 @@ export function ArenaView({ gameId, initialData }: ArenaViewProps) {
   );
 }
 
-// ── ArenaContent (uses useGame) ───────────────────────────────────────────────
-
 function ArenaContent({ gameId: _gameId, initialData }: ArenaViewProps) {
   const { partida: live, isConnected, error, refresh } = useGame();
   const { rol } = useAppSession();
 
-  // Prefer live WebSocket-driven data; fall back to SSR initial data
   const data = live ?? initialData;
 
   if (error && !data) return <ArenaError error={error} onRetry={refresh} />;
@@ -126,9 +113,10 @@ function ArenaContent({ gameId: _gameId, initialData }: ArenaViewProps) {
     return <ArenaPending partida={data} />;
   }
 
+  const showLiveColumn = data.estado === 'en_curso';
+
   return (
-    <div className="space-y-4 p-4 lg:p-6">
-      {/* Header */}
+    <div className="arena-shell space-y-3 p-3 lg:p-4">
       <ArenaHeader
         partida={data}
         isAdmin={isAdmin}
@@ -136,28 +124,23 @@ function ArenaContent({ gameId: _gameId, initialData }: ArenaViewProps) {
         onRefresh={refresh}
       />
 
-      {/* Result banner (shown when finished) */}
       {data.estado === 'finalizada' && <ArenaFinalResult partida={data} />}
 
-      {/* Main grid: teams + deduction board + (when en_curso) activity feed */}
-      <div className={
-        data.estado === 'en_curso'
-          ? 'grid grid-cols-1 lg:grid-cols-[300px_1fr_500px] gap-4'
-          : 'grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-4'
-      }>
+      <section
+        className={
+          showLiveColumn
+            ? 'grid grid-cols-1 gap-3 xl:grid-cols-[minmax(260px,300px)_minmax(0,1fr)_minmax(300px,340px)]'
+            : 'grid grid-cols-1 gap-3 xl:grid-cols-[minmax(260px,300px)_minmax(0,1fr)]'
+        }
+      >
         <ArenaTeamPanel partida={data} />
-        {/* Relative wrapper so the overlay can be absolutely positioned over the board */}
-        <div className="relative">
+        <div className="relative min-w-0">
           <ArenaDeductionBoard partida={data} />
-          {data.estado === 'en_curso' && (
-            <SuggestionRevealOverlay partida={data} />
-          )}
+          {showLiveColumn && <SuggestionRevealOverlay partida={data} />}
         </div>
-        {/* F016: real-time coordinator activity feed — third column, en_curso only */}
-        {data.estado === 'en_curso' && <TurnActivityFeed />}
-      </div>
+        {showLiveColumn && <TurnActivityFeed />}
+      </section>
 
-      {/* Action feed */}
       <ArenaActionFeed partida={data} />
     </div>
   );

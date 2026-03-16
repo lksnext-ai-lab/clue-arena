@@ -202,9 +202,15 @@ export function SuggestionCardStrip({
               }}
             >
               {isHighlighted && refutadorNombre && (
-                <div className="absolute -top-4 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-amber-400 px-2.5 py-0.5 text-[10px] font-bold text-slate-900 shadow-lg z-20">
-                  {refutadorNombre}
-                </div>
+                compact ? (
+                  <div className="absolute left-1.5 top-1.5 z-20 rounded-full border border-amber-100/20 bg-amber-300/90 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.16em] text-slate-950 shadow-lg">
+                    Refuta
+                  </div>
+                ) : (
+                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-amber-400 px-2.5 py-0.5 text-[10px] font-bold text-slate-900 shadow-lg z-20">
+                    {refutadorNombre}
+                  </div>
+                )
               )}
 
               <div
@@ -240,10 +246,19 @@ export function SuggestionCardStrip({
                 <span className={cn(
                   'block font-semibold leading-tight',
                   compact ? 'text-[10px]' : 'text-[11px]',
-                  isHighlighted ? 'text-amber-200' : 'text-slate-200'
+                  isHighlighted
+                    ? compact
+                      ? 'rounded-md bg-amber-300/18 px-1 py-0.5 text-amber-100 shadow-[0_0_18px_rgba(251,191,36,0.18)]'
+                      : 'text-amber-200'
+                    : 'text-slate-200'
                 )}>
                   {card.value}
                 </span>
+                {compact && isHighlighted && (
+                  <span className="mt-1 block text-[8px] font-bold uppercase tracking-[0.16em] text-amber-300">
+                    Carta usada
+                  </span>
+                )}
               </div>
             </div>
           );
@@ -288,6 +303,7 @@ export function SuggestionRevealOverlay({ partida }: SuggestionRevealOverlayProp
   const animSugIdRef      = useRef<string | null>(null);
   const animTurnoNumRef   = useRef<number | null>(null);
   const animRefutadaRef   = useRef<string | null>(null);
+  const bootstrappedRef   = useRef(false);
   const enterTimerRef     = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dissolveTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -337,6 +353,19 @@ export function SuggestionRevealOverlay({ partida }: SuggestionRevealOverlayProp
     const refutadorNombre = sug.refutadaPor
       ? (teamsMap[sug.refutadaPor] ?? sug.refutadaPor)
       : null;
+
+    // If the arena is opened while the game is paused, suppress the stale
+    // "last play" overlay and only animate genuinely new suggestions.
+    if (!bootstrappedRef.current) {
+      bootstrappedRef.current = true;
+      if (partida.modoEjecucion === 'pausado') {
+        shownSugIdsRef.current.add(sug.id);
+        animSugIdRef.current = sug.id;
+        animTurnoNumRef.current = turno.numero;
+        animRefutadaRef.current = sug.refutadaPor;
+        return;
+      }
+    }
 
     // ── Already shown: skip no matter what ──
     if (shownSugIdsRef.current.has(sug.id)) return;

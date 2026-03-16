@@ -14,9 +14,11 @@ interface Props {
 function PodiumCard({
   entry,
   position,
+  t,
 }: {
   entry: TournamentStandingEntry;
   position: number;
+  t: ReturnType<typeof useTranslations<'admin'>>;
 }) {
   const accent =
     position === 1
@@ -31,7 +33,7 @@ function PodiumCard({
     <article className={`rounded-[28px] border p-5 ${accent}`}>
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-xs uppercase tracking-[0.24em]">Top {position}</p>
+          <p className="text-xs uppercase tracking-[0.24em]">{t('torneoPodiumTop', { position })}</p>
           <h3 className="mt-3 text-2xl font-semibold text-white">{entry.teamName}</h3>
         </div>
         <div className="rounded-2xl border border-white/10 bg-white/[0.08] p-3 text-white">
@@ -41,25 +43,25 @@ function PodiumCard({
 
       <div className="mt-5 grid gap-3 sm:grid-cols-3">
         <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-3">
-          <p className="text-xs uppercase tracking-[0.2em] text-current/80">Puntos</p>
+          <p className="text-xs uppercase tracking-[0.2em] text-current/80">{t('torneoPuntos')}</p>
           <p className="mt-2 text-2xl font-semibold text-white">{entry.totalScore}</p>
         </div>
         <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-3">
-          <p className="text-xs uppercase tracking-[0.2em] text-current/80">Victorias</p>
+          <p className="text-xs uppercase tracking-[0.2em] text-current/80">{t('torneoVictorias')}</p>
           <p className="mt-2 text-2xl font-semibold text-white">{entry.wins}</p>
         </div>
         <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-3">
-          <p className="text-xs uppercase tracking-[0.2em] text-current/80">Partidas</p>
+          <p className="text-xs uppercase tracking-[0.2em] text-current/80">{t('torneoPartidas')}</p>
           <p className="mt-2 text-2xl font-semibold text-white">{entry.gamesPlayed}</p>
         </div>
       </div>
 
       <p className="mt-4 text-sm text-current/80">
         {entry.isEliminated
-          ? 'Sigue liderando pese a haber quedado eliminado.'
+          ? t('torneoPodiumEliminated')
           : entry.advancedToPlayoffs
-            ? 'Mantiene plaza de playoffs.'
-            : 'Sigue compitiendo en activo.'}
+            ? t('torneoPodiumPlayoffs')
+            : t('torneoPodiumActive')}
       </p>
     </article>
   );
@@ -91,7 +93,7 @@ export function TournamentStandingsSection({ tournamentId, refreshKey }: Props) 
         <div className="rounded-[28px] border border-white/10 bg-[linear-gradient(160deg,rgba(8,17,29,0.92),rgba(15,23,42,0.9))] p-5">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Lectura competitiva</p>
+              <p className="text-xs uppercase tracking-[0.24em] text-slate-500">{t('torneoStandingsEyebrow')}</p>
               <h2 className="mt-2 text-2xl font-semibold text-white">{t('torneoClasificacion')}</h2>
             </div>
             <div className="rounded-2xl border border-amber-300/20 bg-amber-300/10 p-3 text-amber-100">
@@ -99,21 +101,21 @@ export function TournamentStandingsSection({ tournamentId, refreshKey }: Props) 
             </div>
           </div>
           <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-400">
-            Usa esta vista para leer quién domina el torneo, qué equipos siguen vivos y cómo evoluciona la distancia competitiva entre rondas.
+            {t('torneoStandingsDesc')}
           </p>
 
           {leader ? (
             <div className="mt-5 grid gap-3 sm:grid-cols-3">
               <div className="rounded-2xl border border-emerald-300/20 bg-emerald-300/10 p-4">
-                <p className="text-xs uppercase tracking-[0.2em] text-emerald-100">Líder</p>
+                <p className="text-xs uppercase tracking-[0.2em] text-emerald-100">{t('torneoLeaderLabel')}</p>
                 <p className="mt-3 text-lg font-semibold text-white">{leader.teamName}</p>
               </div>
               <div className="rounded-2xl border border-cyan-400/20 bg-cyan-400/10 p-4">
-                <p className="text-xs uppercase tracking-[0.2em] text-cyan-100">Puntos</p>
+                <p className="text-xs uppercase tracking-[0.2em] text-cyan-100">{t('torneoLeadPointsLabel')}</p>
                 <p className="mt-3 text-3xl font-semibold text-white">{leader.totalScore}</p>
               </div>
               <div className="rounded-2xl border border-fuchsia-300/20 bg-fuchsia-300/10 p-4">
-                <p className="text-xs uppercase tracking-[0.2em] text-fuchsia-100">Ventaja</p>
+                <p className="text-xs uppercase tracking-[0.2em] text-fuchsia-100">{t('torneoLeadGapLabel')}</p>
                 <p className="mt-3 text-3xl font-semibold text-white">
                   {data && data.standings[1] ? leader.totalScore - data.standings[1].totalScore : leader.totalScore}
                 </p>
@@ -125,9 +127,9 @@ export function TournamentStandingsSection({ tournamentId, refreshKey }: Props) 
         <div className="rounded-[28px] border border-white/10 bg-slate-950/45 p-5">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Estado del ranking</p>
+              <p className="text-xs uppercase tracking-[0.24em] text-slate-500">{t('torneoRankingStatusLabel')}</p>
               <p className="mt-2 text-xl font-semibold text-white">
-                {data?.currentRound ? `Tras ronda ${data.currentRound}` : 'Esperando resultados'}
+                {data?.currentRound ? t('torneoRankingStatusAfterRound', { round: data.currentRound }) : t('torneoRankingStatusWaiting')}
               </p>
             </div>
             <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3 text-slate-300">
@@ -137,15 +139,15 @@ export function TournamentStandingsSection({ tournamentId, refreshKey }: Props) 
 
           <div className="mt-5 space-y-3 text-sm text-slate-300">
             <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3">
-              <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Equipos clasificados</p>
+              <p className="text-xs uppercase tracking-[0.2em] text-slate-500">{t('torneoQualifiedTeamsLabel')}</p>
               <p className="mt-2 text-white">{data?.standings.length ?? 0}</p>
             </div>
             <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3">
-              <p className="text-xs uppercase tracking-[0.2em] text-slate-500">En playoffs</p>
+              <p className="text-xs uppercase tracking-[0.2em] text-slate-500">{t('torneoPlayoffTeamsLabel')}</p>
               <p className="mt-2 text-white">{data?.standings.filter((entry) => entry.advancedToPlayoffs).length ?? 0}</p>
             </div>
             <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3">
-              <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Eliminados</p>
+              <p className="text-xs uppercase tracking-[0.2em] text-slate-500">{t('torneoEliminatedTeamsLabel')}</p>
               <p className="mt-2 text-white">{data?.standings.filter((entry) => entry.isEliminated).length ?? 0}</p>
             </div>
           </div>
@@ -173,7 +175,7 @@ export function TournamentStandingsSection({ tournamentId, refreshKey }: Props) 
           <>
             <div className="grid gap-4 xl:grid-cols-3">
               {podium.map((entry, index) => (
-                <PodiumCard key={entry.teamId} entry={entry} position={index + 1} />
+                <PodiumCard key={entry.teamId} entry={entry} position={index + 1} t={t} />
               ))}
             </div>
 
@@ -183,12 +185,12 @@ export function TournamentStandingsSection({ tournamentId, refreshKey }: Props) 
                   <thead className="bg-white/[0.04]">
                     <tr className="border-b border-white/10 text-slate-400">
                       <th className="px-5 py-3 text-center font-medium">{t('torneoRank')}</th>
-                      <th className="px-5 py-3 text-left font-medium">Equipo</th>
+                      <th className="px-5 py-3 text-left font-medium">{t('torneoTableTeamLabel')}</th>
                       <th className="px-5 py-3 text-right font-medium">{t('torneoPuntos')}</th>
                       <th className="px-5 py-3 text-right font-medium">{t('torneoPartidas')}</th>
                       <th className="px-5 py-3 text-right font-medium">{t('torneoVictorias')}</th>
                       <th className="px-5 py-3 text-right font-medium">{t('torneoEliminaciones')}</th>
-                      <th className="px-5 py-3 text-center font-medium">Estado</th>
+                      <th className="px-5 py-3 text-center font-medium">{t('torneoTableStatusLabel')}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/8">
@@ -206,7 +208,7 @@ export function TournamentStandingsSection({ tournamentId, refreshKey }: Props) 
                           <div>
                             <p className="font-semibold text-white">{entry.teamName}</p>
                             <p className="mt-1 text-xs uppercase tracking-[0.2em] text-slate-500">
-                              {entry.groupIndex !== null ? t('torneoGrupo', { n: entry.groupIndex + 1 }) : 'Clasificación general'}
+                              {entry.groupIndex !== null ? t('torneoGrupo', { n: entry.groupIndex + 1 }) : t('torneoTableGeneralLabel')}
                             </p>
                           </div>
                         </td>
@@ -221,7 +223,7 @@ export function TournamentStandingsSection({ tournamentId, refreshKey }: Props) 
                             </span>
                           ) : entry.advancedToPlayoffs ? (
                             <span className="rounded-full border border-fuchsia-300/20 bg-fuchsia-300/10 px-3 py-1 text-xs font-semibold text-fuchsia-100">
-                              Playoffs
+                              {t('torneoPlayoffsLabel')}
                             </span>
                           ) : (
                             <span className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1 text-xs font-semibold text-emerald-100">

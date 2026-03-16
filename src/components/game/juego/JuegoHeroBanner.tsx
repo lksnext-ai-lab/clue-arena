@@ -3,8 +3,10 @@ import { getTranslations } from 'next-intl/server';
 export async function JuegoHeroBanner() {
   const t = await getTranslations('juego');
   const pre = t('heroBannerTitlePre');
+  const title = [pre, t('heroBannerTitleCyan'), t('heroBannerTitlePost')].filter(Boolean).join(' ');
+
   return (
-    <section aria-label="Banner del evento">
+    <section aria-label={t('heroBannerAriaLabel')}>
       <div
         className="relative w-full overflow-hidden rounded-xl border border-slate-700/50"
         style={{ height: 260 }}
@@ -12,7 +14,7 @@ export async function JuegoHeroBanner() {
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/game/banner.png"
-          alt={`Banner del evento Clue Arena — ${t('heroBannerTitleCyan')} ${t('heroBannerTitlePost')}`}
+          alt={t('heroBannerImageAlt', { title })}
           style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top' }}
         />
         {/* Gradient overlay left → transparent */}

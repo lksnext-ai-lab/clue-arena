@@ -137,6 +137,7 @@ export async function GET(request: Request) {
       let puntos = 0;
       let wins = 0;
       let efficiencyBonus = 0;
+      let speedBonus = 0;
       let gamesWithPoints = 0;
       let refutations = 0;
 
@@ -156,6 +157,9 @@ export async function GET(request: Request) {
         efficiencyBonus += gameEvents
           .filter((event) => event.type === 'EVT_WIN_EFFICIENCY')
           .reduce((sum, event) => sum + event.points, 0);
+        speedBonus += gameEvents
+          .filter((event) => event.type === 'EVT_TURN_SPEED')
+          .reduce((sum, event) => sum + event.points, 0);
         refutations += gameEvents.filter((event) => event.type === 'EVT_REFUTATION').length;
       }
 
@@ -170,6 +174,7 @@ export async function GET(request: Request) {
         aciertos: wins,
         _wins: wins,
         _efficiencyBonus: efficiencyBonus,
+        _speedBonus: speedBonus,
         _gamesWithPoints: gamesWithPoints,
         _refutations: refutations,
         _createdAt: new Date(team.createdAt).getTime(),
@@ -180,6 +185,7 @@ export async function GET(request: Request) {
       if (b.puntos !== a.puntos) return b.puntos - a.puntos;
       if (b._wins !== a._wins) return b._wins - a._wins;
       if (b._efficiencyBonus !== a._efficiencyBonus) return b._efficiencyBonus - a._efficiencyBonus;
+      if (b._speedBonus !== a._speedBonus) return b._speedBonus - a._speedBonus;
       if (b._gamesWithPoints !== a._gamesWithPoints) return b._gamesWithPoints - a._gamesWithPoints;
       if (b._refutations !== a._refutations) return b._refutations - a._refutations;
       return a._createdAt - b._createdAt;

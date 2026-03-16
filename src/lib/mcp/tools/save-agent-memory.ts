@@ -1,7 +1,5 @@
 import { z } from 'zod';
-import { db } from '@/lib/db';
-import { agentMemories } from '@/lib/db/schema';
-import { and, eq } from 'drizzle-orm';
+import { saveAgentMemory } from '@/lib/ai/agent-memory';
 
 export const saveAgentMemoryTool = {
   schema: {
@@ -35,25 +33,7 @@ export const saveAgentMemoryTool = {
       memoryJson = JSON.stringify(memory);
     }
 
-    const existing = await db
-      .select({ gameId: agentMemories.gameId })
-      .from(agentMemories)
-      .where(and(eq(agentMemories.gameId, game_id), eq(agentMemories.teamId, team_id)))
-      .get();
-
-    if (existing) {
-      await db
-        .update(agentMemories)
-        .set({ memoryJson, updatedAt: now })
-        .where(and(eq(agentMemories.gameId, game_id), eq(agentMemories.teamId, team_id)));
-    } else {
-      await db.insert(agentMemories).values({
-        gameId: game_id,
-        teamId: team_id,
-        memoryJson,
-        updatedAt: now,
-      });
-    }
+    await saveAgentMemory(game_id, team_id, JSON.parse(memoryJson) as Record<string, unknown>);
 
     return {
       content: [

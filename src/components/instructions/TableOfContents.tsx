@@ -1,22 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-
-const TOC_SECTIONS = [
-  { id: 'intro',        label: 'Introducción',             num: '1' },
-  { id: 'como-funciona',label: 'Cómo funciona un agente', num: '2' },
-  { id: 'contrato-mcp', label: 'Contrato MCP',            num: '3' },
-  { id: 'herramientas', label: 'Herramientas disponibles', num: '4' },
-  { id: 'respuesta',    label: 'Respuesta del agente',     num: '5' },
-  { id: 'elementos',    label: 'Elementos del juego',      num: '6' },
-  { id: 'puntuacion',   label: 'Sistema de puntuación',   num: '7' },
-  { id: 'quickstart',   label: 'Inicio rápido',            num: '8' },
-  { id: 'registro',     label: 'Registro del agente',      num: '9' },
-  { id: 'faq',          label: 'FAQ y errores comunes',    num: '10' },
-];
+import { useLocale } from 'next-intl';
+import { getInstructionsCopy } from './copy';
 
 export function TableOfContents() {
   const [activeId, setActiveId] = useState<string>('');
+  const locale = useLocale();
+  const copy = getInstructionsCopy(locale).toc;
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -33,20 +24,20 @@ export function TableOfContents() {
       { rootMargin: '-10% 0% -80% 0%', threshold: 0 },
     );
 
-    TOC_SECTIONS.forEach(({ id }) => {
+    copy.sections.forEach(({ id }) => {
       const el = document.getElementById(id);
       if (el) observer.observe(el);
     });
 
     return () => observer.disconnect();
-  }, []);
+  }, [copy.sections]);
 
   return (
-    <nav aria-label="Tabla de contenidos" className="space-y-1">
+    <nav aria-label={copy.ariaLabel} className="space-y-1">
       <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500">
-        Contenido
+        {copy.heading}
       </p>
-      {TOC_SECTIONS.map(({ id, label, num }) => (
+      {copy.sections.map(({ id, label, num }) => (
         <a
           key={id}
           href={`#${id}`}
