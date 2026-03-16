@@ -34,13 +34,25 @@ La base de datos SQLite se guarda en el volumen Docker `clue-arena-data`, montad
 
 Las variables `NEXT_PUBLIC_*` tambien se pasan al `build` de la imagen para que la configuracion cliente de Next.js quede embebida correctamente.
 
+Para separar el desarrollo local del entorno Docker:
+
+- `DATABASE_URL` se usa al ejecutar la app en el host
+- `DOCKER_DATABASE_URL` se usa dentro del contenedor
+
 Revisa especialmente:
 
 - `AUTH_SECRET`
+- `DOCKER_DATABASE_URL`
 - `NEXT_PUBLIC_APP_URL`
 - `NEXT_PUBLIC_FIREBASE_*`
 - `FIREBASE_*`
 - `MATTIN_API_*`
 - `MCP_AUTH_TOKEN`
 
-Si no defines `DATABASE_URL`, Compose usara `/app/data/clue-arena.db` dentro del contenedor.
+Si no defines `DOCKER_DATABASE_URL`, Compose usara `/app/data/clue-arena.db` dentro del contenedor.
+
+Puedes comprobar la resolucion final con:
+
+```bash
+docker compose config | grep DATABASE_URL
+```

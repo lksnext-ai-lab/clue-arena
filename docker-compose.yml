@@ -22,7 +22,7 @@ services:
       NODE_ENV: production
       PORT: 3000
       HOSTNAME: 0.0.0.0
-      DATABASE_URL: ${DATABASE_URL:-/app/data/clue-arena.db}
+      DATABASE_URL: ${DOCKER_DATABASE_URL:-/app/data/clue-arena.db}
     volumes:
       - clue-arena-data:/app/data
     restart: unless-stopped
