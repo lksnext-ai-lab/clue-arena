@@ -97,11 +97,12 @@ export async function JuegoQueEsCluedo() {
             <div className="relative overflow-hidden rounded-[1.75rem] border border-white/10 bg-slate-950/50">
               <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent" />
               <Image
-                src="/game/escena.png"
+                src="/game/escena.webp"
                 alt={t('queEsImageAlt')}
                 width={800}
                 height={960}
-                unoptimized
+                quality={80}
+                sizes="(max-width: 1024px) 100vw, 40vw"
                 className="h-full min-h-[320px] w-full object-cover"
               />
               <div className="absolute inset-x-0 bottom-0 p-5 sm:p-6">

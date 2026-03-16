@@ -27,9 +27,9 @@ export async function JuegoEscenarios() {
                   src={meta.imagen}
                   alt={habitacion}
                   fill
-                  unoptimized
+                  quality={75}
                   className="object-cover object-center"
-                  sizes="(max-width: 640px) 50vw, 33vw"
+                  sizes="(max-width: 640px) 33vw, (max-width: 1024px) 16vw, 11vw"
                 />
               </div>
               <div className="p-2 flex flex-col items-center text-center gap-0.5">

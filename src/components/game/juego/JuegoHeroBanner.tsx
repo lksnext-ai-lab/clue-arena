@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import { getTranslations } from 'next-intl/server';
 
 export async function JuegoHeroBanner() {
@@ -11,11 +12,14 @@ export async function JuegoHeroBanner() {
         className="relative w-full overflow-hidden rounded-xl border border-slate-700/50"
         style={{ height: 260 }}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/game/banner.png"
+        <Image
+          src="/game/banner.webp"
           alt={t('heroBannerImageAlt', { title })}
-          style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top' }}
+          fill
+          priority
+          quality={85}
+          sizes="(max-width: 768px) 100vw, 1280px"
+          className="object-cover object-top"
         />
         {/* Gradient overlay left → transparent */}
         <div

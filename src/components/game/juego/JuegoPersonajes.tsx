@@ -60,7 +60,7 @@ export async function JuegoPersonajes() {
                   src={meta.imagen}
                   alt={nombre}
                   fill
-                  unoptimized
+                  quality={75}
                   className="object-cover object-top"
                   sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 16vw"
                 />

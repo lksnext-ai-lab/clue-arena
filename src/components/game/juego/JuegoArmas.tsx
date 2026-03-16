@@ -28,7 +28,7 @@ export async function JuegoArmas() {
                   src={meta.imagen}
                   alt={arma}
                   fill
-                  unoptimized
+                  quality={75}
                   className="object-cover object-center"
                   sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 16vw"
                 />
