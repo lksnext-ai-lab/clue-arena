@@ -7,7 +7,7 @@
     "dev:turbo": "DISABLE_AUTH=true next dev --turbopack",
     "build": "next build",
     "start": "NODE_ENV=production node --import tsx src/server.ts",
-    "start:dev": "NODE_ENV=development node --import tsx src/server.ts",
+    "start:dev": "NODE_ENV=production DISABLE_AUTH=true  node --import tsx src/server.ts",
     "lint": "next lint",
     "type-check": "tsc --noEmit",
     "test": "vitest run",
