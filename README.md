@@ -334,15 +334,13 @@ The SQLite database is stored in the Docker volume `clue-arena-data`.
 
 ## GitHub Actions
 
-The repository now includes two GitHub Actions workflows:
+The repository now includes a single GitHub Actions workflow:
 
-- `CI` runs on every push and pull request. It installs dependencies, runs `npm run lint`, `npm run type-check`, `npm test`, and validates that the Docker image builds successfully.
-- `Release Dev Image` runs on pushes to `main` and on manual dispatch. It treats the `dev` image as a snapshot of `main`, but only publishes it after lint, type-checks, tests, and a production bundle build pass successfully. The image is published to GitHub Container Registry at `ghcr.io/<owner>/<repo>`.
+- `CI and Dev Image` runs on pushes, pull requests, and manual dispatch.
+- Every run installs dependencies, runs `npm run lint`, `npm run type-check`, `npm test`, builds the production bundle, and validates the Docker image build.
+- When the event is a push to `main`, the same workflow publishes `ghcr.io/<owner>/<repo>:dev`.
 
-Published image tags:
-
-- `dev`
-- `dev-<git-sha>`
+The `dev` tag is intentionally a rolling snapshot of `main`, so each new successful commit to `main` replaces the previous `dev` image.
 
 ### Required GitHub settings
 
