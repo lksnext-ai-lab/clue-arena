@@ -316,6 +316,39 @@ The application is exposed on `http://localhost:3000`.
 
 The SQLite database is stored in the Docker volume `clue-arena-data`.
 
+## GitHub Actions
+
+The repository now includes two GitHub Actions workflows:
+
+- `CI` runs on every push and pull request. It installs dependencies, runs `npm run lint`, `npm run type-check`, `npm test`, and validates that the Docker image builds successfully.
+- `Release Dev Image` runs on pushes to `main` and on manual dispatch. It treats the `dev` image as a snapshot of `main`, but only publishes it after lint, type-checks, tests, and a production bundle build pass successfully. The image is published to GitHub Container Registry at `ghcr.io/<owner>/<repo>`.
+
+Published image tags:
+
+- `dev`
+- `dev-<git-sha>`
+
+### Required GitHub settings
+
+To publish images successfully:
+
+- Keep Actions enabled with permission to read repository contents and write packages.
+- Leave the workflow `GITHUB_TOKEN` enabled for package publishing.
+- If the Next.js build needs environment-specific public values, define them as repository or organization variables.
+
+Supported Actions variables for the image build:
+
+- `NEXT_PUBLIC_DISABLE_AUTH`
+- `NEXT_PUBLIC_FIREBASE_API_KEY`
+- `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`
+- `NEXT_PUBLIC_FIREBASE_PROJECT_ID`
+- `NEXT_PUBLIC_FIREBASE_APP_ID`
+- `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID`
+- `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET`
+- `NEXT_PUBLIC_FIREBASE_AUTH_PROVIDER`
+- `NEXT_PUBLIC_APP_URL`
+- `NEXT_PUBLIC_WS_URL`
+
 ## Project Structure
 
 ```text
