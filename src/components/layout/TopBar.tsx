@@ -11,9 +11,11 @@ const S = {
   header: {
     height: 56, flexShrink: 0,
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    padding: '0 24px',
+    padding: '0 24px 0 48px',
     background: '#0f172a',
     borderBottom: '1px solid #1e293b',
+    position: 'relative' as const,
+    zIndex: 1,
   } as React.CSSProperties,
   title: {
     fontSize: 11, fontWeight: 700, letterSpacing: 2,

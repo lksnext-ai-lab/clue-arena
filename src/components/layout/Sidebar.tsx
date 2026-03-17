@@ -24,6 +24,7 @@ const BORDER_SIDEBAR = '#1e293b';
 const ACCENT = '#22d3ee';
 const ACCENT_BG = 'rgba(34,211,238,0.12)';
 const ACCENT_BORDER = 'rgba(34,211,238,0.25)';
+const BRAND_GLOW = 'rgba(34,211,238,0.22)';
 const TEXT_MUTED = '#64748b';
 const TEXT_ACTIVE = '#f1f5f9';
 
@@ -121,41 +122,78 @@ export function Sidebar() {
     <nav
       aria-label={tCommon('mainNavigation')}
       style={{
-        width: 64, minWidth: 64, background: BG_SIDEBAR,
+        width: 76, minWidth: 76, background: BG_SIDEBAR,
         borderRight: `1px solid ${BORDER_SIDEBAR}`,
-        display: 'flex', flexDirection: 'column', alignItems: 'center',
-        padding: '16px 0', flexShrink: 0, height: '100vh',
-        position: 'sticky', top: 0, overflowY: 'auto',
+        flexShrink: 0, height: '100vh',
+        position: 'sticky', top: 0, overflow: 'visible',
+        zIndex: 20,
       }}
     >
       {/* Logo */}
       <Link href="/" aria-label="Clue Arena" style={{
-        marginBottom: 20, flexShrink: 0,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        position: 'absolute',
+        top: 12,
+        left: 8,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: 92,
+        height: 92,
+        borderRadius: 28,
+        border: `1px solid ${ACCENT_BORDER}`,
+        background: `radial-gradient(circle at 32% 28%, rgba(125, 211, 252, 0.22), rgba(8, 47, 73, 0.94) 58%, rgba(2, 6, 23, 0.98) 100%)`,
+        boxShadow: `0 18px 38px ${BRAND_GLOW}, inset 0 1px 0 rgba(255,255,255,0.08)`,
+        zIndex: 30,
       }}>
+        <span
+          aria-hidden="true"
+          style={{
+            position: 'absolute',
+            inset: 8,
+            borderRadius: 22,
+            border: '1px solid rgba(255,255,255,0.06)',
+            pointerEvents: 'none',
+          }}
+        />
         <Image
           src="/clue-logo.png"
           alt="Clue Arena logo"
-          width={36}
-          height={38}
+          width={58}
+          height={61}
           priority
-          style={{ width: 36, height: 'auto' }}
+          style={{
+            width: 58,
+            height: 'auto',
+            filter: 'drop-shadow(0 8px 16px rgba(8, 47, 73, 0.35))',
+          }}
         />
       </Link>
 
-      {/* Main nav */}
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, flex: 1 }}>
-        {mainNav.map((item) => (
-          <SidebarLink key={item.href} {...item} label={t(item.labelKey)} active={isActive(item.href)} />
-        ))}
-      </div>
+      <div
+        style={{
+          height: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          padding: '112px 0 16px',
+          overflowY: 'auto',
+          overflowX: 'hidden',
+        }}
+      >
+        {/* Main nav */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, flex: 1 }}>
+          {mainNav.map((item) => (
+            <SidebarLink key={item.href} {...item} label={t(item.labelKey)} active={isActive(item.href)} />
+          ))}
+        </div>
 
-      {/* Bottom */}
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
-        {bottomNav.map((item) => (
-          <SidebarLink key={item.href} {...item} label={t(item.labelKey)} active={isActive(item.href)} />
-        ))}
-        <LocaleSwitcher />
+        {/* Bottom */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+          {bottomNav.map((item) => (
+            <SidebarLink key={item.href} {...item} label={t(item.labelKey)} active={isActive(item.href)} />
+          ))}
+          <LocaleSwitcher />
+        </div>
       </div>
     </nav>
   );
