@@ -133,7 +133,14 @@ export function Sidebar() {
         marginBottom: 20, flexShrink: 0,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
-        <Image src="/lks.svg" alt="LKS logo" width={26} height={26} priority />
+        <Image
+          src="/clue-logo.png"
+          alt="Clue Arena logo"
+          width={36}
+          height={38}
+          priority
+          style={{ width: 36, height: 'auto' }}
+        />
       </Link>
 
       {/* Main nav */}

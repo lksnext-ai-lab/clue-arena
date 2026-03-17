@@ -17,9 +17,14 @@ export async function generateMetadata(): Promise<Metadata> {
     title: t('appTitle'),
     description: t('appDescription'),
     icons: {
-      icon: '/lks.svg',
-      shortcut: '/lks.svg',
-      apple: '/lks.svg',
+      icon: [
+        { url: '/clue-favico.png', type: 'image/png', sizes: '512x512' },
+        { url: '/icon-192.png', type: 'image/png', sizes: '192x192' },
+        { url: '/icon-512.png', type: 'image/png', sizes: '512x512' },
+        { url: '/favicon.ico', sizes: 'any' },
+      ],
+      shortcut: '/favicon.ico',
+      apple: '/apple-touch-icon.png',
     },
   };
 }
