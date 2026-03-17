@@ -33,6 +33,12 @@ The project combines:
 - Playwright
 - Firebase Authentication
 
+## License
+
+Copyright (C) 2026 LKS Next. Licensed under the GNU AGPL v3.0 or later.
+
+See: [LICENSE](LICENSE)
+
 ## Requirements
 
 - Node.js 22 or compatible
