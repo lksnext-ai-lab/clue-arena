@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { db } from '@/lib/db';
 import { equipos, usuarios } from '@/lib/db/schema';
 import type { AppAuthUser, AppTeamSummary } from './auth-shared';
+import { DEMO_USERS, isDemoEmail, isDemoMode } from './demo';
 
 function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
@@ -90,14 +91,25 @@ export type DemoUser = {
  * Excludes built-in DEV_USERS (clue-arena.local) — only event/demo accounts.
  */
 export async function getDemoUsers(): Promise<DemoUser[]> {
+  if (!isDemoMode()) {
+    return [];
+  }
+
   const rows = await db
     .select({ email: usuarios.email, nombre: usuarios.nombre, rol: usuarios.rol })
     .from(usuarios)
     .all();
 
-  return rows.filter(
-    (u) => u.email.endsWith('.local') && !u.email.endsWith('@clue-arena.local'),
-  );
+  const demoUsers = rows.filter((user) => isDemoEmail(user.email));
+  if (demoUsers.length > 0) {
+    return demoUsers;
+  }
+
+  return DEMO_USERS.map((user) => ({
+    email: user.email,
+    nombre: user.name,
+    rol: user.rol,
+  }));
 }
 
 export async function ensureAppAuthUser(params: { email: string; name?: string | null }): Promise<AppAuthUser> {

@@ -12,8 +12,9 @@ import { gameRunner } from '@/lib/game/runner';
 import { db } from '@/lib/db';
 import { partidas } from '@/lib/db/schema';
 import { isNotNull, eq } from 'drizzle-orm';
-import { seedDevUsers } from '@/lib/db/seed';
+import { seedDemoUsers, seedDevUsers } from '@/lib/db/seed';
 import { recoverStaleTurnClaims } from '@/lib/game/turn-claim';
+import { isDemoMode } from '@/lib/auth/demo';
 
 const dev = process.env.NODE_ENV !== 'production';
 const app = next({ dev });
@@ -65,7 +66,7 @@ async function recoverStaleTurnExecutionClaims() {
 }
 
 app.prepare().then(async () => {
-  // En dev mode, aplicar migraciones y seed
+  // En dev mode, aplicar migraciones y seed local.
   if (process.env.NODE_ENV !== 'production') {
     try {
       console.log('> [db] Applying migrations...');
@@ -77,6 +78,15 @@ app.prepare().then(async () => {
       }
     } catch (err) {
       console.error('> [db] Error during DB initialization:', err);
+      process.exit(1);
+    }
+  }
+
+  if (isDemoMode()) {
+    try {
+      await seedDemoUsers();
+    } catch (err) {
+      console.error('> [demo] Error during demo user initialization:', err);
       process.exit(1);
     }
   }

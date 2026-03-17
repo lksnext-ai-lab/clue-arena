@@ -11,6 +11,7 @@ import {
   getFirebaseClientAuth,
   signInWithEmailAndPassword,
 } from '@/lib/auth/firebase-client';
+import { DEMO_PASSWORD } from '@/lib/auth/demo';
 
 type FirebaseLoginOption = {
   id: string;
@@ -240,7 +241,10 @@ export default function FirebaseLoginButton({
                 <button
                   type="button"
                   disabled={isLoading}
-                  onClick={() => setEmail(u.email)}
+                  onClick={() => {
+                    setEmail(u.email);
+                    setPassword(DEMO_PASSWORD);
+                  }}
                   className="group flex w-full items-center justify-between gap-3 rounded-xl border border-white/8 bg-white/4 px-3 py-2 text-left transition hover:bg-white/8 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <div className="min-w-0">
@@ -256,7 +260,9 @@ export default function FirebaseLoginButton({
               </li>
             ))}
           </ul>
-          <p className="mt-3 text-[11px] text-slate-500">Pulsa para rellenar el email. Usa la contraseña del entorno de demo.</p>
+          <p className="mt-3 text-[11px] text-slate-500">
+            Pulsa para rellenar el acceso. Todas usan la contraseña <code>sample</code>.
+          </p>
         </div>
       ) : null}
     </div>

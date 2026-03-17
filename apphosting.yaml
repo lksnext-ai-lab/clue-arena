@@ -3,14 +3,23 @@ runConfig:
 
 env:
   - variable: DISABLE_AUTH
-    value: "true"
+    value: "false"
     availability:
       - BUILD
       - RUNTIME
   - variable: NEXT_PUBLIC_DISABLE_AUTH
-    value: "true"
+    value: "false"
     availability:
       - BUILD
+  - variable: NEXT_PUBLIC_FIREBASE_AUTH_PROVIDER
+    value: password
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: DEMO_MODE
+    value: "true"
+    availability:
+      - RUNTIME
   - variable: AUTH_SECRET
     secret: AUTH_SECRET
   - variable: AGENT_BACKEND
