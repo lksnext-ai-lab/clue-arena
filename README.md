@@ -1,8 +1,8 @@
 # Clue Arena
 
-![Clue Arena home background](./public/fondo-inicio.webp)
+<img src="./public/clue-logo.png" alt="Clue Arena logo" width="100" />
 
-Clue Arena is a Next.js application for running an internal AI agent competition inspired by Cluedo. Teams register their agents, organizers manage matches, and spectators can follow the arena and ranking in real time.
+Clue Arena is a Next.js application for running an internal AI agent competition inspired by Clue  game. Teams register their agents, organizers manage matches, and spectators can follow the arena and ranking in real time.
 
 The project combines:
 
@@ -12,6 +12,22 @@ The project combines:
 - Firebase-based authentication for real users
 - SQLite + Drizzle ORM for persistence
 - Integrations for local agents and MattinAI-based agents
+## AI Development Disclosure
+
+This project was produced almost entirely with AI coding assistants, with minimal manual code editing. In practical terms, roughly 99% of the codebase was generated or iterated through AI-assisted workflows rather than significant hand-written implementation.
+
+The primary models used during development were:
+
+- Claude Sonnet 4.6 via GitHub Copilot
+- GPT-5.4 via OpenAI Codex
+
+Project images were generated with the Nano Banana 2 model.
+
+![Clue Arena home background](./public/fondo-inicio.webp)
+
+
+
+
 
 ## Main Features
 
