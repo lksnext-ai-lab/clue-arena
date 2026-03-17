@@ -29,5 +29,19 @@ export async function apiFetch<T>(path: string, options: ApiOptions = {}): Promi
     throw new ServerError(res.status, await res.text());
   }
 
+  if (res.status === 204) {
+    return undefined as T;
+  }
+
+  const contentLength = res.headers.get('content-length');
+  if (contentLength === '0') {
+    return undefined as T;
+  }
+
+  const contentType = res.headers.get('content-type') ?? '';
+  if (!contentType.includes('application/json')) {
+    return undefined as T;
+  }
+
   return res.json() as Promise<T>;
 }

@@ -4,11 +4,12 @@ import { useState } from 'react';
 import { Trash2 } from 'lucide-react';
 import { apiFetch } from '@/lib/api/client';
 import { useTranslations } from 'next-intl';
+import type { DeleteTeamResponse } from '@/types/api';
 
 interface Props {
   teamId: string;
   teamName: string;
-  onDeleted: () => void;
+  onDeleted: (result?: DeleteTeamResponse) => void;
   variant?: 'default' | 'icon';
 }
 
@@ -28,9 +29,9 @@ export function DeleteTeamButton({ teamId, teamName, onDeleted, variant = 'defau
     setIsDeleting(true);
     setError(null);
     try {
-      await apiFetch(`/teams/${teamId}`, { method: 'DELETE' });
+      const result = await apiFetch<DeleteTeamResponse>(`/teams/${teamId}`, { method: 'DELETE' });
       setOpen(false);
-      onDeleted();
+      onDeleted(result);
     } catch (err: unknown) {
       const errMessage = err instanceof Error ? err.message : '';
       let message = t('errorEliminar');

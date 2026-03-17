@@ -1,10 +1,24 @@
 import { NextResponse } from 'next/server';
 import { getAuthSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
-import { equipos, usuarios, partidaEquipos, partidas } from '@/lib/db/schema';
+import {
+  equipos,
+  usuarios,
+  partidaEquipos,
+  partidas,
+  partidasEntrenamiento,
+  tournamentTeams,
+  agentMemories,
+  turnos,
+  sugerencias,
+  acusaciones,
+  pases,
+  ranking,
+  scoreEvents,
+} from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { UpdateTeamSchema, TeamMemberUpdateSchema } from '@/lib/schemas/team';
-import type { TeamResponse } from '@/types/api';
+import type { DeleteTeamResponse, TeamResponse } from '@/types/api';
 import { normalizeTeamStatus } from '@/lib/teams/status';
 
 type Params = { params: Promise<{ id: string }> };
@@ -223,6 +237,68 @@ export async function DELETE(_req: Request, { params }: Params) {
     );
   }
 
-  await db.delete(equipos).where(eq(equipos.id, id));
+  const [
+    gameParticipation,
+    turnActivity,
+    suggestionActivity,
+    accusationActivity,
+    passActivity,
+    rankingActivity,
+    scoreEventActivity,
+  ] = await Promise.all([
+    db.select({ id: partidaEquipos.id }).from(partidaEquipos).where(eq(partidaEquipos.equipoId, id)).get(),
+    db.select({ id: turnos.id }).from(turnos).where(eq(turnos.equipoId, id)).get(),
+    db.select({ id: sugerencias.id }).from(sugerencias).where(eq(sugerencias.equipoId, id)).get(),
+    db.select({ id: acusaciones.id }).from(acusaciones).where(eq(acusaciones.equipoId, id)).get(),
+    db.select({ id: pases.id }).from(pases).where(eq(pases.equipoId, id)).get(),
+    db.select({ id: ranking.id }).from(ranking).where(eq(ranking.equipoId, id)).get(),
+    db.select({ id: scoreEvents.id }).from(scoreEvents).where(eq(scoreEvents.equipoId, id)).get(),
+  ]);
+
+  const hasSharedActivity = !!(
+    gameParticipation ||
+    turnActivity ||
+    suggestionActivity ||
+    accusationActivity ||
+    passActivity ||
+    rankingActivity ||
+    scoreEventActivity
+  );
+
+  if (hasSharedActivity) {
+    const archivedTeam = db.transaction((tx) => {
+      tx.delete(partidasEntrenamiento).where(eq(partidasEntrenamiento.equipoId, id)).run();
+      tx.delete(tournamentTeams).where(eq(tournamentTeams.teamId, id)).run();
+      tx.delete(agentMemories).where(eq(agentMemories.teamId, id)).run();
+
+      return tx
+        .update(equipos)
+        .set({
+          estado: 'inactivo',
+          descripcion: null,
+          appId: null,
+          mattinApiKey: null,
+          miembros: '[]',
+        })
+        .where(eq(equipos.id, id))
+        .returning()
+        .get();
+    });
+
+    const payload: DeleteTeamResponse = {
+      deleted: false,
+      archived: true,
+      team: toTeamResponse(archivedTeam),
+    };
+    return NextResponse.json(payload);
+  }
+
+  db.transaction((tx) => {
+    tx.delete(partidasEntrenamiento).where(eq(partidasEntrenamiento.equipoId, id)).run();
+    tx.delete(tournamentTeams).where(eq(tournamentTeams.teamId, id)).run();
+    tx.delete(agentMemories).where(eq(agentMemories.teamId, id)).run();
+    tx.delete(equipos).where(eq(equipos.id, id)).run();
+  });
+
   return new Response(null, { status: 204 });
 }

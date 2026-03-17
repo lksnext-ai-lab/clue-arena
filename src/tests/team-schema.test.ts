@@ -21,6 +21,27 @@ describe('team schema validations', () => {
     expect(result.success).toBe(true);
   });
 
+  test('registration: accepts an optional description and normalizes empty text', () => {
+    const withDescription = TeamRegistrationSchema.safeParse({
+      id: 'equipo-a',
+      nombre: 'Equipo',
+      descripcion: 'Agentes especializados en logica deductiva',
+      agentBackend: 'local',
+    });
+    expect(withDescription.success).toBe(true);
+
+    const emptyDescription = TeamRegistrationSchema.safeParse({
+      id: 'equipo-a',
+      nombre: 'Equipo',
+      descripcion: '',
+      agentBackend: 'local',
+    });
+    expect(emptyDescription.success).toBe(true);
+    if (emptyDescription.success) {
+      expect(emptyDescription.data.descripcion).toBeUndefined();
+    }
+  });
+
   test('registration: mattin backend requires agentId, appId and api key', () => {
     const result = TeamRegistrationSchema.safeParse({
       id: 'equipo-a',

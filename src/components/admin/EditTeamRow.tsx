@@ -2,7 +2,7 @@
 
 import { Bot, Orbit, PencilLine, Shield } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import type { TeamResponse } from '@/types/api';
+import type { DeleteTeamResponse, TeamResponse } from '@/types/api';
 import { DeleteTeamButton } from './DeleteTeamButton';
 import Image from 'next/image';
 
@@ -11,7 +11,7 @@ interface Props {
   statusColors: Record<string, string>;
   isSelected: boolean;
   onSelect: () => void;
-  onDeleted: () => void;
+  onDeleted: (result?: DeleteTeamResponse) => void;
 }
 
 export function EditTeamRow({ team, statusColors, isSelected, onSelect, onDeleted }: Props) {

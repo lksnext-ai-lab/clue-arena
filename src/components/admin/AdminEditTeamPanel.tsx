@@ -18,14 +18,14 @@ import {
 import { useTranslations } from 'next-intl';
 import { apiFetch } from '@/lib/api/client';
 import { UpdateTeamSchema, type UpdateTeamInput } from '@/lib/schemas/team';
-import type { TeamResponse, UserResponse } from '@/types/api';
+import type { DeleteTeamResponse, TeamResponse, UserResponse } from '@/types/api';
 import { MembersEditor } from '@/components/team/MembersEditor';
 import { DeleteTeamButton } from './DeleteTeamButton';
 
 interface Props {
   team: TeamResponse | null;
   onUpdated: (updated: TeamResponse) => void;
-  onDeleted: (teamId: string) => void;
+  onDeleted: (teamId: string, result?: DeleteTeamResponse) => void;
   onClose: () => void;
 }
 
@@ -294,7 +294,11 @@ export function AdminEditTeamPanel({ team, onUpdated, onDeleted, onClose }: Prop
           </div>
 
           <div className="flex shrink-0 items-center gap-2">
-            <DeleteTeamButton teamId={team.id} teamName={team.nombre} onDeleted={() => onDeleted(team.id)} />
+            <DeleteTeamButton
+              teamId={team.id}
+              teamName={team.nombre}
+              onDeleted={(result) => onDeleted(team.id, result)}
+            />
             <button
               type="button"
               onClick={onClose}

@@ -30,6 +30,7 @@ export interface TeamResponse {
 export interface CreateTeamRequest {
   id?: string;
   nombre: string;
+  descripcion?: string;
   agentId?: string;
   agentBackend?: 'mattin' | 'local';
   appId?: string;
@@ -50,6 +51,12 @@ export interface UpdateTeamRequest {
   estado?: TeamStatus;
   miembros?: string[];
   usuarioId?: string;
+}
+
+export interface DeleteTeamResponse {
+  deleted: boolean;
+  archived: boolean;
+  team?: TeamResponse;
 }
 
 // --- Users (admin) ---

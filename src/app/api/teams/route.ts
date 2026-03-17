@@ -156,6 +156,7 @@ export async function POST(request: Request) {
   const newTeam = {
     id: resolvedTeamId,
     nombre: parsed.data.nombre,
+    descripcion: parsed.data.descripcion ?? null,
     agentId: parsed.data.agentId ?? '',
     agentBackend: parsed.data.agentBackend ?? 'mattin',
     appId: parsed.data.appId ?? null,
@@ -169,7 +170,7 @@ export async function POST(request: Request) {
   await db.insert(equipos).values(newTeam);
 
   return NextResponse.json(
-    { equipo: toTeamResponse({ ...newTeam, descripcion: null, avatarUrl: null }) },
+    { equipo: toTeamResponse({ ...newTeam, avatarUrl: null }) },
     { status: 201 }
   );
 }

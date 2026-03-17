@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react';
 import { Bot, Filter, Search, ShieldPlus, Sparkles, Users } from 'lucide-react';
 import { apiFetch } from '@/lib/api/client';
 import { useTranslations } from 'next-intl';
-import type { TeamResponse } from '@/types/api';
+import type { DeleteTeamResponse, TeamResponse } from '@/types/api';
 import { EditTeamRow } from './EditTeamRow';
 import { CreateTeamForm } from './CreateTeamForm';
 import { AdminEditTeamPanel } from './AdminEditTeamPanel';
@@ -84,7 +84,12 @@ export function AdminTeamsSection({ initialTeams }: { initialTeams?: TeamRespons
     setTeams((prev) => prev.map((team) => (team.id === updated.id ? updated : team)));
   };
 
-  const handleDeleted = (id: string) => {
+  const handleDeleted = (id: string, result?: DeleteTeamResponse) => {
+    if (result?.archived && result.team) {
+      setTeams((prev) => prev.map((team) => (team.id === id ? result.team! : team)));
+      return;
+    }
+
     setTeams((prev) => {
       const nextTeams = prev.filter((team) => team.id !== id);
       setSelectedTeamId((current) => (current === id ? null : current));
@@ -219,7 +224,7 @@ export function AdminTeamsSection({ initialTeams }: { initialTeams?: TeamRespons
               statusColors={STATUS_COLORS}
               isSelected={selectedTeamId === team.id}
               onSelect={() => setSelectedTeamId(team.id)}
-              onDeleted={() => handleDeleted(team.id)}
+              onDeleted={(result) => handleDeleted(team.id, result)}
             />
           ))}
         </div>

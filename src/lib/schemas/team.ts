@@ -30,6 +30,10 @@ export const TeamRegistrationSchema = z.object({
     .min(3, 'El nombre debe tener al menos 3 caracteres')
     .max(50, 'El nombre no puede superar 50 caracteres')
     .regex(/^[\w\s\-áéíóúÁÉÍÓÚñÑüÜ]+$/, 'Solo se permiten letras, números, espacios y guiones'),
+  descripcion: z.preprocess(
+    v => (v === '' ? undefined : v),
+    z.string().max(300, 'La descripción no puede superar 300 caracteres').optional()
+  ),
   agentId: optionalInputString('El agent_id no puede estar vacío'),
   agentBackend: z.enum(['mattin', 'local']).default('mattin'),
   // appId and mattinApiKey are only required when the backend is MattinAI.  

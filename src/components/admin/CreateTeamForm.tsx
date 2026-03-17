@@ -277,6 +277,19 @@ export function CreateTeamForm({ onCreated, onCancel }: CreateTeamFormProps) {
               </select>
             </Field>
 
+            <Field label={t('descripcionEquipo')} className="sm:col-span-2">
+              <textarea
+                {...register('descripcion')}
+                rows={4}
+                className={inputClass}
+                style={{ background: 'rgba(15, 23, 42, 0.78)', color: '#f8fafc', border: '1px solid rgba(148, 163, 184, 0.22)' }}
+                placeholder={t('descripcionPlaceholder')}
+              />
+              {errors.descripcion && (
+                <p className="mt-2 text-xs" style={{ color: '#fca5a5' }}>{errors.descripcion.message}</p>
+              )}
+            </Field>
+
             <Field label={t('agentBackendLabel')} className="sm:col-span-2">
               <select
                 {...register('agentBackend')}

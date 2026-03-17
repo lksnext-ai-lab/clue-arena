@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Bot, ImageUp, KeyRound, Orbit, Radio, Shield, ShieldCheck, Sparkles } from 'lucide-react';
@@ -24,6 +25,7 @@ interface MattinCheckResponse {
  */
 export default function TeamRegistrationPage() {
   const router = useRouter();
+  const { update } = useSession();
   const t = useTranslations('equipo');
   const [serverError, setServerError] = useState<string | null>(null);
   const [testMessage, setTestMessage] = useState<string | null>(null);
@@ -114,8 +116,9 @@ export default function TeamRegistrationPage() {
         }
       }
 
+      await update();
+      router.replace('/equipo');
       router.refresh();
-      router.push('/equipo');
     } catch (err: unknown) {
       const errMessage = err instanceof Error ? err.message : '';
       let message = errMessage || t('registroError');
@@ -287,6 +290,17 @@ export default function TeamRegistrationPage() {
                       {errors.id && <FieldError message={errors.id.message} />}
                     </FieldBlock>
                   </div>
+
+                  <FieldBlock label={t('descripcionLabel')}>
+                    <textarea
+                      {...register('descripcion')}
+                      rows={4}
+                      className="w-full rounded-2xl px-4 py-3 text-sm outline-none transition focus:ring-2 focus:ring-amber-400/30"
+                      style={sharedInputStyle}
+                      placeholder={t('descripcionPlaceholder')}
+                    />
+                    {errors.descripcion && <FieldError message={errors.descripcion.message} />}
+                  </FieldBlock>
 
                   <div
                     className="rounded-3xl border p-5"
