@@ -228,6 +228,17 @@ Notes:
 - If `DISABLE_AUTH=true`, local development users are seeded automatically.
 - If `DEMO_MODE=true`, demo users are initialized at startup.
 
+## Releases
+
+The repository includes a manual GitHub Actions workflow at [`.github/workflows/release.yml`](/home/jjrodrig/projects/cluedo-workspace/clue-arena-app/.github/workflows/release.yml).
+
+Run it from the Actions tab and provide the target semantic version such as `1.2.3`. The workflow updates the package version, reruns the main validation steps, publishes release container images to GHCR with the version tag and `latest`, creates a git tag, and opens a GitHub Release.
+
+If you also want the Helm chart repository to release automatically afterwards, configure:
+
+- Repository variable `CHART_REPOSITORY` with the target chart repository slug. If omitted, the workflow falls back to `<owner>/clue-arena-chart`.
+- Repository secret `CHART_REPO_TOKEN` with a token that can dispatch workflows in the chart repository.
+
 ## Database Commands
 
 Useful database commands:
