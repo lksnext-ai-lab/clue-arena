@@ -178,17 +178,3 @@ jobs:
           name: Clue Arena v${{ steps.release.outputs.version }}
           generate_release_notes: true
           prerelease: ${{ steps.release.outputs.prerelease == 'true' }}
-
-      - name: Trigger chart release
-        if: ${{ env.CHART_REPO_TOKEN != '' }}
-        uses: peter-evans/repository-dispatch@v3
-        with:
-          token: ${{ env.CHART_REPO_TOKEN }}
-          repository: ${{ env.CHART_REPOSITORY }}
-          event-type: app-released
-          client-payload: >-
-            {"version":"${{ steps.release.outputs.version }}","image_repository":"${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}","source_repository":"${{ github.repository }}","source_tag":"${{ steps.release.outputs.tag }}"}
-
-      - name: Chart release dispatch not configured
-        if: ${{ env.CHART_REPO_TOKEN == '' }}
-        run: echo "Skipping chart release dispatch because CHART_REPO_TOKEN is not configured."
