@@ -4,6 +4,7 @@ import { Inter } from 'next/font/google';
 import './globals.css';
 import { SessionProvider as NextAuthProvider } from 'next-auth/react';
 import { SessionProvider } from '@/contexts/SessionContext';
+import { RuntimeConfigProvider } from '@/contexts/RuntimeConfigContext';
 import { NextIntlClientProvider } from 'next-intl';
 import { getLocale, getMessages, getTranslations } from 'next-intl/server';
 import { RootShell } from '@/components/layout/RootShell';
@@ -41,11 +42,13 @@ export default async function RootLayout({
     <html lang={locale}>
       <body className={inter.className}>
         <NextIntlClientProvider messages={messages}>
-          <NextAuthProvider>
-            <SessionProvider>
-              <RootShell>{children}</RootShell>
-            </SessionProvider>
-          </NextAuthProvider>
+          <RuntimeConfigProvider>
+            <NextAuthProvider>
+              <SessionProvider>
+                <RootShell>{children}</RootShell>
+              </SessionProvider>
+            </NextAuthProvider>
+          </RuntimeConfigProvider>
         </NextIntlClientProvider>
       </body>
     </html>

@@ -11,31 +11,57 @@ import {
   signInWithEmailAndPassword,
   TwitterAuthProvider,
 } from 'firebase/auth';
+import { fetchRuntimeConfig, hasStaticFirebaseConfig, getStaticConfig } from '@/lib/runtime-config';
 import { getFirebaseAuthProviderId } from './firebase-provider';
 
 let persistenceReady = false;
 
-function requireEnv(value: string | undefined, name: string): string {
-  const trimmed = value?.trim();
-  if (!trimmed) {
-    throw new Error(`Missing Firebase configuration: ${name}`);
-  }
-  return trimmed;
-}
+async function getFirebaseClientConfig(): Promise<FirebaseOptions> {
+  const staticConfig = getStaticConfig();
 
-function getFirebaseClientConfig(): FirebaseOptions {
+  if (hasStaticFirebaseConfig(staticConfig)) {
+    return {
+      apiKey: staticConfig.NEXT_PUBLIC_FIREBASE_API_KEY,
+      authDomain: staticConfig.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+      projectId: staticConfig.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+      appId: staticConfig.NEXT_PUBLIC_FIREBASE_APP_ID,
+      messagingSenderId: staticConfig.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || undefined,
+      storageBucket: staticConfig.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || undefined,
+    };
+  }
+
+  // Build-time vars were empty (CI/K8s): load from the running pod's env via /api/config.
+  const cfg = await fetchRuntimeConfig();
+
+  if (!cfg.NEXT_PUBLIC_FIREBASE_API_KEY || !cfg.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN ||
+      !cfg.NEXT_PUBLIC_FIREBASE_PROJECT_ID || !cfg.NEXT_PUBLIC_FIREBASE_APP_ID) {
+    throw new Error(
+      'Missing Firebase configuration. Ensure NEXT_PUBLIC_FIREBASE_API_KEY, ' +
+      'NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN, NEXT_PUBLIC_FIREBASE_PROJECT_ID and ' +
+      'NEXT_PUBLIC_FIREBASE_APP_ID are set in the environment.',
+    );
+  }
+
   return {
-    apiKey: requireEnv(process.env.NEXT_PUBLIC_FIREBASE_API_KEY, 'NEXT_PUBLIC_FIREBASE_API_KEY'),
-    authDomain: requireEnv(process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN, 'NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN'),
-    projectId: requireEnv(process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID, 'NEXT_PUBLIC_FIREBASE_PROJECT_ID'),
-    appId: requireEnv(process.env.NEXT_PUBLIC_FIREBASE_APP_ID, 'NEXT_PUBLIC_FIREBASE_APP_ID'),
-    messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID?.trim(),
-    storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET?.trim(),
+    apiKey: cfg.NEXT_PUBLIC_FIREBASE_API_KEY,
+    authDomain: cfg.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+    projectId: cfg.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+    appId: cfg.NEXT_PUBLIC_FIREBASE_APP_ID,
+    messagingSenderId: cfg.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || undefined,
+    storageBucket: cfg.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || undefined,
   };
 }
 
+export async function initializeFirebaseClient(): Promise<void> {
+  if (getApps().length > 0) return;
+
+  const config = await getFirebaseClientConfig();
+  initializeApp(config);
+}
+
 export function getFirebaseClientApp() {
-  return getApps().length > 0 ? getApp() : initializeApp(getFirebaseClientConfig());
+  if (getApps().length > 0) return getApp();
+  throw new Error('Firebase client has not been initialized. Use initializeFirebaseClient() first.');
 }
 
 export function getFirebaseClientAuth() {
@@ -44,6 +70,8 @@ export function getFirebaseClientAuth() {
 
 export async function ensureFirebaseClientPersistence() {
   if (persistenceReady || typeof window === 'undefined') return;
+
+  await initializeFirebaseClient();
 
   const auth = getFirebaseClientAuth();
 

@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import type { UserRole } from '@/types/domain';
 import { DEV_COOKIE, DEV_USERS } from '@/lib/auth/dev';
+import { useRuntimeConfig } from '@/contexts/RuntimeConfigContext';
 
 interface SessionContextValue {
   user: { id: string; name: string; email: string } | null;
@@ -31,18 +32,20 @@ function getDevRole(): keyof typeof DEV_USERS | null {
 
 export function SessionProvider({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession();
+  const runtimeConfig = useRuntimeConfig();
+  const disableAuth = runtimeConfig.NEXT_PUBLIC_DISABLE_AUTH === 'true';
 
   // Dev-mode: serve mock user from cookie without hitting next-auth
   const [devRole, setDevRole] = useState<keyof typeof DEV_USERS | null>(null);
   useEffect(() => {
-    if (process.env.NEXT_PUBLIC_DISABLE_AUTH === 'true') {
+    if (disableAuth) {
       setDevRole(getDevRole());
     }
-  }, []);
+  }, [disableAuth]);
 
   let value: SessionContextValue;
 
-  if (process.env.NEXT_PUBLIC_DISABLE_AUTH === 'true' && devRole) {
+  if (disableAuth && devRole) {
     const devUser = DEV_USERS[devRole];
     value = {
       user: { id: devUser.id, name: devUser.name, email: devUser.email },

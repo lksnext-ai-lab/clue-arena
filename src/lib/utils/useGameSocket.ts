@@ -3,6 +3,7 @@
 // src/lib/utils/useGameSocket.ts
 import { useEffect, useRef, useCallback } from 'react';
 import type { ServerMessage } from '@/lib/ws/protocol';
+import { useRuntimeConfig } from '@/contexts/RuntimeConfigContext';
 
 interface UseGameSocketOptions {
   gameId: string;
@@ -11,11 +12,10 @@ interface UseGameSocketOptions {
   enabled: boolean; // false cuando la partida está finalizada
 }
 
-// Build the websocket URL. Prefer explicit env var (build time),
-// otherwise construct it at runtime from the current host so that the
-// bundle doesn't hard‑code `localhost` in production. Last fallback is the
-// development address used by `npm run dev`.
-export function getWsUrl() {
+// Build the websocket URL from static build-time vars, window.location, or dev fallback.
+// Kept as a pure function for backwards compatibility with tests.
+export function getWsUrl(overrideUrl?: string) {
+  if (overrideUrl) return overrideUrl;
   if (process.env.NEXT_PUBLIC_WS_URL) return process.env.NEXT_PUBLIC_WS_URL;
   if (typeof window !== 'undefined') {
     const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
@@ -30,6 +30,7 @@ const MAX_RECONNECT_ATTEMPTS = 10;
 
 
 export function useGameSocket({ gameId, onMessage, onDisconnect, enabled }: UseGameSocketOptions) {
+  const { NEXT_PUBLIC_WS_URL } = useRuntimeConfig();
   const wsRef = useRef<WebSocket | null>(null);
   const attemptsRef = useRef(0);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -45,7 +46,7 @@ export function useGameSocket({ gameId, onMessage, onDisconnect, enabled }: UseG
     if (!enabledRef.current) return;
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
 
-    const ws = new WebSocket(getWsUrl());
+    const ws = new WebSocket(getWsUrl(NEXT_PUBLIC_WS_URL || undefined));
     wsRef.current = ws;
 
     ws.onopen = () => {
