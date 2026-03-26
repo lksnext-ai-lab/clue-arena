@@ -4,6 +4,7 @@ import { LogOut } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useAppSession } from '@/contexts/SessionContext';
 import { NotificationBell } from '@/components/layout/NotificationPanel';
+import { useRuntimeConfig } from '@/contexts/RuntimeConfigContext';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
@@ -21,6 +22,15 @@ const S = {
     fontSize: 11, fontWeight: 700, letterSpacing: 2,
     color: '#94a3b8', textTransform: 'uppercase' as const,
   },
+  version: {
+    fontSize: 11,
+    fontWeight: 600,
+    color: '#94a3b8',
+    padding: '4px 8px',
+    borderRadius: 999,
+    border: '1px solid #334155',
+    background: '#111827',
+  } as React.CSSProperties,
   actions: { display: 'flex', alignItems: 'center', gap: 4 },
   btn: {
     width: 34, height: 34, border: 'none', cursor: 'pointer', borderRadius: 8,
@@ -52,6 +62,7 @@ function getPageTitle(pathname: string, t: (key: string) => string): string {
 
 export function TopBar() {
   const { logout, user } = useAppSession();
+  const { NEXT_PUBLIC_APP_VERSION } = useRuntimeConfig();
   const tCommon = useTranslations('common');
   const tNav = useTranslations('nav');
   const tTitles = useTranslations('pageTitles');
@@ -59,12 +70,19 @@ export function TopBar() {
 
   const title = getPageTitle(pathname, tTitles);
   const creditsActive = pathname.startsWith('/creditos');
+  const appVersion = NEXT_PUBLIC_APP_VERSION.trim();
 
   return (
     <header style={S.header}>
       <h1 style={S.title}>{title}</h1>
 
       <div style={S.actions}>
+        {appVersion ? (
+          <span style={S.version} title="Deployed application version">
+            v{appVersion}
+          </span>
+        ) : null}
+
         <Link
           href="/creditos"
           aria-current={creditsActive ? 'page' : undefined}

@@ -25,6 +25,7 @@ export interface PublicConfig {
   NEXT_PUBLIC_FIREBASE_AUTH_PROVIDER: string;
   NEXT_PUBLIC_APP_URL: string;
   NEXT_PUBLIC_WS_URL: string;
+  NEXT_PUBLIC_APP_VERSION: string;
 }
 
 /** Values baked in at build time (empty strings when built without env vars). */
@@ -41,6 +42,7 @@ export function getStaticConfig(): PublicConfig {
     NEXT_PUBLIC_FIREBASE_AUTH_PROVIDER: process.env.NEXT_PUBLIC_FIREBASE_AUTH_PROVIDER ?? '',
     NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL ?? '',
     NEXT_PUBLIC_WS_URL: process.env.NEXT_PUBLIC_WS_URL ?? '',
+    NEXT_PUBLIC_APP_VERSION: process.env.NEXT_PUBLIC_APP_VERSION ?? '',
   };
 }
 
