@@ -25,7 +25,7 @@ export async function JuegoQueEsCluedo() {
   return (
     <section aria-labelledby="cluedo-heading" className="relative">
       <div className="overflow-hidden rounded-[2rem] border border-white/10 bg-[radial-gradient(circle_at_top_left,_rgba(34,211,238,0.16),_transparent_34%),radial-gradient(circle_at_bottom_right,_rgba(251,191,36,0.14),_transparent_30%),linear-gradient(180deg,_rgba(15,23,42,0.98),_rgba(2,6,23,0.98))] shadow-[0_26px_70px_rgba(2,6,23,0.32)]">
-        <div className="grid gap-8 p-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)] lg:p-8 xl:p-10">
+        <div className="grid gap-8 p-5 sm:p-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)] lg:p-8 xl:p-10">
           <div className="space-y-6">
             <div className="space-y-4">
               <p className="text-xs font-semibold uppercase tracking-[0.32em] text-cyan-300/80">
@@ -60,7 +60,7 @@ export async function JuegoQueEsCluedo() {
               ))}
             </div>
 
-            <div className="rounded-[1.5rem] border border-white/10 bg-slate-950/35 p-5">
+            <div className="rounded-[1.5rem] border border-white/10 bg-slate-950/35 p-5 sm:p-6">
               <p className="text-xs font-semibold uppercase tracking-[0.28em] text-amber-300/80">
                 {t('queEsStoryLabel')}
               </p>
@@ -93,7 +93,7 @@ export async function JuegoQueEsCluedo() {
             </div>
           </div>
 
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-4 lg:sticky lg:top-6 lg:self-start">
             <div className="relative overflow-hidden rounded-[1.75rem] border border-white/10 bg-slate-950/50">
               <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent" />
               <Image
@@ -103,7 +103,7 @@ export async function JuegoQueEsCluedo() {
                 height={960}
                 quality={80}
                 sizes="(max-width: 1024px) 100vw, 40vw"
-                className="h-full min-h-[320px] w-full object-cover"
+                className="h-full min-h-[300px] w-full object-cover sm:min-h-[360px]"
               />
               <div className="absolute inset-x-0 bottom-0 p-5 sm:p-6">
                 <p className="text-xs font-semibold uppercase tracking-[0.28em] text-amber-300/80">
@@ -115,7 +115,7 @@ export async function JuegoQueEsCluedo() {
               </div>
             </div>
 
-            <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.04] p-5">
+            <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.04] p-5 sm:p-6">
               <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-400">
                 {t('queEsFlowLabel')}
               </p>
@@ -137,7 +137,7 @@ export async function JuegoQueEsCluedo() {
               </div>
             </div>
 
-            <aside className="rounded-[1.5rem] border border-cyan-400/20 bg-cyan-400/6 p-5">
+            <aside className="rounded-[1.5rem] border border-cyan-400/20 bg-cyan-400/6 p-5 sm:p-6">
               <p className="text-xs font-semibold uppercase tracking-[0.28em] text-cyan-300">
                 {t('queEsInfoboxLabel')}
               </p>

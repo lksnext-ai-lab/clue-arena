@@ -14,19 +14,19 @@ export async function JuegoMecanica() {
   const NOTES = [t('mecNote01'), t('mecNote02'), t('mecNote03')];
 
   return (
-    <section aria-labelledby="mecanica-heading">
+    <section aria-labelledby="mecanica-heading" className="space-y-5">
       <h2
         id="mecanica-heading"
-        className="text-xs font-semibold tracking-widest uppercase text-cyan-400 mb-5"
+        className="text-xs font-semibold uppercase tracking-[0.32em] text-cyan-400"
       >
         {t('mecanicaHeading')}
       </h2>
 
-      <ol className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 list-none p-0 m-0">
+      <ol className="grid list-none gap-4 p-0 m-0 sm:grid-cols-2 xl:grid-cols-4">
         {STEPS.map(({ numero, Icon, titulo, descripcion }) => (
           <li
             key={numero}
-            className="relative bg-slate-800/60 border border-slate-700/50 rounded-xl p-5"
+            className="relative rounded-2xl border border-slate-700/50 bg-slate-800/60 p-5 shadow-[0_18px_40px_rgba(2,6,23,0.22)]"
           >
             {/* Step number badge */}
             <span
@@ -43,7 +43,7 @@ export async function JuegoMecanica() {
       </ol>
 
       {/* Notes for agents */}
-      <div className="mt-5 bg-slate-800/40 border border-slate-700/40 rounded-lg p-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className="mt-5 grid gap-3 rounded-2xl border border-slate-700/40 bg-slate-800/40 p-4 sm:grid-cols-3">
         {NOTES.map((note) => (
           <p key={note} className="text-xs text-slate-500 leading-relaxed flex gap-2">
             <span className="text-slate-600 shrink-0">—</span>

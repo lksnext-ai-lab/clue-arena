@@ -106,12 +106,12 @@ export default async function InstruccionesPage() {
     <InstructionsLayout>
       <section
         id="intro"
-        className="scroll-mt-20 overflow-hidden rounded-[32px] border border-slate-800/80 bg-[radial-gradient(circle_at_top_left,_rgba(56,189,248,0.2),_transparent_35%),radial-gradient(circle_at_80%_20%,_rgba(251,191,36,0.18),_transparent_30%),linear-gradient(145deg,_rgba(2,6,23,0.98),_rgba(15,23,42,0.92))] p-6 shadow-[0_30px_90px_rgba(2,6,23,0.55)] md:p-10"
+        className="scroll-mt-24 sm:scroll-mt-28 overflow-hidden rounded-[28px] border border-slate-800/80 bg-[radial-gradient(circle_at_top_left,_rgba(56,189,248,0.2),_transparent_35%),radial-gradient(circle_at_80%_20%,_rgba(251,191,36,0.18),_transparent_30%),linear-gradient(145deg,_rgba(2,6,23,0.98),_rgba(15,23,42,0.92))] p-5 shadow-[0_30px_90px_rgba(2,6,23,0.55)] sm:p-6 md:rounded-[32px] md:p-10"
       >
-        <div className="grid gap-8 xl:grid-cols-[1.2fr_0.8fr]">
+        <div className="grid gap-8 xl:grid-cols-2">
           <div className="space-y-6">
             <div className="space-y-4">
-              <h1 className="max-w-4xl text-4xl font-black tracking-tight text-white md:text-5xl">
+              <h1 className="max-w-4xl text-3xl font-black tracking-tight text-white sm:text-4xl md:text-5xl">
                 {tJuego('subtitulo')}
               </h1>
               <p className="max-w-2xl text-base leading-7 text-slate-300 md:text-lg">
@@ -119,7 +119,7 @@ export default async function InstruccionesPage() {
               </p>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-3">
               {copy.heroMetrics.map((metric, index) => (
                 <HeroMetric
                   key={`${metric.label}-${index}`}
@@ -133,64 +133,6 @@ export default async function InstruccionesPage() {
                   tone={metric.tone as 'cyan' | 'emerald' | 'amber'}
                 />
               ))}
-            </div>
-
-            <div className="grid gap-4">
-              <HighlightPanel
-                title={copy.essentialsTitle}
-                description={copy.essentialsDescription}
-                icon={<Sparkles className="h-4 w-4" />}
-              >
-                <div className="grid gap-3 text-sm text-slate-300 sm:grid-cols-2">
-                  {copy.launchChecklist.map((item) => (
-                    <div
-                      key={item}
-                      className="flex items-start gap-2 rounded-2xl border border-white/8 bg-white/5 px-3 py-3"
-                    >
-                      <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-300" />
-                      <span>{item}</span>
-                    </div>
-                  ))}
-                </div>
-              </HighlightPanel>
-
-              <aside className="rounded-[28px] border border-white/10 bg-slate-950/50 p-5 backdrop-blur">
-                <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-100">
-                  <ClipboardCheck className="h-4 w-4 text-amber-300" />
-                  {copy.recommendedPathTitle}
-                </div>
-                <div className="space-y-3">
-                  {copy.quickstartSteps.map((step, index) => (
-                    <div key={step.title} className="rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-3">
-                      <div className="mb-1 flex items-center gap-2 text-sm font-semibold text-white">
-                        <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-amber-400/15 text-xs text-amber-200">
-                          {index + 1}
-                        </span>
-                        {step.title}
-                      </div>
-                      <p className="text-sm leading-6 text-slate-400">{step.body}</p>
-                    </div>
-                  ))}
-                </div>
-              </aside>
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-4">
-            <div className="rounded-[28px] border border-cyan-400/15 bg-slate-950/70 p-5">
-              <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-cyan-200">
-                <BrainCircuit className="h-4 w-4" />
-                {copy.mentalModelTitle}
-              </div>
-              <div className="space-y-3">
-                {copy.flowSteps.map((step) => (
-                  <FlowStep
-                    key={step.title}
-                    title={step.title}
-                    description={step.description}
-                  />
-                ))}
-              </div>
             </div>
 
             <div className="rounded-[28px] border border-amber-400/15 bg-[linear-gradient(180deg,_rgba(120,53,15,0.28),_rgba(15,23,42,0.72))] p-5">
@@ -208,11 +150,47 @@ export default async function InstruccionesPage() {
               </div>
             </div>
           </div>
+
+          <div className="flex flex-col gap-4">
+            <HighlightPanel
+              title={copy.essentialsTitle}
+              description={copy.essentialsDescription}
+              icon={<Sparkles className="h-4 w-4" />}
+            >
+              <div className="grid gap-3 text-sm text-slate-300 sm:grid-cols-2">
+                {copy.launchChecklist.map((item) => (
+                  <div
+                    key={item}
+                    className="flex items-start gap-2 rounded-2xl border border-white/8 bg-white/5 px-3 py-3"
+                  >
+                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-300" />
+                    <span>{item}</span>
+                  </div>
+                ))}
+              </div>
+            </HighlightPanel>
+
+            <div className="rounded-[28px] border border-cyan-400/15 bg-slate-950/70 p-5">
+              <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-cyan-200">
+                <BrainCircuit className="h-4 w-4" />
+                {copy.mentalModelTitle}
+              </div>
+              <div className="space-y-3">
+                {copy.flowSteps.map((step) => (
+                  <FlowStep
+                    key={step.title}
+                    title={step.title}
+                    description={step.description}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
       <SectionWrapper id="quickstart" title={t('sec8Titulo')} titleNumber="1">
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
           {copy.quickstartSteps.map((step, index) => (
             <StepCard key={step.title} index={index + 1} title={step.title}>
               <p className="text-sm leading-6 text-slate-400">{step.body}</p>
@@ -220,7 +198,7 @@ export default async function InstruccionesPage() {
           ))}
         </div>
 
-        <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
+        <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr] 2xl:grid-cols-[1.1fr_0.9fr]">
           <HighlightPanel
             title={copy.mcpConfigTitle}
             description={copy.mcpConfigDescription}
@@ -263,14 +241,14 @@ export default async function InstruccionesPage() {
       </SectionWrapper>
 
       <SectionWrapper id="como-funciona" title={t('sec2Titulo')} titleNumber="2">
-        <div className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
+        <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr] 2xl:grid-cols-[0.85fr_1.15fr]">
           <HighlightPanel
             title={copy.invokeAgentTitle}
             description={copy.invokeAgentDescription}
             icon={<Swords className="h-4 w-4" />}
           >
             <div className="overflow-x-auto rounded-2xl border border-slate-800">
-              <table className="w-full text-left text-sm">
+              <table className="w-full min-w-[40rem] text-left text-sm">
                 <thead>
                   <tr>
                     {copy.invokeHeaders.map((header) => (
@@ -323,7 +301,7 @@ export default async function InstruccionesPage() {
           description={copy.toolStateDescription}
           footer={copy.toolStateFooter}
         >
-          <div className="grid gap-4 xl:grid-cols-2">
+          <div className="grid gap-4 xl:grid-cols-2 2xl:grid-cols-2">
             <div>
               <p className="mb-2 text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">{copy.inputLabel}</p>
               <CodeBlock code={GAME_STATE_INPUT} language="json" />
@@ -339,7 +317,7 @@ export default async function InstruccionesPage() {
           name="get_agent_memory"
           description={copy.toolMemoryDescription}
         >
-          <div className="grid gap-4 xl:grid-cols-2">
+          <div className="grid gap-4 xl:grid-cols-2 2xl:grid-cols-2">
             <div>
               <p className="mb-2 text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">{copy.inputLabel}</p>
               <CodeBlock code={MEMORY_INPUT} language="json" />
@@ -356,7 +334,7 @@ export default async function InstruccionesPage() {
           description={copy.toolSaveDescription}
           footer={copy.toolSaveFooter}
         >
-          <div className="grid gap-4 xl:grid-cols-2">
+          <div className="grid gap-4 xl:grid-cols-2 2xl:grid-cols-2">
             <div>
               <p className="mb-2 text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">{copy.inputLabel}</p>
               <CodeBlock code={SAVE_MEMORY_INPUT} language="json" />
@@ -370,7 +348,7 @@ export default async function InstruccionesPage() {
       </SectionWrapper>
 
       <SectionWrapper id="respuesta" title={t('sec5Titulo')} titleNumber="5">
-        <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
+        <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr] 2xl:grid-cols-[0.85fr_1.15fr]">
           <HighlightPanel
             title={copy.agentResponseTitle}
             description={copy.agentResponseDescription}
@@ -385,7 +363,7 @@ export default async function InstruccionesPage() {
             icon={<ClipboardCheck className="h-4 w-4" />}
           >
             <div className="overflow-x-auto rounded-2xl border border-slate-800">
-              <table className="w-full text-left text-sm">
+              <table className="w-full min-w-[40rem] text-left text-sm">
                 <thead>
                   <tr>
                     {copy.validActionsHeaders.map((header) => (
@@ -415,7 +393,7 @@ export default async function InstruccionesPage() {
           </HighlightPanel>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
           <ExampleCard title={copy.exampleTitles[0]} code={copy.exampleSuggestion} />
           <ExampleCard title={copy.exampleTitles[1]} code={copy.exampleAccusation} />
           <ExampleCard title={copy.exampleTitles[2]} code={copy.examplePass} />
@@ -493,7 +471,7 @@ export default async function InstruccionesPage() {
 
       <SectionWrapper id="faq" title={t('sec10Titulo')} titleNumber="10">
         <div className="overflow-x-auto rounded-2xl border border-slate-800">
-          <table className="w-full text-left text-sm">
+          <table className="w-full min-w-[48rem] text-left text-sm">
             <caption className="sr-only">{copy.faqCaption}</caption>
             <thead>
               <tr>
@@ -556,7 +534,7 @@ function HeroMetric({
         {icon}
         {label}
       </div>
-      <div className="text-lg font-bold text-white">{value}</div>
+      <div className="text-base font-bold text-white sm:text-lg">{value}</div>
     </div>
   );
 }
@@ -573,7 +551,7 @@ function HighlightPanel({
   children: ReactNode;
 }) {
   return (
-    <div className="rounded-[28px] border border-slate-800 bg-slate-950/55 p-5 backdrop-blur">
+    <div className="rounded-[24px] border border-slate-800 bg-slate-950/55 p-4 backdrop-blur sm:rounded-[28px] sm:p-5">
       <div className="mb-4 flex items-start gap-3">
         <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-2xl bg-cyan-400/10 text-cyan-200">
           {icon}
@@ -598,7 +576,7 @@ function StepCard({
   children: ReactNode;
 }) {
   return (
-    <div className="rounded-[24px] border border-slate-800 bg-slate-950/55 p-5">
+    <div className="rounded-[20px] border border-slate-800 bg-slate-950/55 p-4 sm:rounded-[24px] sm:p-5">
       <div className="mb-3 flex items-center gap-3">
         <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-amber-400/15 text-sm font-bold text-amber-200">
           {index}
@@ -661,7 +639,7 @@ function ToolPanel({
   children: ReactNode;
 }) {
   return (
-    <div className="rounded-[28px] border border-slate-800 bg-slate-950/55 p-5">
+    <div className="rounded-[24px] border border-slate-800 bg-slate-950/55 p-4 sm:rounded-[28px] sm:p-5">
       <div className="mb-4">
         <h3 className="font-mono text-base font-bold text-cyan-300">{name}</h3>
         <p className="mt-1 text-sm leading-6 text-slate-400">{description}</p>
@@ -674,7 +652,7 @@ function ToolPanel({
 
 function ExampleCard({ title, code }: { title: string; code: string }) {
   return (
-    <div className="rounded-[24px] border border-slate-800 bg-slate-950/55 p-4">
+    <div className="rounded-[20px] border border-slate-800 bg-slate-950/55 p-3 sm:rounded-[24px] sm:p-4">
       <p className="mb-2 text-sm font-semibold text-slate-200">{title}</p>
       <CodeBlock code={code} language="json" />
     </div>

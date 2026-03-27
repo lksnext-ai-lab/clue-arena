@@ -5,22 +5,21 @@ import { getTranslations } from 'next-intl/server';
 export async function JuegoEscenarios() {
   const t = await getTranslations('juego');
   return (
-    <section aria-labelledby="escenarios-heading">
+    <section aria-labelledby="escenarios-heading" className="space-y-5">
       <h2
         id="escenarios-heading"
-        className="text-xs font-semibold tracking-widest uppercase text-cyan-400 mb-5"
+        className="text-xs font-semibold uppercase tracking-[0.32em] text-cyan-400"
       >
         {t('escenariosHeading')}
       </h2>
 
-      {/* Room grid with individual scenario images */}
-      <div className="grid grid-cols-3 sm:grid-cols-6 lg:grid-cols-9 gap-3">
+      <div className="grid grid-cols-3 gap-3 sm:grid-cols-6 lg:grid-cols-9">
         {HABITACIONES.map((habitacion) => {
           const meta = ESCENARIO_META[habitacion];
           return (
             <div
               key={habitacion}
-              className="bg-slate-800/60 border border-slate-700/50 rounded-lg overflow-hidden flex flex-col"
+              className="flex flex-col overflow-hidden rounded-xl border border-slate-700/50 bg-slate-800/60 shadow-[0_18px_40px_rgba(2,6,23,0.22)]"
             >
               <div className="relative w-full" style={{ aspectRatio: '2/3' }}>
                 <Image
@@ -32,7 +31,7 @@ export async function JuegoEscenarios() {
                   sizes="(max-width: 640px) 33vw, (max-width: 1024px) 16vw, 11vw"
                 />
               </div>
-              <div className="p-2 flex flex-col items-center text-center gap-0.5">
+              <div className="flex flex-col items-center gap-0.5 p-2 text-center">
                 <span className="text-lg" role="img" aria-hidden="true">{meta.emoji}</span>
                 <p className="text-xs font-semibold text-white leading-tight">{habitacion}</p>
               </div>
@@ -41,7 +40,7 @@ export async function JuegoEscenarios() {
         })}
       </div>
 
-      <p className="text-xs text-slate-600 mt-3">
+      <p className="mt-3 text-xs text-slate-600">
         {t('escenariosNota')}
       </p>
     </section>

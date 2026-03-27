@@ -133,7 +133,6 @@ const es = {
       'La memoria se guarda tras cada turno útil.',
       'Las sugerencias repetidas se evitan con estado persistido.',
     ],
-    recommendedPathTitle: 'Camino recomendado',
     quickstartSteps: [
       {
         title: 'Crea una aplicación en MattinAI',
@@ -374,7 +373,6 @@ Tienes acceso a tres herramientas MCP. Úsalas en este orden en cada turno:
 
 ## Valores canónicos del juego
 Los valores exactos los proporciona get_game_state en cada llamada.
-Usa UNICAMENTE los nombres tal como aparecen en la respuesta de get_game_state.
 
 ## Reglas clave
 El motor te invocará con dos tipos de solicitud:
@@ -383,10 +381,8 @@ El motor te invocará con dos tipos de solicitud:
 - refute: debes decidir si puedes refutar la sugerencia recibida y, si es así, qué carta mostrar.
 
 Responde siempre con el formato JSON correcto para cada modo.
-El motor rechaza cualquier respuesta que no sea JSON válido con los campos exactos.
 
 ## Formato de respuesta
-Responde UNICAMENTE con un objeto JSON válido, sin texto adicional.
 
 Modo play_turn:
   Sugerencia: {"action":"suggestion","sospechoso":"...","arma":"...","escenario":"...","spectatorComment":"..."}
@@ -553,7 +549,6 @@ const eu = {
       'Memoria txanda erabilgarri bakoitzaren ondoren gordetzen da.',
       'Iradokizun errepikatuak egoera iraunkorrarekin saihesten dira.',
     ],
-    recommendedPathTitle: 'Gomendatutako bidea',
     quickstartSteps: [
       {
         title: 'Sortu aplikazio bat MattinAI-n',
@@ -794,7 +789,6 @@ Hiru MCP tresna dituzu eskura. Erabili itzazu ordena honetan txanda bakoitzean:
 
 ## Jokoaren balio kanonikoak
 Balio zehatzak get_game_state-k ematen ditu dei bakoitzean.
-Erabili BAKARRIK get_game_state-ren erantzunean agertzen diren izenak.
 
 ## Funtsezko arauak
 Motorrak bi eskaera-motarekin deituko dizu:
@@ -803,10 +797,8 @@ Motorrak bi eskaera-motarekin deituko dizu:
 - refute: jasotako iradokizuna ezezta dezakezun eta, hala bada, zer karta erakutsi behar duzun erabaki behar duzu.
 
 Erantzun beti modu bakoitzerako JSON formatu egokiarekin.
-Motorrak baztertu egingo du JSON baliozkoa ez den edo eremu zehatzak ez dituen edozein erantzun.
 
 ## Erantzun-formatua
-Erantzun BAKARRIK JSON objektu baliozko batekin, testu gehigarririk gabe.
 
 play_turn modua:
   Iradokizuna: {"action":"suggestion","sospechoso":"...","arma":"...","escenario":"...","spectatorComment":"..."}

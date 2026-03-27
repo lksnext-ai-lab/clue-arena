@@ -5,22 +5,21 @@ import { getTranslations } from 'next-intl/server';
 export async function JuegoArmas() {
   const t = await getTranslations('juego');
   return (
-    <section aria-labelledby="armas-heading">
+    <section aria-labelledby="armas-heading" className="space-y-5">
       <h2
         id="armas-heading"
-        className="text-xs font-semibold tracking-widest uppercase text-cyan-400 mb-5"
+        className="text-xs font-semibold uppercase tracking-[0.32em] text-cyan-400"
       >
         {t('armasHeading')}
       </h2>
 
-      {/* Weapon cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         {ARMAS.map((arma) => {
           const meta = ARMA_META[arma];
           return (
             <div
               key={arma}
-              className="bg-slate-800/60 border border-slate-700/50 rounded-lg overflow-hidden flex flex-col"
+              className="flex flex-col overflow-hidden rounded-xl border border-slate-700/50 bg-slate-800/60 shadow-[0_18px_40px_rgba(2,6,23,0.22)]"
             >
               {/* Weapon card image */}
               <div className="relative w-full" style={{ aspectRatio: '2/3' }}>
@@ -34,7 +33,7 @@ export async function JuegoArmas() {
                 />
               </div>
               {/* Name */}
-              <div className="p-2 flex flex-col items-center text-center gap-0.5">
+              <div className="flex flex-col items-center gap-0.5 p-2 text-center">
                 <span className="text-lg" role="img" aria-label={arma}>
                   {meta.emoji}
                 </span>
@@ -45,7 +44,7 @@ export async function JuegoArmas() {
         })}
       </div>
 
-      <p className="text-xs text-slate-600 mt-3">
+      <p className="mt-3 text-xs text-slate-600">
         {t('armasNota')}
       </p>
     </section>

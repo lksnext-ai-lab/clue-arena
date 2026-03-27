@@ -12,20 +12,19 @@ export async function JuegoObjetivos() {
   ];
 
   return (
-    <section aria-labelledby="objetivos-heading">
+    <section aria-labelledby="objetivos-heading" className="space-y-5">
       <h2
         id="objetivos-heading"
-        className="text-xs font-semibold tracking-widest uppercase text-cyan-400 mb-5"
+        className="text-xs font-semibold uppercase tracking-[0.32em] text-cyan-400"
       >
         {t('objetivosHeading')}
       </h2>
 
-      {/* Objetivo cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {OBJETIVO_ITEMS.map(({ id, Icon, titulo, descripcion }) => (
           <div
             key={id}
-            className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-5"
+            className="rounded-2xl border border-slate-700/50 bg-slate-800/60 p-5 shadow-[0_18px_40px_rgba(2,6,23,0.22)]"
           >
             <div className="flex items-center gap-2 mb-1">
               <Icon size={18} className="text-cyan-400 shrink-0" />

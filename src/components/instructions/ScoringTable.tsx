@@ -7,17 +7,17 @@ export async function ScoringTable() {
 
   return (
     <div className="overflow-x-auto rounded-lg border border-slate-700">
-      <table className="w-full text-sm text-left">
+      <table className="w-full min-w-[48rem] text-left text-sm">
         <caption className="sr-only">{copy.caption}</caption>
         <thead>
           <tr>
-            <th className="px-4 py-2.5 font-semibold text-slate-300 bg-slate-800/80 border-b border-slate-700">
+            <th className="border-b border-slate-700 bg-slate-800/80 px-3 py-2.5 font-semibold text-slate-300 sm:px-4">
               {copy.eventHeader}
             </th>
-            <th className="px-4 py-2.5 font-semibold text-slate-300 bg-slate-800/80 border-b border-slate-700">
+            <th className="border-b border-slate-700 bg-slate-800/80 px-3 py-2.5 font-semibold text-slate-300 sm:px-4">
               {copy.whenHeader}
             </th>
-            <th className="px-4 py-2.5 font-semibold text-slate-300 bg-slate-800/80 border-b border-slate-700 text-right whitespace-nowrap">
+            <th className="border-b border-slate-700 bg-slate-800/80 px-3 py-2.5 text-right font-semibold whitespace-nowrap text-slate-300 sm:px-4">
               {copy.pointsHeader}
             </th>
           </tr>
@@ -25,15 +25,15 @@ export async function ScoringTable() {
         <tbody>
           {copy.events.map((e) => (
             <tr key={e.id} className="hover:bg-slate-800/30">
-              <td className="px-4 py-2.5 border-b border-slate-800 font-mono text-xs text-cyan-300 whitespace-nowrap">
+              <td className="border-b border-slate-800 px-3 py-2.5 font-mono text-xs whitespace-nowrap text-cyan-300 sm:px-4">
                 {e.id}
               </td>
-              <td className="px-4 py-2.5 border-b border-slate-800 text-slate-300">
+              <td className="border-b border-slate-800 px-3 py-2.5 text-slate-300 sm:px-4">
                 {e.description}
               </td>
               <td
                 className={[
-                  'px-4 py-2.5 border-b border-slate-800 text-right font-mono font-bold whitespace-nowrap',
+                  'border-b border-slate-800 px-3 py-2.5 text-right font-mono font-bold whitespace-nowrap sm:px-4',
                   e.color,
                 ].join(' ')}
               >

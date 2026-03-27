@@ -12,14 +12,14 @@ import { getInstructionsCopy } from './copy';
 function TableWrapper({ children }: { children: React.ReactNode }) {
   return (
     <div className="overflow-x-auto rounded-lg border border-slate-700">
-      <table className="w-full text-sm text-left">{children}</table>
+      <table className="w-full min-w-[36rem] text-left text-sm">{children}</table>
     </div>
   );
 }
 
 function Th({ children }: { children: React.ReactNode }) {
   return (
-    <th className="px-4 py-2.5 font-semibold text-slate-300 bg-slate-800/80 border-b border-slate-700">
+    <th className="border-b border-slate-700 bg-slate-800/80 px-3 py-2.5 font-semibold text-slate-300 sm:px-4">
       {children}
     </th>
   );
@@ -29,7 +29,7 @@ function Td({ children, mono }: { children: React.ReactNode; mono?: boolean }) {
   return (
     <td
       className={[
-        'px-4 py-2.5 border-b border-slate-800',
+        'border-b border-slate-800 px-3 py-2.5 sm:px-4',
         mono ? 'font-mono text-cyan-300' : 'text-slate-300',
       ].join(' ')}
     >

@@ -9,8 +9,8 @@ interface SectionWrapperProps {
 
 export function SectionWrapper({ id, title, titleNumber, children }: SectionWrapperProps) {
   return (
-    <section id={id} className="scroll-mt-20">
-      <h2 className="mb-6 flex items-baseline gap-3 text-xl font-bold text-cyan-400 border-b border-slate-700 pb-3">
+    <section id={id} className="scroll-mt-24 sm:scroll-mt-28">
+      <h2 className="mb-6 flex flex-wrap items-baseline gap-x-3 gap-y-2 border-b border-slate-700 pb-3 text-xl font-bold text-cyan-400">
         <span className="text-slate-500 font-mono text-base">§{titleNumber}</span>
         {title}
       </h2>

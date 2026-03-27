@@ -24,7 +24,7 @@ export async function generateMetadata(): Promise<Metadata> {
  */
 export default function JuegoPage() {
   return (
-    <main className="flex flex-col gap-10 p-6 max-w-7xl mx-auto w-full pb-16">
+    <main className="mx-auto flex w-full max-w-screen-2xl flex-col gap-10 px-4 py-6 pb-16 sm:px-6 lg:px-8 xl:px-10 xl:py-8">
       <JuegoHeroBanner />
       <JuegoObjetivos />
       <JuegoQueEsCluedo />
